@@ -1,6 +1,6 @@
 "use client";
 
-import { can, firstName, formatMoney, formatMoneyShort, greeting, leadScope, type Role } from "@wedding-yantra/core";
+import { can, firstName, formatMoney, formatMoneyShort, greeting, leadScope, todayIn, type Role } from "@wedding-yantra/core";
 import { useHome, useMyDay } from "@wedding-yantra/api-client/react";
 import { UNIT_LABELS, type HomeSummary } from "@wedding-yantra/types";
 import {
@@ -12,6 +12,7 @@ import {
   Inbox,
   IndianRupee,
   ListChecks,
+  MessageSquareText,
   Package,
   ReceiptText,
   Sparkles,
@@ -41,6 +42,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { SETUP_LINKS } from "@/lib/links";
+import { summarySentOn } from "@/lib/summary-sent";
 
 export default function HomePage() {
   const { me, workspace } = useCurrentWorkspace();
@@ -83,6 +85,9 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
   const day = myDay.data && myDayHasContent(myDay.data) ? myDay.data : null;
   // `tasks` can be missing for a minute while a new web version waits on the API's deploy.
   const teamLate = home.tasks?.teamOverdue ?? 0;
+  // After 5 pm, until today's summary has been sent from this device.
+  const [summarySent] = useState(() => summarySentOn(workspace.id) === todayIn(workspace.timezone));
+  const offerSummary = can(role, "team.review") && new Date().getHours() >= 17 && !summarySent;
   // Events already in "Your day" aren't listed twice.
   const coming = home.upcomingEvents.filter((e) => !day?.events.some((d) => d.id === e.id));
 
@@ -98,6 +103,13 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
       {teamLate > 0 && (
         <Banner href="/app/tasks?view=team" icon={AlarmClock} tone="danger">
           {teamLate} team task{teamLate === 1 ? " is" : "s are"} late
+        </Banner>
+      )}
+
+      {/* Closing time: the day's summary is ready to send. */}
+      {offerSummary && (
+        <Banner href="/app/summary" icon={MessageSquareText}>
+          Today&apos;s summary is ready to send
         </Banner>
       )}
 

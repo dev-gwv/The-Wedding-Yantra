@@ -11,6 +11,7 @@ export * from "./expenses.js";
 export * from "./home.js";
 export * from "./money.js";
 export * from "./reports.js";
+export * from "./review.js";
 export * from "./sales.js";
 export * from "./tasks.js";
 export * from "./team.js";

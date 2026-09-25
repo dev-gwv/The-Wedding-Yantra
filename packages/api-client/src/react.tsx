@@ -3,6 +3,7 @@
  * mobile app (React Native) can import this file unchanged.
  */
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -105,6 +106,10 @@ export const queryKeys = {
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
+  /** Scores, the activity log and the daily summary: read-only views over everything. */
+  scores: (id: string, month: string) => ["workspace", id, "review", "scores", month] as const,
+  activity: (id: string, userId: string) => ["workspace", id, "review", "activity", userId] as const,
+  dailySummary: (id: string, date: string) => ["workspace", id, "review", "daily-summary", date] as const,
 };
 
 interface QueryOpts {
@@ -743,4 +748,28 @@ export function useSaveEventTeam(workspaceId: string, eventId: string) {
       void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
     },
   });
+}
+
+// ---- Scores, activity log and the daily summary -----------------------------------
+
+export function useScores(workspaceId: string, month: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.scores(workspaceId, month), queryFn: () => api.review.scores(workspaceId, month), enabled });
+}
+
+/** The activity log, a page at a time, newest first. */
+export function useActivity(workspaceId: string, userId?: string, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: queryKeys.activity(workspaceId, userId ?? ""),
+    queryFn: ({ pageParam }) => api.review.activity(workspaceId, { before: pageParam, userId }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.next ?? undefined,
+    enabled,
+  });
+}
+
+export function useDailySummary(workspaceId: string, date: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.dailySummary(workspaceId, date), queryFn: () => api.review.dailySummary(workspaceId, date), enabled });
 }

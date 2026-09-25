@@ -48,6 +48,8 @@ export const PERMISSIONS = [
   "tasks.manage",
   /** See and finish your own tasks, add tasks for yourself */
   "tasks.work",
+  /** Everyone's scores, the activity log and the daily summary */
+  "team.review",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -76,6 +78,7 @@ const GRANTS: Record<Role, readonly Permission[]> = {
     "expenses.approve",
     "tasks.manage",
     "tasks.work",
+    "team.review",
   ],
   staff: ["members.view", "leads.work", "events.view", "expenses.submit", "tasks.work"],
   // Freelancers see only the events they're booked on (see eventScope) and their tasks.

@@ -3,7 +3,7 @@
 #   1. first start applies every migration; health, business types and the full
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
 #      -> bill -> payment -> bill photo -> expense -> monthly report -> checklist and tasks
-#      flow work over real HTTP
+#      -> scores, activity log and daily summary flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -58,7 +58,7 @@ echo "== first start (fresh database)"
 start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
-  0008_tasks_and_team; do
+  0008_tasks_and_team 0009_team_review; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -135,6 +135,12 @@ expect "and ticked off" '.success and .data.done == true' \
   "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$TASK" | jq -r '.data.id')/done" '{"done":true}' "$TOKEN")"
 expect "My Day answers" '.success and (.data.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
   "$(api GET "/api/v1/workspaces/$WS_ID/my-day" "" "$TOKEN")"
+expect "the month's scores are worked out" ".success and (.data.people | length) >= 1 and .data.business != null" \
+  "$(api GET "/api/v1/workspaces/$WS_ID/scores?month=$MONTH" "" "$TOKEN")"
+expect "the activity log tells who did what" '.success and (.data.items | map(.action) | index("payment.recorded")) != null' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/activity" "" "$TOKEN")"
+expect "the daily summary adds up the day" '.success and (.data.tomorrow.date | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/daily-summary" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

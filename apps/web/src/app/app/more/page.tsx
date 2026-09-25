@@ -9,6 +9,9 @@ import {
   Check,
   ChevronRight,
   ClipboardList,
+  History,
+  MessageSquareText,
+  Trophy,
   GitBranch,
   ListChecks,
   LogOut,
@@ -82,6 +85,8 @@ export default function MorePage() {
             {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
               <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
             )}
+            <Row href="/app/scores" icon={Trophy} label={can(workspace.role, "team.review") ? "Team scores" : "My score"} />
+            {can(workspace.role, "team.review") && <Row href="/app/summary" icon={MessageSquareText} label="Daily summary" />}
             {can(workspace.role, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
           </Card>
         </>
@@ -91,6 +96,7 @@ export default function MorePage() {
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         <Row href="/app/team" icon={Users} label="Team" />
+        {can(workspace.role, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
         {me.workspaces.length > 1 && (
           <Row onClick={() => setSwitching(true)} icon={ArrowLeftRight} label="Switch business" />
         )}

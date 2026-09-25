@@ -645,3 +645,45 @@ made a private folder that Docker tried to read. Phase 3 part 3 went live after 
 
 Next: Phase 4 part 2. KRA scores worked out from this data, an activity log, and a daily
 summary.
+
+---
+
+## 21. Built in Phase 4, part 2: scores, the activity log and the daily summary
+
+**Scores (the KRAs), worked out from the work itself.** Nobody fills anything in. Each person
+gets up to four measures a month:
+- **Tasks done on time:** tasks whose day has passed, ticked off by that day.
+- **Follow-ups kept:** follow-ups that came due, with a call, a message or a note by the end
+  of that day. A follow-up moved before it came due, or on a lead that closed first, doesn't
+  count either way. The first follow-up of a new enquiry counts too, including the same-day
+  reply an enquiry-form lead needs.
+- **Enquiries booked:** of their enquiries that closed this month, the share booked.
+- **Expenses added in a day:** money spent, added by the next day.
+
+The score is the plain average of the measures that had something to measure. 85 and over
+reads as great, under 60 in red. Tasks of cancelled events don't count.
+
+- **Owners and managers:** More → Team scores shows everyone's month, with tasks late right
+  now. For events that began this month, it also shows the money collected before the event
+  and whether every step was done on time.
+- **Everyone else:** More → My score shows only their own month.
+
+**Activity log** (More → Activity, for owners and managers). Who did what, newest first, in
+plain sentences, for example "Aman ticked off “Pack the bridal kit” for Kavya's wedding".
+- **What's in it:** the business's log and every enquiry's timeline (calls, notes, stage
+  moves) in one list, grouped by day.
+- **Filter by person.** Each entry opens the event, enquiry or bill it's about.
+- **Paging is exact:** "Show older" never skips or repeats an entry, even when many things
+  happened at the same moment.
+
+**Daily summary** (More → Daily summary, for owners and managers).
+- **The day:** money received, new enquiries and bookings, tasks done, who has late tasks,
+  and expenses waiting for approval.
+- **Tomorrow:** each event with its functions, times and team, and the tasks due.
+- **One tap sends it** on WhatsApp to yourself or the team group, or copies it. After 5 pm,
+  Home says the summary is ready, until it has been sent from that phone or computer.
+- **Past days** can be looked back on.
+
+Sending it automatically every evening needs the WhatsApp provider, which is still open.
+
+Next: Phase 5, the SaaS layer: plans, free trial, subscriptions, limits and onboarding.

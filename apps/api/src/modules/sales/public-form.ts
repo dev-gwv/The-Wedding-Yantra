@@ -110,6 +110,11 @@ export async function submitPublicForm(
       `INSERT INTO lead_activities (workspace_id, lead_id, kind, meta) VALUES ($1, $2, 'created', $3)`,
       [form.workspace_id, rows[0]!.id, { source: "enquiry_form" }],
     );
+    // A form enquiry wants a reply the same day: that's its first follow-up.
+    await tx.query(
+      `INSERT INTO lead_activities (workspace_id, lead_id, kind, meta) VALUES ($1, $2, 'follow_up_set', jsonb_build_object('at', now()))`,
+      [form.workspace_id, rows[0]!.id],
+    );
   });
   return { received: true };
 }

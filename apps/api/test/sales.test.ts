@@ -86,7 +86,8 @@ describe("leads", () => {
     expect(neha.stageId).toBe(stages[0]!.id);
     expect(neha.assignedTo).not.toBeNull();
     expect(neha.followUpState).toBe("overdue");
-    expect(neha.activities.map((a) => a.kind)).toEqual(["created"]);
+    // Created with a follow-up: both show, "created" at the bottom.
+    expect(neha.activities.map((a) => a.kind)).toEqual(["follow_up_set", "created"]);
 
     await call(t.app, "POST", `/workspaces/${ws}/leads`, {
       token: owner,
@@ -305,7 +306,7 @@ describe("public enquiry form", () => {
       token: owner,
     });
     expect(lead.body.data).toMatchObject({ name: "Pooja Sharma", source: "enquiry_form", followUpState: "today" });
-    expect(lead.body.data.activities.map((a) => a.kind)).toEqual(["note", "created"]);
+    expect(lead.body.data.activities.map((a) => a.kind)).toEqual(["note", "follow_up_set", "created"]);
 
     await call(t.app, "PATCH", `/workspaces/${ws}/lead-form`, { token: owner, body: { enabled: false } });
     expect((await call(t.app, "GET", `/public/forms/${slug}`)).status).toBe(404);

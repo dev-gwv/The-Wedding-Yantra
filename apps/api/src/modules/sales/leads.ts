@@ -197,7 +197,8 @@ export async function getLead(db: Queryable, ctx: MemberContext, leadId: string)
        FROM lead_activities a
        LEFT JOIN users u ON u.id = a.actor_user_id
       WHERE a.lead_id = $1
-      ORDER BY a.created_at DESC
+      -- Things done together (a lead and its first follow-up) keep "created" at the bottom.
+      ORDER BY a.created_at DESC, (a.kind = 'created'), a.id
       LIMIT 200`,
     [leadId],
   );
@@ -338,6 +339,8 @@ export async function createLead(db: Db, ctx: MemberContext, input: LeadFields):
     );
     const id = rows[0]!.id;
     await addActivityRow(tx, ctx, id, "created", null, { source: input.source ?? "other" });
+    // The first follow-up counts like any other (for "follow-ups kept").
+    if (input.nextFollowUpAt) await addActivityRow(tx, ctx, id, "follow_up_set", null, { at: input.nextFollowUpAt });
     return getLead(tx, ctx, id);
   });
 }

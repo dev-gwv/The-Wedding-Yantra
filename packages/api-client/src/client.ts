@@ -1,4 +1,8 @@
 import type {
+  ActivityPage,
+  ActivityQuery,
+  DailySummary,
+  TeamScores,
   ChecklistItem,
   MyDay,
   SaveChecklistInput,
@@ -336,6 +340,13 @@ export function createApiClient(options: ApiClientOptions) {
     eventTeam: {
       save: (workspaceId: string, eventId: string, input: SaveEventTeamInput) =>
         request<TeamMember[]>("PUT", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/team`, input),
+    },
+    review: {
+      /** Everyone's month for owners and managers; your own for everyone else */
+      scores: (workspaceId: string, month: string) => request<TeamScores>("GET", `${ws(workspaceId)}/scores${qs({ month })}`),
+      activity: (workspaceId: string, query: ActivityQuery = {}) =>
+        request<ActivityPage>("GET", `${ws(workspaceId)}/activity${qs(query)}`),
+      dailySummary: (workspaceId: string, date?: string) => request<DailySummary>("GET", `${ws(workspaceId)}/daily-summary${qs({ date })}`),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

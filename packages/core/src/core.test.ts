@@ -320,3 +320,78 @@ describe("bills", () => {
     expect(rupeesInWords(0)).toBe("Rupees Zero Only");
   });
 });
+
+import { activityText, dailySummaryMessage, overallScore, percentOf, scoreBand } from "./index.js";
+
+describe("scores", () => {
+  it("averages only the measures that had something to measure", () => {
+    expect(percentOf(3, 4)).toBe(75);
+    expect(percentOf(0, 0)).toBeNull();
+    expect(overallScore([{ done: 9, total: 10 }, { done: 1, total: 2 }, { done: 0, total: 0 }])).toBe(70);
+    expect(overallScore([{ done: 0, total: 0 }])).toBeNull();
+    expect([scoreBand(92), scoreBand(70), scoreBand(40)]).toEqual(["great", "good", "low"]);
+  });
+});
+
+describe("activity sentences", () => {
+  const base = { actorName: "Riya", subject: null, other: null, amount: null, detail: null };
+  it("reads like a person telling you", () => {
+    expect(activityText({ ...base, action: "task.done", subject: "Kit packed", detail: "Kavya's wedding", late: true })).toBe(
+      "ticked off “Kit packed” for Kavya's wedding, late",
+    );
+    expect(activityText({ ...base, action: "payment.recorded", amount: 20000, other: "Kavya Rao" })).toBe("recorded ₹20,000 from Kavya Rao");
+    expect(activityText({ ...base, action: "task.assigned", subject: "Call the florist", other: "Aman" })).toBe("gave Aman a task: “Call the florist”");
+    expect(activityText({ ...base, action: "lead.stage_changed", subject: "Neha", detail: "Booked" })).toBe("moved Neha to Booked");
+    expect(activityText({ ...base, action: "expense.rejected", other: "Aman", amount: 1500, detail: "Add the bill photo" })).toBe(
+      "sent back Aman's expense of ₹1,500: Add the bill photo",
+    );
+  });
+  it("tells whole sentences when a client or the enquiry form did it", () => {
+    expect(activityText({ ...base, actorName: null, action: "quote.accepted", subject: "Q-0003", other: "Kavya Rao", amount: 29500 })).toBe(
+      "Kavya Rao accepted quote Q-0003 (₹29,500)",
+    );
+    expect(activityText({ ...base, actorName: null, action: "lead.created", subject: "Neha", detail: "enquiry form" })).toBe(
+      "New enquiry from Neha via the enquiry form",
+    );
+  });
+});
+
+describe("daily summary message", () => {
+  it("puts the day and tomorrow in a few short lines", () => {
+    const text = dailySummaryMessage(
+      {
+        date: "2026-09-25",
+        received: { total: 45000, count: 2 },
+        newLeads: 2,
+        booked: 1,
+        tasksDone: 6,
+        lateTasks: [
+          { name: "Aman Verma", count: 2 },
+          { name: null, count: 1 },
+        ],
+        expensesWaiting: 1,
+        tomorrow: {
+          date: "2026-09-26",
+          events: [{ title: "Kavya's wedding", functions: [{ name: "Mehendi", time: "16:00" }], team: ["Aman Verma", "Pooja Singh"] }],
+          tasksDue: 3,
+        },
+      },
+      "Riya Makeup Studio",
+    );
+    expect(text).toBe(
+      [
+        "*Riya Makeup Studio: Fri 25 Sep*",
+        "",
+        "₹45,000 received (2 payments)",
+        "2 new enquiries, 1 booked",
+        "6 tasks done",
+        "Late: Aman 2, Anyone 1",
+        "1 expense waiting for approval",
+        "",
+        "*Tomorrow, Sat 26 Sep*",
+        "Kavya's wedding: Mehendi 4 pm. Team: Aman, Pooja",
+        "3 tasks due",
+      ].join("\n"),
+    );
+  });
+});
