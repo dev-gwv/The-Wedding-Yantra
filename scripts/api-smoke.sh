@@ -59,7 +59,7 @@ start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
-  0011_billing 0012_client_portal 0013_deliverables; do
+  0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -157,6 +157,13 @@ DELIV="$(api POST "/api/v1/workspaces/$WS_ID/deliverables" "{\"eventId\":\"$EVEN
 expect "a deliverable can be planned for the event" '.success and .data.status == "pending" and .data.late == false' "$DELIV"
 expect "and handed over with its link" '.success and .data.status == "delivered" and .data.link == "https://example.com/gallery"' \
   "$(api PATCH "/api/v1/workspaces/$WS_ID/deliverables/$(echo "$DELIV" | jq -r '.data.id')" '{"status":"delivered","link":"https://example.com/gallery"}' "$TOKEN")"
+VENDOR="$(api POST "/api/v1/workspaces/$WS_ID/vendors" '{"name":"Smoke Florist","upiId":"florist@okaxis"}' "$TOKEN")"
+expect "a vendor can be added" '.success and .data.owed == 0' "$VENDOR"
+PAYOUT="$(api POST "/api/v1/workspaces/$WS_ID/payouts" "{\"vendorId\":\"$(echo "$VENDOR" | jq -r '.data.id')\",\"eventId\":\"$EVENT_ID\",\"description\":\"Flowers\",\"amount\":3000}" "$TOKEN")"
+expect "what the event owes them is noted" '.success and .data.status == "owed"' "$PAYOUT"
+api POST "/api/v1/workspaces/$WS_ID/payouts/$(echo "$PAYOUT" | jq -r '.data.id')/pay" '{"paidOn":"2026-09-25","method":"upi"}' "$TOKEN" >/dev/null
+expect "paying the vendor counts in the event's profit" '.success and .data.spent == 8000 and .data.profit == 17000 and .data.toPay == 0' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/money" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

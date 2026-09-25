@@ -13,6 +13,7 @@ import { businessTypeRoutes } from "./modules/business-types/routes.js";
 import { fileRoutes } from "./modules/files/routes.js";
 import { deliverableRoutes } from "./modules/deliverables/routes.js";
 import { growRoutes } from "./modules/grow/routes.js";
+import { vendorRoutes } from "./modules/vendors/routes.js";
 import type { Files } from "./modules/files/service.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { moneyRoutes } from "./modules/money/routes.js";
@@ -110,6 +111,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       reviewRoutes(v1, { db });
       growRoutes(v1, { db });
       deliverableRoutes(v1, { db });
+      vendorRoutes(v1, { db });
       billingRoutes(v1, { db, config, gateway });
     },
     { prefix: "/api/v1" },

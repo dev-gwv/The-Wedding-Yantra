@@ -18,4 +18,5 @@ export * from "./review.js";
 export * from "./sales.js";
 export * from "./tasks.js";
 export * from "./team.js";
+export * from "./vendors.js";
 export * from "./workspaces.js";

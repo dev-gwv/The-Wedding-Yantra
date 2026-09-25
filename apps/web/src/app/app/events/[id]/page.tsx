@@ -12,6 +12,7 @@ import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
 import { EventDeliverables } from "@/components/deliverables/deliverables";
 import { ReviewCard } from "@/components/grow/review-card";
+import { EventPayouts } from "@/components/vendors/payouts";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
 import { EventTasks, EventTeamCard } from "@/components/tasks/event-work";
@@ -175,6 +176,8 @@ function EventView({ event }: { event: WeddingEvent }) {
       <EventMoneyCard event={event} />
 
       <EventExpenses eventId={event.id} />
+
+      <EventPayouts eventId={event.id} cancelled={event.status === "cancelled"} />
 
       <Card className="divide-y divide-line overflow-hidden">
         {event.clientId && (

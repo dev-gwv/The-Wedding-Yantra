@@ -3,7 +3,8 @@
 import { can, formatMoneyShort } from "@wedding-yantra/core";
 import { useBills, useMoneyOverview, useQuotes } from "@wedding-yantra/api-client/react";
 import { QUOTE_STATUS_LABELS, type DueItem, type QuoteStatus } from "@wedding-yantra/types";
-import { BarChart3, FileText, Lock, PartyPopper, ReceiptIndianRupee } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, Lock, PartyPopper, ReceiptIndianRupee } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -73,6 +74,12 @@ function MoneyScreen() {
           <p className="mt-1 font-display text-2xl font-extrabold tabular text-success">{o ? formatMoneyShort(o.receivedThisMonth) : "…"}</p>
           {o && o.billedThisMonth > 0 && <p className="mt-0.5 text-xs text-ink-muted">{formatMoneyShort(o.billedThisMonth)} billed</p>}
         </Card>
+        <Link href="/app/vendors" className="col-span-2 flex items-center justify-between gap-3 rounded-3xl border border-line bg-surface px-4 py-3 shadow-soft hover:bg-cream">
+          <span className="text-sm font-semibold text-ink-muted">To pay vendors and helpers</span>
+          <span className="flex items-center gap-1 font-display text-lg font-extrabold tabular">
+            {o ? formatMoneyShort(o.toPay ?? 0) : "…"} <ChevronRight className="size-4 text-ink-subtle" />
+          </span>
+        </Link>
       </div>
 
       <div className="mb-5 flex w-full rounded-2xl border border-line bg-cream p-1 sm:inline-flex sm:w-auto" role="tablist" aria-label="Money view">

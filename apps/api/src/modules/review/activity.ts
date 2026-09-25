@@ -192,6 +192,12 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         if (r.action === "event.review_requested") item.other = str(m.client);
         item.link = id ? { kind: "event", id } : null;
         break;
+      case "payout":
+        item.other = str(m.vendor);
+        item.amount = num(m.amount);
+        item.subject = (str(m.eventId) && events.get(str(m.eventId)!)?.title) ?? null;
+        item.link = str(m.eventId) ? { kind: "event", id: str(m.eventId) } : null;
+        break;
       case "deliverable":
         item.subject = str(m.title);
         item.detail = (str(m.eventId) && events.get(str(m.eventId)!)?.title) ?? null;

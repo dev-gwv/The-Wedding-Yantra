@@ -10,6 +10,12 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  PayoutInput,
+  PayoutListQuery,
+  PayPayoutInput,
+  UpdatePayoutInput,
+  UpdateVendorInput,
+  VendorInput,
   DeliverableInput,
   DeliverableListQuery,
   UpdateDeliverableInput,
@@ -122,6 +128,10 @@ export const queryKeys = {
   grow: (id: string) => ["workspace", id, "grow"] as const,
   /** Deliverables live under work: Home and My Day count them. */
   deliverables: (id: string, query: object) => ["workspace", id, "work", "deliverables", query] as const,
+  /** Vendors and payouts live under bookings: paying one changes an event's profit. */
+  vendors: (id: string) => ["workspace", id, "bookings", "vendors"] as const,
+  vendor: (id: string, vendorId: string) => ["workspace", id, "bookings", "vendor", vendorId] as const,
+  payouts: (id: string, query: object) => ["workspace", id, "bookings", "payouts", query] as const,
   portal: (token: string) => ["public-portal", token] as const,
 };
 
@@ -886,4 +896,73 @@ export function useUpdateDeliverable(workspaceId: string) {
 export function useDeleteDeliverable(workspaceId: string) {
   const api = useApi();
   return useDeliverableMutation(workspaceId, (id: string) => api.deliverables.remove(workspaceId, id));
+}
+
+// ---- Vendors and payouts ------------------------------------------------------------
+
+export function useVendors(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.vendors(workspaceId), queryFn: () => api.vendors.list(workspaceId), enabled });
+}
+
+export function useVendor(workspaceId: string, vendorId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.vendor(workspaceId, vendorId), queryFn: () => api.vendors.get(workspaceId, vendorId), enabled: !!vendorId });
+}
+
+export function usePayouts(workspaceId: string, query: PayoutListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.payouts(workspaceId, query), queryFn: () => api.payouts.list(workspaceId, query), enabled });
+}
+
+/** Vendors, payouts, event profit and the Money page all move together. */
+function useVendorMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.bookings(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useCreateVendor(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (input: VendorInput) => api.vendors.create(workspaceId, input));
+}
+
+export function useUpdateVendor(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, ({ id, ...input }: UpdateVendorInput & { id: string }) => api.vendors.update(workspaceId, id, input));
+}
+
+export function useDeleteVendor(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (id: string) => api.vendors.remove(workspaceId, id));
+}
+
+export function useCreatePayout(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (input: PayoutInput) => api.payouts.create(workspaceId, input));
+}
+
+export function useUpdatePayout(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, ({ id, ...input }: UpdatePayoutInput & { id: string }) => api.payouts.update(workspaceId, id, input));
+}
+
+export function usePayPayout(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, ({ id, ...input }: PayPayoutInput & { id: string }) => api.payouts.pay(workspaceId, id, input));
+}
+
+export function useUnpayPayout(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (id: string) => api.payouts.unpay(workspaceId, id));
+}
+
+export function useDeletePayout(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (id: string) => api.payouts.remove(workspaceId, id));
 }

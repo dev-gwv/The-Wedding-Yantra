@@ -172,11 +172,18 @@ export async function createExpense(db: Db, secret: Buffer, ctx: MemberContext, 
  * Approvers change any expense. Others change their own until it's approved; a change
  * to a rejected one sends it for approval again.
  */
+/** Expenses made by paying a vendor change only from Vendors, so the two never disagree. */
+async function requireNotPayout(db: Queryable, id: string) {
+  const { rowCount } = await db.query(`SELECT 1 FROM payouts WHERE expense_id = $1 AND deleted_at IS NULL`, [id]);
+  if (rowCount) throw new AppError(409, "EXPENSE_FROM_PAYOUT", "This was recorded by paying a vendor. Change it from Vendors.");
+}
+
 export async function updateExpense(db: Db, secret: Buffer, ctx: MemberContext, id: string, input: Partial<ExpenseFields>): Promise<Expense> {
   requireSubmit(ctx);
   return withTransaction(db, async (tx) => {
     const current = await loadRow(tx, ctx, id, true);
     requireChange(ctx, current);
+    await requireNotPayout(tx, id);
     const approver = can(ctx.role, "expenses.approve");
     if (!approver && current.status === "approved") {
       throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to change it.");
@@ -236,6 +243,7 @@ export async function deleteExpense(db: Db, ctx: MemberContext, id: string): Pro
   if (!can(ctx.role, "expenses.approve") && current.status === "approved") {
     throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to remove it.");
   }
+  await requireNotPayout(db, id);
   await db.query(`UPDATE expenses SET deleted_at = now() WHERE id = $1`, [id]);
   await logActivity(db, {
     workspaceId: ctx.workspaceId,

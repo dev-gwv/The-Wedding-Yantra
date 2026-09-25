@@ -1,4 +1,13 @@
 import type {
+  Payout,
+  PayoutInput,
+  PayoutListQuery,
+  PayPayoutInput,
+  UpdatePayoutInput,
+  UpdateVendorInput,
+  Vendor,
+  VendorInput,
+  VendorSummary,
   Deliverable,
   DeliverableInput,
   DeliverableListQuery,
@@ -374,6 +383,25 @@ export function createApiClient(options: ApiClientOptions) {
         request<Deliverable>("PATCH", `${ws(workspaceId)}/deliverables/${encodeURIComponent(id)}`, input),
       remove: (workspaceId: string, id: string) =>
         request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/deliverables/${encodeURIComponent(id)}`),
+    },
+    vendors: {
+      list: (workspaceId: string) => request<VendorSummary[]>("GET", `${ws(workspaceId)}/vendors`),
+      get: (workspaceId: string, id: string) => request<Vendor>("GET", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: VendorInput) => request<Vendor>("POST", `${ws(workspaceId)}/vendors`, input),
+      update: (workspaceId: string, id: string, input: UpdateVendorInput) =>
+        request<Vendor>("PATCH", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`),
+    },
+    payouts: {
+      list: (workspaceId: string, query: PayoutListQuery = {}) => request<Payout[]>("GET", `${ws(workspaceId)}/payouts${qs(query)}`),
+      create: (workspaceId: string, input: PayoutInput) => request<Payout>("POST", `${ws(workspaceId)}/payouts`, input),
+      update: (workspaceId: string, id: string, input: UpdatePayoutInput) =>
+        request<Payout>("PATCH", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`, input),
+      /** Marks it paid; an expense is recorded on its event */
+      pay: (workspaceId: string, id: string, input: PayPayoutInput) =>
+        request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/pay`, input),
+      unpay: (workspaceId: string, id: string) => request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/unpay`),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`),
     },
     grow: {
       /** Turns on the client's own page; asking again returns the same link */

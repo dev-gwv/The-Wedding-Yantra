@@ -88,6 +88,7 @@ const GUIDES: Guide[] = [
     steps: [
       "Add money spent with a photo of the bill: materials, travel, helpers. Staff's expenses wait for the owner or a manager to approve.",
       "Every event shows its profit: what you billed before GST, minus what you spent on it.",
+      "Keep your vendors in More, Vendors and payouts: florists, helpers, a generator, a second shooter. Note what each event owes them, and pay by UPI in one tap. Paying adds it to the event's expenses, so its profit stays right.",
       "Money, Monthly report shows the month's cash, profit, GST, where the work came from and what sold, with spreadsheets for your CA.",
     ],
   },

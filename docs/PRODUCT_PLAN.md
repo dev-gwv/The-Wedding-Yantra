@@ -867,3 +867,33 @@ edited photos, the film, the album, reels, hampers, a song mix.
   - The activity log records each hand-over, and marks it when it was late.
 
 Deleting an event removes its deliverables. A cancelled event's deliverables leave the lists.
+
+---
+
+## 28. Built in Phase 6, part 3: vendors and payouts
+
+**Who you hire, and what you owe them.** More, Vendors and payouts keeps each vendor or
+helper: florists, a generator, a setup crew, a second shooter. Each has a phone and a UPI ID.
+
+**Payouts.**
+- Each event can note what it owes someone, with a "pay by" date. The event page lists
+  them with the total still to pay.
+- Someone new can be added right from that sheet.
+- **Pay:** opens any UPI app with the vendor's UPI ID and the amount filled in. Cash,
+  bank or cheque are noted just as easily.
+- **Paying records an expense.** An approved "Vendors & helpers" expense goes on the
+  event, so profit, the monthly report and the CA's spreadsheets include it with nothing
+  typed twice.
+- **Changes stay in step.** Changing a paid payout updates its expense. "Mark as not
+  paid" or removing the payout takes the expense away. Those expenses can't be edited
+  from Expenses, so the two never disagree.
+
+**Keeping track.**
+- The Vendors screen shows everything still to pay, late ones in red, and each vendor's
+  balance.
+- Each vendor's page shows what's owed, what's been paid and every payout.
+- Money shows "To pay vendors and helpers".
+- A vendor still owed money can't be removed.
+
+**Roles and log.** Owners and managers run payouts; the accountant can read them. The
+activity log records each payment.

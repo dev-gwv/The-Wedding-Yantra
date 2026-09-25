@@ -263,6 +263,8 @@ export interface MoneyOverview {
   overdue: number;
   receivedThisMonth: number;
   billedThisMonth: number;
+  /** Still to pay vendors and helpers */
+  toPay: number;
   dues: DueItem[];
 }
 
@@ -283,6 +285,8 @@ export interface EventMoney {
   pendingSpend: number;
   /** Revenue minus approved expenses */
   profit: number;
+  /** Still to pay vendors for this event; it joins "spent" once paid */
+  toPay: number;
   bills: BillSummary[];
   payments: Payment[];
 }

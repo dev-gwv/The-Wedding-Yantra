@@ -7,6 +7,7 @@ import { requireMoneyView } from "./access.js";
 import { BILL_SELECT, toBillSummary, type BillRow } from "./bills.js";
 import { eventSpend, pendingExpenseCount } from "./expenses.js";
 import { listPayments } from "./payments.js";
+import { toPay } from "../vendors/service.js";
 
 /**
  * Everything still to collect: bills with a balance, and bookings with a value that
@@ -108,6 +109,7 @@ export async function moneyOverview(db: Queryable, ctx: MemberContext): Promise<
     overdue: sum(list.filter((d) => d.overdue)),
     receivedThisMonth: Number(rows[0]?.received ?? 0),
     billedThisMonth: Number(rows[0]?.billed ?? 0),
+    toPay: await toPay(db, ctx.workspaceId),
     dues: list,
   };
 }
@@ -166,6 +168,7 @@ export async function eventMoney(db: Queryable, ctx: MemberContext, eventId: str
     spent: spend.spent,
     pendingSpend: spend.pending,
     profit: round2(revenue - spend.spent),
+    toPay: await toPay(db, ctx.workspaceId, eventId),
     bills: summaries,
     payments,
   };
