@@ -25,6 +25,7 @@ on:
       - "packages/types/**"
       - "packages/core/**"
       - "docker-compose.prod.yml"
+      - ".dockerignore"
       - "infra/backup/**"
       - "scripts/api-smoke.sh"
       - "pnpm-lock.yaml"
