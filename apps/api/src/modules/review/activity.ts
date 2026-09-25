@@ -92,7 +92,7 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
   const metaIds = (key: string) => new Set(page.map((r) => str(r.meta[key])).filter((v): v is string => v !== null));
   const ws = ctx.workspaceId;
   const [events, tasks, bills, payments, expenses, quotes, members, invitations, leads, clients, users, workspace] = await Promise.all([
-    lookup<{ id: string; title: string }>(db, `SELECT id, title FROM events WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("event")),
+    lookup<{ id: string; title: string }>(db, `SELECT id, title FROM events WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, new Set([...ids("event"), ...metaIds("eventId")])),
     lookup<{ id: string; title: string; event_id: string | null; event_title: string | null }>(
       db,
       `SELECT t.id, t.title, t.event_id, e.title AS event_title FROM tasks t LEFT JOIN events e ON e.id = t.event_id
@@ -191,6 +191,12 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.subject = (id && events.get(id)?.title) ?? null;
         if (r.action === "event.review_requested") item.other = str(m.client);
         item.link = id ? { kind: "event", id } : null;
+        break;
+      case "deliverable":
+        item.subject = str(m.title);
+        item.detail = (str(m.eventId) && events.get(str(m.eventId)!)?.title) ?? null;
+        item.late = m.late === true;
+        item.link = str(m.eventId) ? { kind: "event", id: str(m.eventId) } : null;
         break;
       case "client":
         item.subject = (id && clients.get(id)?.name) ?? null;

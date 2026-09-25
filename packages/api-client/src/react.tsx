@@ -10,6 +10,9 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  DeliverableInput,
+  DeliverableListQuery,
+  UpdateDeliverableInput,
   CheckoutInput,
   SaveChecklistInput,
   SaveEventTeamInput,
@@ -117,6 +120,8 @@ export const queryKeys = {
   billing: (id: string) => ["workspace", id, "billing"] as const,
   /** Reviews to ask for and who refers work */
   grow: (id: string) => ["workspace", id, "grow"] as const,
+  /** Deliverables live under work: Home and My Day count them. */
+  deliverables: (id: string, query: object) => ["workspace", id, "work", "deliverables", query] as const,
   portal: (token: string) => ["public-portal", token] as const,
 };
 
@@ -847,4 +852,38 @@ export function useRequestReview(workspaceId: string) {
 export function useGrow(workspaceId: string, enabled = true) {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.grow(workspaceId), queryFn: () => api.grow.summary(workspaceId), enabled });
+}
+
+// ---- Deliverables -------------------------------------------------------------------
+
+export function useDeliverables(workspaceId: string, query: DeliverableListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.deliverables(workspaceId, query), queryFn: () => api.deliverables.list(workspaceId, query), enabled });
+}
+
+/** Refreshes deliverable lists, Home and the client's page data after a change. */
+function useDeliverableMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useCreateDeliverable(workspaceId: string) {
+  const api = useApi();
+  return useDeliverableMutation(workspaceId, (input: DeliverableInput) => api.deliverables.create(workspaceId, input));
+}
+
+export function useUpdateDeliverable(workspaceId: string) {
+  const api = useApi();
+  return useDeliverableMutation(workspaceId, ({ id, ...input }: UpdateDeliverableInput & { id: string }) => api.deliverables.update(workspaceId, id, input));
+}
+
+export function useDeleteDeliverable(workspaceId: string) {
+  const api = useApi();
+  return useDeliverableMutation(workspaceId, (id: string) => api.deliverables.remove(workspaceId, id));
 }

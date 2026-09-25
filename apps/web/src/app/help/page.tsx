@@ -78,6 +78,8 @@ const GUIDES: Guide[] = [
       "Choose who works each event, their role there and when to reach. They see it in their day. Freelancers see only the events they're on.",
       "Add the checklist to an event in one tap: every step gets its date from the functions. Give steps to people, or leave them to anyone on the event.",
       "Mark the days people are away in More, Days off. Choosing an event's team then warns you about anyone who's off.",
+      "Plan what each event owes the client under “For the client”: edited photos, the film, the album, hampers, a song mix. Your trade's usual ones are one tap, dated from the event.",
+      "Whoever makes it marks it delivered with the link, and tells the client on WhatsApp in one tap. The client's own page shows what's coming and opens the link once it's ready. More, Deliverables lists what's late and due this week.",
     ],
   },
   {

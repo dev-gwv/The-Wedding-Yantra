@@ -59,7 +59,7 @@ start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
-  0011_billing 0012_client_portal; do
+  0011_billing 0012_client_portal 0013_deliverables; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -153,6 +153,10 @@ expect "the client opens it without signing in and sees their bill" '.success an
   "$(api GET "/api/v1/public/clients/$(echo "$PORTAL" | jq -r '.data.token')")"
 expect "reviews and referrals are worked out" '.success and .data.referrals.enquiries == 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/grow" "" "$TOKEN")"
+DELIV="$(api POST "/api/v1/workspaces/$WS_ID/deliverables" "{\"eventId\":\"$EVENT_ID\",\"title\":\"Edited photos\",\"dueDate\":\"2099-12-01\"}" "$TOKEN")"
+expect "a deliverable can be planned for the event" '.success and .data.status == "pending" and .data.late == false' "$DELIV"
+expect "and handed over with its link" '.success and .data.status == "delivered" and .data.link == "https://example.com/gallery"' \
+  "$(api PATCH "/api/v1/workspaces/$WS_ID/deliverables/$(echo "$DELIV" | jq -r '.data.id')" '{"status":"delivered","link":"https://example.com/gallery"}' "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

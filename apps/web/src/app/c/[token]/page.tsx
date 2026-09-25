@@ -3,7 +3,7 @@
 import { formatDate, formatMoney, formatPhone, normalizePhone, PAYMENT_METHOD_LABELS, referralMessage, whatsappLink } from "@wedding-yantra/core";
 import { usePortal } from "@wedding-yantra/api-client/react";
 import { EVENT_LABELS, type ClientPortal, type PortalEvent } from "@wedding-yantra/types";
-import { CalendarHeart, ChevronRight, Clock, Copy, Heart, MapPin, MessageCircle, Phone, Star, UserX } from "lucide-react";
+import { CalendarHeart, ChevronRight, Clock, Copy, ExternalLink, Heart, MapPin, MessageCircle, Phone, Star, UserX } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
@@ -258,6 +258,35 @@ function EventBlock({ event }: { event: PortalEvent }) {
             </li>
           ))}
         </ol>
+      )}
+      {/* Missing for a minute while a new web version waits on the API's deploy. */}
+      {(event.deliverables ?? []).length > 0 && (
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="text-sm font-bold text-brand-strong">What you&apos;ll receive</p>
+          <ul className="mt-2 space-y-2.5">
+            {event.deliverables.map((d, i) => (
+              <li key={`${d.title}-${i}`} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold">{d.title}</p>
+                  <p className="text-sm text-ink-muted">
+                    {d.status === "delivered" ? "Ready" : d.dueDate ? `By ${formatDate(d.dueDate)}` : "Date to be set"}
+                  </p>
+                </div>
+                {d.status === "delivered" ? (
+                  d.link ? (
+                    <a href={d.link} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "secondary", size: "sm", className: "shrink-0" })}>
+                      <ExternalLink className="size-4" /> Open
+                    </a>
+                  ) : (
+                    <Pill tone="success">Ready</Pill>
+                  )
+                ) : (
+                  d.status === "in_progress" && <Pill tone="brand">Working on it</Pill>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </Card>
   );

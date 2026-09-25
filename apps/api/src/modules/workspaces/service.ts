@@ -9,6 +9,7 @@ import { salesSummary } from "../sales/leads.js";
 import { listEvents } from "../bookings/events.js";
 import { homeMoney } from "../money/dues.js";
 import { homeTasks, installChecklist } from "../tasks/service.js";
+import { homeDeliverables } from "../deliverables/service.js";
 import { homeBilling } from "../billing/service.js";
 import type { Config } from "../../config.js";
 
@@ -243,6 +244,7 @@ export async function getHome(db: Db, ctx: MemberContext, config: Config): Promi
     upcomingEvents: await upcomingEvents(db, ctx),
     money: await homeMoney(db, ctx),
     tasks: await homeTasks(db, ctx),
+    deliverables: await homeDeliverables(db, ctx),
     billing: await homeBilling(db, ctx, config),
     starterPack: row.starter_pack,
   };

@@ -843,3 +843,27 @@ and sharing later makes a new one. Search engines are told not to index the page
   clients who send the most work.
 
 The activity log records pages shared and stopped, and review requests.
+
+---
+
+## 27. Built in Phase 6, part 2: deliverables
+
+**What each event owes the client, with dates.** Each event has a "For the client" list:
+edited photos, the film, the album, reels, hampers, a song mix.
+- **Quick add:** each trade has ready suggestions, one tap each. Photographers get sneak
+  peeks, edited photos, the highlight film and the album; choreographers get the song mix
+  and practice videos. Each suggestion is dated from the event: after its last day, or
+  before its first.
+- **Who does what:** owners and managers plan them and choose who makes each one. That
+  person, or anyone on the event's team when nobody is named, moves it along: not
+  started, working on it, delivered.
+- **Handing over:** mark it delivered with the link (a gallery, a Drive folder, a video),
+  then tell the client on WhatsApp in one tap.
+- **The client's page** shows what's coming and when, and opens the link once it's
+  delivered.
+- **Keeping track:**
+  - More, Deliverables lists what's late, due this week and later, with "Only mine".
+  - Home warns when something is late for a client, or due this week.
+  - The activity log records each hand-over, and marks it when it was late.
+
+Deleting an event removes its deliverables. A cancelled event's deliverables leave the lists.

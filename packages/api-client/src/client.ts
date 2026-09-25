@@ -1,4 +1,8 @@
 import type {
+  Deliverable,
+  DeliverableInput,
+  DeliverableListQuery,
+  UpdateDeliverableInput,
   ClientPortal,
   ClientPortalLink,
   GrowSummary,
@@ -361,6 +365,15 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string) => request<BillingOverview>("GET", `${ws(workspaceId)}/billing`),
       /** Starts paying online; send the owner to the returned url */
       checkout: (workspaceId: string, input: CheckoutInput) => request<Checkout>("POST", `${ws(workspaceId)}/billing/checkout`, input),
+    },
+    deliverables: {
+      list: (workspaceId: string, query: DeliverableListQuery = {}) =>
+        request<Deliverable[]>("GET", `${ws(workspaceId)}/deliverables${qs(query)}`),
+      create: (workspaceId: string, input: DeliverableInput) => request<Deliverable>("POST", `${ws(workspaceId)}/deliverables`, input),
+      update: (workspaceId: string, id: string, input: UpdateDeliverableInput) =>
+        request<Deliverable>("PATCH", `${ws(workspaceId)}/deliverables/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/deliverables/${encodeURIComponent(id)}`),
     },
     grow: {
       /** Turns on the client's own page; asking again returns the same link */

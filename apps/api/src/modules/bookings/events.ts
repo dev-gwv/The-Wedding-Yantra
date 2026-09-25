@@ -385,6 +385,7 @@ export async function deleteEvent(db: Db, ctx: MemberContext, eventId: string): 
   await db.query(`UPDATE quotes SET event_id = NULL WHERE event_id = $1`, [eventId]);
   // Its checklist and tasks go with it.
   await db.query(`UPDATE tasks SET deleted_at = now() WHERE event_id = $1 AND deleted_at IS NULL`, [eventId]);
+  await db.query(`UPDATE deliverables SET deleted_at = now() WHERE event_id = $1 AND deleted_at IS NULL`, [eventId]);
 }
 
 /** Every function in a month, for the calendar. `month` is YYYY-MM. */

@@ -98,6 +98,8 @@ export function activityText(a: ActivityFacts): string {
       return `chose the team for ${subject}`;
     case "event.review_requested":
       return `asked ${a.other ?? "the client"} for a review of ${subject}`;
+    case "deliverable.delivered":
+      return `delivered ${q(a.subject)}${a.detail ? ` for ${a.detail}` : ""}${a.late ? ", late" : ""}`;
     case "client.portal_shared":
       return `shared ${subject ? `${subject}'s` : "a client's"} page with them`;
     case "client.portal_stopped":

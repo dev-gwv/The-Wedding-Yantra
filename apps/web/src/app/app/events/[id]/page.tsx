@@ -10,6 +10,7 @@ import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
+import { EventDeliverables } from "@/components/deliverables/deliverables";
 import { ReviewCard } from "@/components/grow/review-card";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
@@ -168,6 +169,8 @@ function EventView({ event }: { event: WeddingEvent }) {
       <EventTeamCard event={event} />
 
       <EventTasks event={event} />
+
+      <EventDeliverables event={event} />
 
       <EventMoneyCard event={event} />
 

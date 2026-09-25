@@ -109,6 +109,15 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
         </Banner>
       )}
 
+      {/* Owed to clients: late ones first; otherwise what's due this week. */}
+      {home.deliverables && (home.deliverables.late > 0 || home.deliverables.dueThisWeek > 0) && (
+        <Banner href="/app/deliverables" icon={Package} tone={home.deliverables.late > 0 ? "danger" : undefined}>
+          {home.deliverables.late > 0
+            ? `${home.deliverables.late} deliverable${home.deliverables.late === 1 ? " is" : "s are"} late for clients`
+            : `${home.deliverables.dueThisWeek} deliverable${home.deliverables.dueThisWeek === 1 ? "" : "s"} due to clients this week`}
+        </Banner>
+      )}
+
       {/* Closing time: the day's summary is ready to send. */}
       {offerSummary && (
         <Banner href="/app/summary" icon={MessageSquareText}>

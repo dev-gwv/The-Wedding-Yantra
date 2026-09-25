@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { can, eventIsOver, quoteNumber, receiptNumber, round2, type PaymentMethod } from "@wedding-yantra/core";
-import type { ClientPortal, ClientPortalLink, EventType, PortalEvent } from "@wedding-yantra/types";
+import type { ClientPortal, ClientPortalLink, DeliverableStatus, EventType, PortalEvent } from "@wedding-yantra/types";
 import { withTransaction, type Db } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { forbidden, notFound } from "../../lib/http.js";
@@ -158,13 +158,22 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
     ),
   ]);
 
-  const functions = events.rows.length
-    ? await db.query<{ event_id: string; name: string; date: string; start_time: string | null; venue: string | null }>(
-        `SELECT event_id, name, date::text AS date, to_char(start_time, 'HH24:MI') AS start_time, venue
-           FROM event_functions WHERE event_id = ANY($1::uuid[]) ORDER BY date, start_time NULLS LAST, position`,
-        [events.rows.map((e) => e.id)],
-      )
-    : { rows: [] };
+  const eventIds = events.rows.map((e) => e.id);
+  const [functions, deliverables] = eventIds.length
+    ? await Promise.all([
+        db.query<{ event_id: string; name: string; date: string; start_time: string | null; venue: string | null }>(
+          `SELECT event_id, name, date::text AS date, to_char(start_time, 'HH24:MI') AS start_time, venue
+             FROM event_functions WHERE event_id = ANY($1::uuid[]) ORDER BY date, start_time NULLS LAST, position`,
+          [eventIds],
+        ),
+        db.query<{ event_id: string; title: string; due_date: string | null; status: DeliverableStatus; link: string | null }>(
+          `SELECT event_id, title, due_date::text AS due_date, status, link
+             FROM deliverables WHERE event_id = ANY($1::uuid[]) AND deleted_at IS NULL
+            ORDER BY due_date NULLS LAST, position`,
+          [eventIds],
+        ),
+      ])
+    : [{ rows: [] }, { rows: [] }];
 
   const portalBills = bills.rows.map((b) => {
     const total = Number(b.total);
@@ -211,6 +220,10 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
       functions: functions.rows
         .filter((f) => f.event_id === e.id)
         .map((f) => ({ name: f.name, date: f.date, startTime: f.start_time, venue: f.venue })),
+      // The link is shared only once it's handed over.
+      deliverables: deliverables.rows
+        .filter((d) => d.event_id === e.id)
+        .map((d) => ({ title: d.title, dueDate: d.due_date, status: d.status, link: d.status === "delivered" ? d.link : null })),
     })),
     quotes: quotes.rows.map((q) => ({
       number: quoteNumber(q.number),

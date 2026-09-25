@@ -49,6 +49,8 @@ export interface HomeSummary {
   } | null;
   /** Your tasks, and the team's overdue ones for those who manage tasks */
   tasks: { overdue: number; dueToday: number; teamOverdue: number | null };
+  /** Deliverables still owed to clients: everyone's for owners and managers, your own otherwise */
+  deliverables: { late: number; dueThisWeek: number } | null;
   /** The plan and trial, for the owner */
   billing: { status: BillingStatus; trialDaysLeft: number; enforced: boolean } | null;
   starterPack: StarterPack;

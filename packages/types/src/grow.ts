@@ -1,5 +1,6 @@
 import type { PaymentMethod } from "@wedding-yantra/core";
 import type { EventStatus, EventType } from "./bookings.js";
+import type { DeliverableStatus } from "./deliverables.js";
 
 // ---------------------------------------------------------------------------
 // The client's own page, at /c/<token>
@@ -20,6 +21,8 @@ export interface PortalEvent {
   startDate: string | null;
   endDate: string | null;
   functions: { name: string; date: string; startTime: string | null; venue: string | null }[];
+  /** What the business will hand over, and the link once it's delivered */
+  deliverables: { title: string; dueDate: string | null; status: DeliverableStatus; link: string | null }[];
 }
 
 export interface PortalQuote {

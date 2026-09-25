@@ -463,3 +463,27 @@ describe("reviews and referrals", () => {
     );
   });
 });
+
+import { deliverableMessage, deliverableSuggestions, suggestedDue } from "./index.js";
+
+describe("deliverables", () => {
+  it("dates suggestions from the event: after its last day, or before its first", () => {
+    const event = { startDate: "2026-11-19", endDate: "2026-11-20" };
+    expect(suggestedDue(30, event)).toBe("2026-12-20");
+    expect(suggestedDue(-21, event)).toBe("2026-10-29");
+    expect(suggestedDue(0, { startDate: "2026-11-19", endDate: null })).toBe("2026-11-19");
+    expect(suggestedDue(7, { startDate: null, endDate: null })).toBeNull();
+  });
+  it("suggests for every trade, with a fallback", () => {
+    expect(deliverableSuggestions("photographer").map((s) => s.title)).toContain("Edited photos");
+    expect(deliverableSuggestions("something_new")).toEqual([{ title: "Event photos", days: 7 }]);
+  });
+  it("tells the client it's ready", () => {
+    expect(deliverableMessage({ clientName: "Kavya Rao", business: "Lens Studio", title: "Edited photos", link: "https://x.io/g" })).toBe(
+      "Hi Kavya, your edited photos from Lens Studio are ready! Here it is: https://x.io/g",
+    );
+    expect(deliverableMessage({ clientName: "Kavya", business: "Lens Studio", title: "Wedding album", link: null })).toBe(
+      "Hi Kavya, your wedding album from Lens Studio is ready!",
+    );
+  });
+});

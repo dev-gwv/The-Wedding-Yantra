@@ -87,6 +87,7 @@ export default function MorePage() {
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Work</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
+            <Row href="/app/deliverables" icon={Package} label="Deliverables" />
             <Row href="/app/time-off" icon={CalendarOff} label="Days off" />
             {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
               <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
