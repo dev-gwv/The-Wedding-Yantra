@@ -35,6 +35,7 @@ function LoginFlow() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [devCode, setDevCode] = useState<string | undefined>();
+  const [channel, setChannel] = useState<"whatsapp" | "sms" | "none" | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [resendIn, setResendIn] = useState(0);
   const [finishing, setFinishing] = useState(false);
@@ -69,6 +70,7 @@ function LoginFlow() {
       const result = await requestOtp.mutateAsync({ phone });
       setNormalized(result.phone);
       setDevCode(result.devCode);
+      setChannel(result.channel);
       setCode("");
       setStep("code");
       setResendIn(30);
@@ -144,7 +146,8 @@ function LoginFlow() {
           <div>
             <h1 className="font-display text-3xl font-extrabold">Enter the code</h1>
             <p className="mt-1 text-[15px] text-ink-muted">
-              We sent a 6-digit code to <span className="font-medium text-ink tabular">{formatPhone(normalized)}</span>
+              We sent a 6-digit code {channel === "whatsapp" ? "on WhatsApp " : channel === "sms" ? "by SMS " : ""}to{" "}
+              <span className="font-medium text-ink tabular">{formatPhone(normalized)}</span>
             </p>
           </div>
           {devCode && (

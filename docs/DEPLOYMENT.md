@@ -340,3 +340,25 @@ curl -X POST https://<API_HOST>/api/v1/admin/workspaces/<business id>/plan \
 
 The owner sees their business id at the bottom of **More → Plan and billing**, to quote when
 paying. You can also look it up with `SELECT id, name FROM workspaces;`.
+
+## 12. Sign-in codes by WhatsApp or SMS
+
+Until a provider is set, codes aren't delivered. `AUTH_OTP_DEV_ECHO=true` shows them in the
+app for testing, but then anyone can sign in as any number. Before real customers:
+
+1. **WhatsApp (recommended).** In Meta Business Manager, set up the WhatsApp Cloud API for
+   the business number.
+   - Create an **Authentication** template with a copy-code button, e.g. `sign_in_code`
+     in English, and wait for it to be approved.
+   - Put the permanent token and the phone number id in `.env` as `WHATSAPP_TOKEN` and
+     `WHATSAPP_PHONE_NUMBER_ID`, plus `WHATSAPP_OTP_TEMPLATE` and `WHATSAPP_OTP_LANGUAGE`
+     if yours differ.
+2. **SMS as a backup (optional).** In MSG91, register a DLT template that contains `##OTP##`.
+   Put the auth key and template id in `.env` as `MSG91_AUTH_KEY` and
+   `MSG91_OTP_TEMPLATE_ID`.
+3. **Choose the order.** Set `OTP_PROVIDER=whatsapp,msg91` (or just one of them).
+4. **Switch testing off.** Set `AUTH_OTP_DEV_ECHO=false`, then run `docker compose ... up -d`.
+
+The API won't start if a provider is chosen without its keys, so a typo can't silently stop
+sign-ins. When no provider gets a code through, the person is asked to try again in a
+minute, and the API log records why.

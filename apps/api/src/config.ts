@@ -17,6 +17,12 @@ export interface Config {
   otpDevEcho: boolean;
   /** Sign-in codes one IP address may request per 15 minutes. */
   otpMaxPerIp: number;
+  /** How sign-in codes reach people, tried in order. Empty: not delivered (development). */
+  otp: {
+    providers: ("whatsapp" | "msg91")[];
+    whatsapp: { token: string; phoneNumberId: string; template: string; language: string } | null;
+    msg91: { authKey: string; templateId: string } | null;
+  };
   /** Where uploaded photos (bill photos, receipts) are kept on disk. */
   uploadsDir: string;
   /** Signs the short-lived links that show uploaded files. */
@@ -50,6 +56,31 @@ function parsePlanIds(value: string | undefined): Record<string, string> {
   return out;
 }
 
+/** OTP_PROVIDER="whatsapp,msg91": which providers send sign-in codes, and in what order. */
+function otpConfig(env: NodeJS.ProcessEnv): Config["otp"] {
+  const providers = (env.OTP_PROVIDER ?? "")
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p && p !== "console");
+  for (const p of providers) {
+    if (p !== "whatsapp" && p !== "msg91") throw new Error(`OTP_PROVIDER: "${p}" isn't known. Use whatsapp, msg91 or both.`);
+  }
+  const whatsapp =
+    env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID
+      ? {
+          token: env.WHATSAPP_TOKEN,
+          phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+          template: env.WHATSAPP_OTP_TEMPLATE || "sign_in_code",
+          language: env.WHATSAPP_OTP_LANGUAGE || "en",
+        }
+      : null;
+  const msg91 = env.MSG91_AUTH_KEY && env.MSG91_OTP_TEMPLATE_ID ? { authKey: env.MSG91_AUTH_KEY, templateId: env.MSG91_OTP_TEMPLATE_ID } : null;
+  // Fail at start-up rather than silently not sending codes.
+  if (providers.includes("whatsapp") && !whatsapp) throw new Error("OTP_PROVIDER=whatsapp needs WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID");
+  if (providers.includes("msg91") && !msg91) throw new Error("OTP_PROVIDER=msg91 needs MSG91_AUTH_KEY and MSG91_OTP_TEMPLATE_ID");
+  return { providers: [...new Set(providers)] as ("whatsapp" | "msg91")[], whatsapp, msg91 };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -70,6 +101,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     corsPreviewPattern: env.CORS_VERCEL_PREVIEW_PATTERN ? new RegExp(env.CORS_VERCEL_PREVIEW_PATTERN) : null,
     otpDevEcho: env.AUTH_OTP_DEV_ECHO === "true",
     otpMaxPerIp: Number(env.AUTH_OTP_MAX_PER_IP ?? 20),
+    otp: otpConfig(env),
     uploadsDir: env.UPLOADS_DIR ?? "uploads",
     // FILES_SECRET is optional: by default it's derived from the database password, which
     // is already secret and stable across restarts.

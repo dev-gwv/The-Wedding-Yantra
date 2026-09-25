@@ -51,9 +51,9 @@ export async function requestOtp(
      VALUES ($1, $2, now() + make_interval(secs => $3), $4)`,
     [input.phone, hashCode(input.phone, code), OTP_TTL_SECONDS, input.ip],
   );
-  await sender.send(input.phone, code);
+  const channel = (await sender.send(input.phone, code)) ?? "none";
 
-  const result: OtpRequestResult = { sent: true, phone: input.phone, expiresInSeconds: OTP_TTL_SECONDS };
+  const result: OtpRequestResult = { sent: true, phone: input.phone, expiresInSeconds: OTP_TTL_SECONDS, channel };
   if (input.echo) result.devCode = code;
   return result;
 }

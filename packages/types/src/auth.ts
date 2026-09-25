@@ -24,6 +24,8 @@ export interface OtpRequestResult {
   sent: true;
   phone: string;
   expiresInSeconds: number;
+  /** How the code went out; "none" when no provider is set up (development). */
+  channel?: "whatsapp" | "sms" | "none";
   /** Only present when the server runs with AUTH_OTP_DEV_ECHO=true (no SMS/WhatsApp provider yet). */
   devCode?: string;
 }

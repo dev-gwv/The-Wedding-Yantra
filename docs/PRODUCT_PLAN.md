@@ -789,3 +789,20 @@ Phase 5 is built. What's left for launch is outside the code:
 - set up Razorpay and switch billing on;
 - connect a WhatsApp or SMS provider for sign-in codes and turn `AUTH_OTP_DEV_ECHO` off;
 - choose the domain.
+
+---
+
+## 25. Built in Phase 5, part 3: sign-in codes by WhatsApp or SMS
+
+**The code is ready; it waits for the provider accounts.** Sign-in codes can go out on
+WhatsApp (Meta's Cloud API, with an approved authentication template) or by SMS (MSG91,
+with a DLT-approved template).
+- **Both providers:** WhatsApp is tried first and SMS if it fails
+  (`OTP_PROVIDER=whatsapp,msg91`).
+- **The code screen** says where the code went: "on WhatsApp" or "by SMS".
+- **When nothing gets through,** the person is asked to try again in a minute, and the
+  reason is logged.
+- **A provider without its keys** stops the API from starting, instead of silently
+  blocking every sign-in.
+- **Until one is set up,** nothing changes. `docs/DEPLOYMENT.md` section 12 has the steps,
+  ending with switching `AUTH_OTP_DEV_ECHO` off.

@@ -5,7 +5,7 @@ import type { Db } from "./db.js";
 import { AppError, fail } from "./lib/http.js";
 import { localFileStore } from "./lib/storage.js";
 import { registerAuth } from "./modules/auth/guard.js";
-import { createConsoleOtpSender, type OtpSender } from "./modules/auth/otp-sender.js";
+import { createOtpSender, type OtpSender } from "./modules/auth/otp-sender.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { billingGuard, billingRoutes } from "./modules/billing/routes.js";
 import { razorpayGateway, type PaymentGateway } from "./modules/billing/gateway.js";
@@ -47,9 +47,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     bodyLimit: 1_048_576,
   });
 
-  const otpSender =
-    deps.otpSender ??
-    createConsoleOtpSender(app.log, { revealCode: config.nodeEnv !== "production" || config.otpDevEcho });
+  const otpSender = deps.otpSender ?? createOtpSender(config, app.log);
+  if (config.nodeEnv === "production" && config.otp.providers.length === 0 && !config.otpDevEcho) {
+    app.log.warn("No OTP_PROVIDER is set: sign-in codes aren't delivered, so nobody can sign in.");
+  }
   if (config.otpDevEcho && config.nodeEnv === "production") {
     app.log.warn("AUTH_OTP_DEV_ECHO is on: sign-in codes are returned in API responses. Turn it off before real customers use the app.");
   }
