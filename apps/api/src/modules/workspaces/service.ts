@@ -3,6 +3,9 @@ import type { HomeSummary, StarterPack, UpdateWorkspaceInput, Workspace } from "
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, notFound } from "../../lib/http.js";
+import type { MemberContext } from "../auth/guard.js";
+import { installSalesDefaults } from "../sales/defaults.js";
+import { salesSummary } from "../sales/leads.js";
 
 interface WorkspaceRow {
   id: string;
@@ -53,8 +56,11 @@ export async function createWorkspace(
   input: { name: string; businessTypeId: string; city: string },
 ): Promise<Workspace> {
   return withTransaction(db, async (tx) => {
-    const type = await tx.query(`SELECT 1 FROM business_types WHERE id = $1 AND active`, [input.businessTypeId]);
-    if (type.rowCount === 0) {
+    const type = await tx.query<{ starter_pack: StarterPack }>(
+      `SELECT starter_pack FROM business_types WHERE id = $1 AND active`,
+      [input.businessTypeId],
+    );
+    if (!type.rows[0]) {
       throw new AppError(400, "VALIDATION_ERROR", "Pick what your business does", {
         businessTypeId: "Pick what your business does",
       });
@@ -71,6 +77,7 @@ export async function createWorkspace(
       workspaceId,
       userId,
     ]);
+    await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack });
     await logActivity(tx, {
       workspaceId,
       actorUserId: userId,
@@ -122,7 +129,8 @@ export async function updateWorkspace(
 }
 
 /** Everything the Home screen needs, worked out here so every app shows the same thing. */
-export async function getHome(db: Db, workspaceId: string): Promise<HomeSummary> {
+export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> {
+  const workspaceId = ctx.workspaceId;
   const { rows } = await db.query<{
     name: string;
     phone: string | null;
@@ -175,6 +183,7 @@ export async function getHome(db: Db, workspaceId: string): Promise<HomeSummary>
     setupDone: setup.filter((s) => s.done).length,
     setupTotal: setup.length,
     team: { members, pendingInvites },
+    sales: await salesSummary(db, ctx),
     starterPack: row.starter_pack,
   };
 }

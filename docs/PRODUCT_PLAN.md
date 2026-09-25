@@ -436,3 +436,38 @@ system, balanced exactly as PhotoLancer balances it.
 - **Fonts:** Bricolage Grotesque, extra-bold, for headings. Plus Jakarta Sans for text.
 - **Source of truth:** `packages/design-tokens`. It generates the Tailwind theme and will
   feed the mobile app.
+
+---
+
+## 15. Built in Phase 1: Sales
+
+**What an owner can do now**
+- **Add leads** with the everyday details: name, number, event, date, budget and where
+  they came from. More details stay folded away.
+- **Follow up.** Pick "This evening", "Tomorrow morning", "In 3 days", "Next week" or any
+  time. The Leads screen groups leads into Overdue, Today and Coming up. Home shows what
+  to do first, and flags open leads with no follow-up set.
+- **Pipeline.** Each trade gets its own stages from its starter pack. On phones, stages
+  are chips. On desktop, they are a board. Moving a lead takes one tap on its page.
+- **Booked and lost.** Marking a lead Booked makes it a client automatically, matched by
+  phone number. Marking it Lost asks why: price, date, another vendor, stopped replying,
+  or plans changed.
+- **WhatsApp quick replies.** Four starter messages come ready. They fill in the client's
+  name, event date and business name, then open WhatsApp ready to send. The history
+  records every message.
+- **Notes, calls and history.** Every note, call, message, stage move, follow-up and
+  handover is kept on the lead.
+- **Public enquiry form.** Each business gets a link and a QR code to share or print.
+  - Each enquiry becomes a lead that is due today.
+  - The same number enquiring twice in a day adds a note instead of a duplicate lead.
+  - Bots are filtered out.
+  - One device can send at most 10 enquiries an hour.
+- **Clients.** A searchable list, and one page per client with every enquiry and booking.
+- **Team.** Staff see only the leads they added or were given. Owners and managers see
+  every lead and can hand leads to others. Accountants see clients but not leads.
+
+**Settings:** sales stages (rename, reorder, add, remove empty ones), WhatsApp replies
+and the enquiry form (share, QR code, switch off).
+
+**Not in Phase 1:** drag-and-drop on the board, and lead-source reports. Both come with
+the reports in Phase 3.

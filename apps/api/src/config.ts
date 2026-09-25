@@ -13,6 +13,8 @@ export interface Config {
    * until an SMS/WhatsApp provider is connected. Never enable for real customers.
    */
   otpDevEcho: boolean;
+  /** Sign-in codes one IP address may request per 15 minutes. */
+  otpMaxPerIp: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -34,5 +36,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ),
     corsPreviewPattern: env.CORS_VERCEL_PREVIEW_PATTERN ? new RegExp(env.CORS_VERCEL_PREVIEW_PATTERN) : null,
     otpDevEcho: env.AUTH_OTP_DEV_ECHO === "true",
+    otpMaxPerIp: Number(env.AUTH_OTP_MAX_PER_IP ?? 20),
   };
 }

@@ -1,9 +1,23 @@
 "use client";
 
-import { can, firstName, formatMoney, greeting, type Role } from "@wedding-yantra/core";
+import { can, firstName, formatMoney, formatMoneyShort, greeting, leadScope, type Role } from "@wedding-yantra/core";
 import { useHome } from "@wedding-yantra/api-client/react";
 import { UNIT_LABELS, type HomeSummary } from "@wedding-yantra/types";
-import { Check, ChevronRight, GitBranch, Inbox, ListChecks, Package, Sparkles, type LucideIcon } from "lucide-react";
+import {
+  AlarmClock,
+  BellRing,
+  Check,
+  ChevronRight,
+  GitBranch,
+  Inbox,
+  IndianRupee,
+  ListChecks,
+  Package,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
+import { LeadCard } from "@/components/sales/lead-card";
+import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -64,15 +78,73 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
     <div className="space-y-6">
       {showSetup && <SetupCard home={home} />}
 
-      <Card>
-        <EmptyState icon={Inbox} title="Nothing needs you today">
-          New enquiries, follow-ups, events and payments due will show up here, so you know what to do first
-          each morning.
-        </EmptyState>
-      </Card>
+      {leadScope(role) !== "none" ? (
+        <Today home={home} />
+      ) : (
+        <Card>
+          <EmptyState icon={Inbox} title="Nothing needs you today">
+            Your events and tasks will show up here, so you know what to do first each morning.
+          </EmptyState>
+        </Card>
+      )}
 
       <StarterPack home={home} icon={icon} />
     </div>
+  );
+}
+
+/** What to do first today: follow-ups due, new enquiries and what's in the pipeline. */
+function Today({ home }: { home: HomeSummary }) {
+  const { overdue, dueToday, newLeads, openValue, due } = home.sales;
+  const tiles: { label: string; value: string; icon: LucideIcon; tone?: "danger" }[] = [
+    { label: "Overdue", value: String(overdue), icon: AlarmClock, tone: overdue > 0 ? "danger" : undefined },
+    { label: "Due today", value: String(dueToday), icon: BellRing },
+    { label: "New enquiries", value: String(newLeads), icon: Inbox },
+    { label: "In the pipeline", value: formatMoneyShort(openValue), icon: IndianRupee },
+  ];
+
+  return (
+    <section className="space-y-4">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map((t) => (
+          <Card key={t.label} className="p-4">
+            <IconSquare icon={t.icon} className={cn("size-9 [&_svg]:size-4", t.tone === "danger" && "bg-danger-soft text-danger")} />
+            <dd className={cn("mt-3 font-display text-2xl font-extrabold tabular", t.tone === "danger" && "text-danger")}>{t.value}</dd>
+            <dt className="text-xs font-semibold text-ink-muted">{t.label}</dt>
+          </Card>
+        ))}
+      </dl>
+
+      {due.length > 0 ? (
+        <Card className="p-5 sm:p-6">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-lg font-extrabold">Follow up first</h2>
+            <Link href="/app/leads" className="text-sm font-bold text-brand-strong hover:text-brand-deep">
+              See all
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {due.map((lead) => (
+              <LeadCard key={lead.id} lead={lead} showStage />
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <EmptyState
+            icon={Inbox}
+            title="Nothing needs you today"
+            action={
+              <ButtonLink href="/app/leads" variant="secondary">
+                Go to leads
+              </ButtonLink>
+            }
+          >
+            Follow-ups that are due and new enquiries show up here, so you know what to do first each morning.
+          </EmptyState>
+        </Card>
+      )}
+    </section>
   );
 }
 

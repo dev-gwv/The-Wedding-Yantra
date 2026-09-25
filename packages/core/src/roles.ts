@@ -21,15 +21,36 @@ export const PERMISSIONS = [
   "members.manage",
   "finance.view",
   "billing.manage",
+  /** Add leads and work on the ones you can see */
+  "leads.work",
+  /** See every lead, not just your own */
+  "leads.view_all",
+  /** Give a lead to someone on the team */
+  "leads.assign",
+  "leads.delete",
+  "clients.view",
+  "clients.manage",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
-  manager: ["workspace.update", "members.view", "members.invite", "members.manage", "finance.view"],
-  staff: ["members.view"],
+  manager: [
+    "workspace.update",
+    "members.view",
+    "members.invite",
+    "members.manage",
+    "finance.view",
+    "leads.work",
+    "leads.view_all",
+    "leads.assign",
+    "leads.delete",
+    "clients.view",
+    "clients.manage",
+  ],
+  staff: ["members.view", "leads.work"],
   freelancer: [],
-  accountant: ["members.view", "finance.view"],
+  accountant: ["members.view", "finance.view", "clients.view"],
 };
 
 export function can(role: Role, permission: Permission): boolean {
@@ -51,4 +72,14 @@ export function canManageMember(actor: Role, target: Role): boolean {
   if (target === "owner") return false;
   if (actor === "owner") return true;
   return actor === "manager" && target !== "manager";
+}
+
+/**
+ * Which leads someone sees: every lead, only the ones they created or were given, or none.
+ * Staff see their own so each person's list stays short and theirs.
+ */
+export function leadScope(role: Role): "all" | "own" | "none" {
+  if (can(role, "leads.view_all")) return "all";
+  if (can(role, "leads.work")) return "own";
+  return "none";
 }

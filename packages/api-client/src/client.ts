@@ -1,5 +1,22 @@
 import type {
   AcceptedInvitation,
+  AddActivityInput,
+  Client,
+  ClientInput,
+  ClientSummary,
+  CreateLeadInput,
+  Lead,
+  LeadFormSettings,
+  LeadList,
+  LeadListQuery,
+  PipelineStage,
+  PublicLeadForm,
+  SaveStagesInput,
+  SubmitLeadFormInput,
+  TemplateInput,
+  UpdateClientInput,
+  UpdateLeadInput,
+  WhatsAppTemplate,
   ApiError,
   ApiResponse,
   AuthSession,
@@ -47,7 +64,7 @@ export interface ApiClientOptions {
   fetch?: typeof fetch;
 }
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export function createApiClient(options: ApiClientOptions) {
   const base = options.baseUrl.replace(/\/$/, "");
@@ -85,6 +102,10 @@ export function createApiClient(options: ApiClientOptions) {
   }
 
   const ws = (id: string) => `/workspaces/${encodeURIComponent(id)}`;
+  const qs = (params: Record<string, string | undefined>) => {
+    const entries = Object.entries(params).filter((e): e is [string, string] => !!e[1]);
+    return entries.length ? `?${new URLSearchParams(entries).toString()}` : "";
+  };
 
   return {
     auth: {
@@ -113,6 +134,44 @@ export function createApiClient(options: ApiClientOptions) {
         request<{ updated: true }>("PATCH", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}`, input),
       removeMember: (workspaceId: string, memberId: string) =>
         request<{ removed: true }>("DELETE", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}`),
+    },
+    leads: {
+      list: (workspaceId: string, query: LeadListQuery = {}) =>
+        request<LeadList>("GET", `${ws(workspaceId)}/leads${qs(query)}`),
+      get: (workspaceId: string, id: string) => request<Lead>("GET", `${ws(workspaceId)}/leads/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: CreateLeadInput) => request<Lead>("POST", `${ws(workspaceId)}/leads`, input),
+      update: (workspaceId: string, id: string, input: UpdateLeadInput) =>
+        request<Lead>("PATCH", `${ws(workspaceId)}/leads/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/leads/${encodeURIComponent(id)}`),
+      addActivity: (workspaceId: string, id: string, input: AddActivityInput) =>
+        request<Lead>("POST", `${ws(workspaceId)}/leads/${encodeURIComponent(id)}/activities`, input),
+      saveStages: (workspaceId: string, input: SaveStagesInput) =>
+        request<PipelineStage[]>("PUT", `${ws(workspaceId)}/pipeline-stages`, input),
+    },
+    clients: {
+      list: (workspaceId: string, q?: string) => request<ClientSummary[]>("GET", `${ws(workspaceId)}/clients${qs({ q })}`),
+      get: (workspaceId: string, id: string) => request<Client>("GET", `${ws(workspaceId)}/clients/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: ClientInput) => request<Client>("POST", `${ws(workspaceId)}/clients`, input),
+      update: (workspaceId: string, id: string, input: UpdateClientInput) =>
+        request<Client>("PATCH", `${ws(workspaceId)}/clients/${encodeURIComponent(id)}`, input),
+    },
+    templates: {
+      list: (workspaceId: string) => request<WhatsAppTemplate[]>("GET", `${ws(workspaceId)}/whatsapp-templates`),
+      create: (workspaceId: string, input: TemplateInput) =>
+        request<WhatsAppTemplate>("POST", `${ws(workspaceId)}/whatsapp-templates`, input),
+      update: (workspaceId: string, id: string, input: Partial<TemplateInput>) =>
+        request<WhatsAppTemplate>("PATCH", `${ws(workspaceId)}/whatsapp-templates/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/whatsapp-templates/${encodeURIComponent(id)}`),
+    },
+    leadForm: {
+      get: (workspaceId: string) => request<LeadFormSettings>("GET", `${ws(workspaceId)}/lead-form`),
+      setEnabled: (workspaceId: string, enabled: boolean) =>
+        request<LeadFormSettings>("PATCH", `${ws(workspaceId)}/lead-form`, { enabled }),
+      publicGet: (slug: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}`),
+      submit: (slug: string, input: SubmitLeadFormInput) =>
+        request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

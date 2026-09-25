@@ -54,7 +54,7 @@ sign_in() {
 
 echo "== first start (fresh database)"
 start_api
-for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types; do
+for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -70,6 +70,10 @@ expect "business created with the owner role" '.success and .data.role == "owner
 WS_ID="$(echo "$WS" | jq -r '.data.id')"
 expect "Home summary is worked out by the server" '.success and .data.setupTotal == 3 and .data.setupDone == 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/home" "" "$TOKEN")"
+LEAD="$(api POST "/api/v1/workspaces/$WS_ID/leads" '{"name":"Smoke Lead","phone":"9811100000","budget":50000}' "$TOKEN")"
+expect "a lead can be added to the first stage" '.success and .data.stageName == "New enquiry" and .data.budget == 50000' "$LEAD"
+expect "the pipeline counts it" '.success and .data.stages[0].leadCount == 1' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/leads" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

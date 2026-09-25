@@ -7,7 +7,6 @@ import type { OtpSender } from "./otp-sender.js";
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_MAX_PER_PHONE = 5; // per 15 minutes
-const OTP_MAX_PER_IP = 20; // per 15 minutes
 const SESSION_TTL_DAYS = 60;
 
 interface UserRow {
@@ -31,7 +30,7 @@ const hashCode = (phone: string, code: string) => sha256(`${phone}:${code}`);
 export async function requestOtp(
   db: Db,
   sender: OtpSender,
-  input: { phone: string; ip: string; echo: boolean },
+  input: { phone: string; ip: string; echo: boolean; maxPerIp: number },
 ): Promise<OtpRequestResult> {
   const { rows } = await db.query<{ by_phone: string; by_ip: string }>(
     `SELECT count(*) FILTER (WHERE phone = $1)        AS by_phone,
@@ -40,7 +39,7 @@ export async function requestOtp(
       WHERE created_at > now() - interval '15 minutes'`,
     [input.phone, input.ip],
   );
-  if (Number(rows[0]?.by_phone) >= OTP_MAX_PER_PHONE || Number(rows[0]?.by_ip) >= OTP_MAX_PER_IP) {
+  if (Number(rows[0]?.by_phone) >= OTP_MAX_PER_PHONE || Number(rows[0]?.by_ip) >= input.maxPerIp) {
     throw new AppError(429, "TOO_MANY_REQUESTS", "Too many codes requested. Please wait 15 minutes and try again.");
   }
 

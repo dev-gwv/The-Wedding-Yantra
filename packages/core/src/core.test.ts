@@ -82,3 +82,44 @@ describe("roles", () => {
     expect(canManageMember("manager", "staff")).toBe(true);
   });
 });
+
+import { leadScope, renderTemplate } from "./index.js";
+
+describe("leads", () => {
+  it("shows staff only their own leads and freelancers none", () => {
+    expect(leadScope("owner")).toBe("all");
+    expect(leadScope("manager")).toBe("all");
+    expect(leadScope("staff")).toBe("own");
+    expect(leadScope("freelancer")).toBe("none");
+    expect(leadScope("accountant")).toBe("none");
+  });
+
+  it("fills quick replies and never leaves raw placeholders", () => {
+    const body = "Hi {first_name}, {business} is free on {event_date}. {my_name}";
+    expect(renderTemplate(body, { name: "Neha Kapoor", business: "Riya Studio", eventDate: "2026-12-05", myName: "Riya" })).toBe(
+      "Hi Neha, Riya Studio is free on 5 Dec 2026. Riya",
+    );
+    expect(renderTemplate(body, {})).toBe("Hi there, us is free on your event date. ");
+  });
+});
+
+import { followUpPresets, formatFollowUp, timeAgo } from "./index.js";
+
+describe("follow-up times", () => {
+  const now = new Date(2026, 10, 12, 10, 30); // Thu 12 Nov 2026, 10:30 local
+  it("reads like a person would say it", () => {
+    expect(formatFollowUp(new Date(2026, 10, 12, 18, 0).toISOString(), now)).toBe("Today, 6 pm");
+    expect(formatFollowUp(new Date(2026, 10, 13, 11, 30).toISOString(), now)).toBe("Tomorrow, 11:30 am");
+    expect(formatFollowUp(new Date(2026, 10, 11, 9, 0).toISOString(), now)).toBe("Yesterday");
+    expect(formatFollowUp(new Date(2026, 10, 20, 9, 0).toISOString(), now)).toBe("Fri 20 Nov");
+    expect(formatFollowUp(new Date(2027, 0, 4, 9, 0).toISOString(), now)).toBe("Mon 4 Jan 2027");
+  });
+  it("offers this evening only before 5 pm", () => {
+    expect(followUpPresets(now).map((p) => p.label)).toEqual(["This evening", "Tomorrow morning", "In 3 days", "Next week"]);
+    expect(followUpPresets(new Date(2026, 10, 12, 19)).map((p) => p.label)[0]).toBe("Tomorrow morning");
+  });
+  it("says how long ago things happened", () => {
+    expect(timeAgo(new Date(2026, 10, 12, 8, 30).toISOString(), now)).toBe("2 hours ago");
+    expect(timeAgo(new Date(2026, 10, 9, 10, 0).toISOString(), now)).toBe("3 days ago");
+  });
+});

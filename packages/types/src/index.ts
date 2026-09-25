@@ -7,5 +7,6 @@ export * from "./auth.js";
 export * from "./business-types.js";
 export * from "./common.js";
 export * from "./home.js";
+export * from "./sales.js";
 export * from "./team.js";
 export * from "./workspaces.js";

@@ -12,7 +12,14 @@ export function authRoutes(app: FastifyInstance, deps: { db: Db; config: Config;
 
   app.post("/auth/otp/request", async (request) => {
     const { phone } = parse(otpRequestInput, request.body);
-    return ok(await auth.requestOtp(db, otpSender, { phone, ip: request.ip, echo: config.otpDevEcho }));
+    return ok(
+      await auth.requestOtp(db, otpSender, {
+        phone,
+        ip: request.ip,
+        echo: config.otpDevEcho,
+        maxPerIp: config.otpMaxPerIp,
+      }),
+    );
   });
 
   app.post("/auth/otp/verify", async (request) => {

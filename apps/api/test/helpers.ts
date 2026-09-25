@@ -23,6 +23,8 @@ export async function setup(): Promise<TestContext> {
     DATABASE_URL: TEST_DATABASE_URL,
     NODE_ENV: "test",
     AUTH_OTP_DEV_ECHO: "true",
+    // Every test signs in from the same address.
+    AUTH_OTP_MAX_PER_IP: "10000",
     LOG_LEVEL: "silent",
   });
   const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined } });

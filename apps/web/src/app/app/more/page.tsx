@@ -1,9 +1,22 @@
 "use client";
 
-import { formatPhone, ROLE_INFO } from "@wedding-yantra/core";
+import { can, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
 import { useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Building2, Check, ChevronRight, LogOut, Plus, Users, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Building2,
+  Check,
+  ChevronRight,
+  GitBranch,
+  LogOut,
+  MessageCircle,
+  Plus,
+  QrCode,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { BusinessIcon } from "@/components/app/business-icon";
@@ -42,6 +55,19 @@ export default function MorePage() {
         </div>
       </Card>
 
+      {(leadScope(workspace.role) !== "none" || can(workspace.role, "clients.view")) && (
+        <>
+          <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
+          <Card className="mb-6 divide-y divide-line overflow-hidden">
+            {can(workspace.role, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
+            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
+            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
+            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
+          </Card>
+        </>
+      )}
+
+      <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         <Row href="/app/team" icon={Users} label="Team" />

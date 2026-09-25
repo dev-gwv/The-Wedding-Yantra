@@ -1,0 +1,137 @@
+import { can, leadScope } from "@wedding-yantra/core";
+import type { Client, ClientSummary } from "@wedding-yantra/types";
+import type { Db } from "../../db.js";
+import { AppError, forbidden, notFound } from "../../lib/http.js";
+import type { MemberContext } from "../auth/guard.js";
+import { scopeCondition, toSummary, type SummaryRow } from "./leads.js";
+
+interface ClientRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  notes: string | null;
+  lead_count: string;
+  created_at: Date;
+}
+
+const toClientSummary = (r: ClientRow): ClientSummary => ({
+  id: r.id,
+  name: r.name,
+  phone: r.phone,
+  email: r.email,
+  city: r.city,
+  leadCount: Number(r.lead_count),
+  createdAt: r.created_at.toISOString(),
+});
+
+const SELECT = `
+  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.created_at,
+         (SELECT count(*) FROM leads l WHERE l.client_id = c.id AND l.deleted_at IS NULL) AS lead_count
+    FROM clients c`;
+
+function duplicatePhone(err: unknown): never {
+  if ((err as { code?: string }).code === "23505") {
+    const message = "A client with this number already exists";
+    throw new AppError(409, "DUPLICATE_CLIENT", message, { phone: message });
+  }
+  throw err;
+}
+
+export async function listClients(db: Db, ctx: MemberContext, q?: string): Promise<ClientSummary[]> {
+  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  const params: unknown[] = [ctx.workspaceId];
+  let filter = "";
+  if (q) {
+    params.push(`%${q.replace(/[%_\\]/g, "\\$&")}%`);
+    const digits = q.replace(/\D/g, "");
+    filter = ` AND (c.name ILIKE $2${digits.length >= 3 ? " OR c.phone LIKE $3" : ""})`;
+    if (digits.length >= 3) params.push(`%${digits}%`);
+  }
+  const { rows } = await db.query<ClientRow>(
+    `${SELECT} WHERE c.workspace_id = $1 AND c.deleted_at IS NULL${filter} ORDER BY c.created_at DESC LIMIT 500`,
+    params,
+  );
+  return rows.map(toClientSummary);
+}
+
+export async function getClient(db: Db, ctx: MemberContext, clientId: string): Promise<Client> {
+  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  const { rows } = await db.query<ClientRow>(
+    `${SELECT} WHERE c.workspace_id = $1 AND c.id = $2 AND c.deleted_at IS NULL`,
+    [ctx.workspaceId, clientId],
+  );
+  const row = rows[0];
+  if (!row) throw notFound("This client");
+
+  let leads: Client["leads"] = [];
+  if (leadScope(ctx.role) !== "none") {
+    const params: unknown[] = [ctx.workspaceId, clientId];
+    const scope = scopeCondition(ctx, params);
+    const result = await db.query<SummaryRow>(
+      `SELECT l.id, l.name, l.phone, l.event_type, l.event_date, l.city, l.budget, l.source,
+              l.stage_id, s.name AS stage_name, s.kind AS stage_kind,
+              l.assigned_to, au.name AS assigned_name, l.next_follow_up_at, l.client_id,
+              l.created_at, l.updated_at, 'none' AS follow_up_state
+         FROM leads l
+         JOIN pipeline_stages s ON s.id = l.stage_id
+         LEFT JOIN users au ON au.id = l.assigned_to
+        WHERE l.workspace_id = $1 AND l.client_id = $2 AND l.deleted_at IS NULL AND ${scope}
+        ORDER BY l.created_at DESC`,
+      params,
+    );
+    leads = result.rows.map(toSummary);
+  }
+  return { ...toClientSummary(row), notes: row.notes, leads };
+}
+
+export interface ClientFields {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  city?: string | null;
+  notes?: string | null;
+}
+
+export async function createClient(db: Db, ctx: MemberContext, input: Required<Pick<ClientFields, "name">> & ClientFields) {
+  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can add clients");
+  const { rows } = await db
+    .query<{ id: string }>(
+      `INSERT INTO clients (workspace_id, name, phone, email, city, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [ctx.workspaceId, input.name, input.phone ?? null, input.email ?? null, input.city ?? null, input.notes ?? null, ctx.userId],
+    )
+    .catch(duplicatePhone);
+  return getClient(db, ctx, rows[0]!.id);
+}
+
+export async function updateClient(db: Db, ctx: MemberContext, clientId: string, input: ClientFields) {
+  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can change clients");
+  const columns: [keyof ClientFields, string][] = [
+    ["name", "name"],
+    ["phone", "phone"],
+    ["email", "email"],
+    ["city", "city"],
+    ["notes", "notes"],
+  ];
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, column] of columns) {
+    if (input[key] === undefined) continue;
+    values.push(input[key]);
+    sets.push(`${column} = $${values.length}`);
+  }
+  if (sets.length > 0) {
+    values.push(clientId, ctx.workspaceId);
+    const result = await db
+      .query(
+        `UPDATE clients SET ${sets.join(", ")}
+          WHERE id = $${values.length - 1} AND workspace_id = $${values.length} AND deleted_at IS NULL`,
+        values,
+      )
+      .catch(duplicatePhone);
+    if (!result.rowCount) throw notFound("This client");
+  }
+  return getClient(db, ctx, clientId);
+}

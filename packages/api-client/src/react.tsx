@@ -9,6 +9,15 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  AddActivityInput,
+  ClientInput,
+  CreateLeadInput,
+  LeadListQuery,
+  SaveStagesInput,
+  SubmitLeadFormInput,
+  TemplateInput,
+  UpdateClientInput,
+  UpdateLeadInput,
   CreateInvitationInput,
   CreateWorkspaceInput,
   OtpRequestInput,
@@ -39,6 +48,15 @@ export const queryKeys = {
   home: (id: string) => ["workspace", id, "home"] as const,
   team: (id: string) => ["workspace", id, "team"] as const,
   invitation: (token: string) => ["invitation", token] as const,
+  /** Everything about leads in one business; invalidate this after any lead change. */
+  sales: (id: string) => ["workspace", id, "sales"] as const,
+  leads: (id: string, query: LeadListQuery) => ["workspace", id, "sales", "leads", query] as const,
+  lead: (id: string, leadId: string) => ["workspace", id, "sales", "lead", leadId] as const,
+  clients: (id: string, q: string) => ["workspace", id, "sales", "clients", q] as const,
+  client: (id: string, clientId: string) => ["workspace", id, "sales", "client", clientId] as const,
+  templates: (id: string) => ["workspace", id, "templates"] as const,
+  leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
+  publicForm: (slug: string) => ["public-form", slug] as const,
 };
 
 interface QueryOpts {
@@ -186,4 +204,130 @@ export function useAcceptInvitation() {
     mutationFn: (token: string) => api.invitations.accept(token),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me, refetchType: "all" }),
   });
+}
+
+// ---- Sales ------------------------------------------------------------------
+
+/** Refreshes lead lists, lead pages, clients and Home after something changes. */
+function useSalesMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.sales(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useLeads(workspaceId: string, query: LeadListQuery = {}) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.leads(workspaceId, query),
+    queryFn: () => api.leads.list(workspaceId, query),
+  });
+}
+
+export function useLead(workspaceId: string, leadId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.lead(workspaceId, leadId), queryFn: () => api.leads.get(workspaceId, leadId) });
+}
+
+export function useCreateLead(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: CreateLeadInput) => api.leads.create(workspaceId, input));
+}
+
+export function useUpdateLead(workspaceId: string, leadId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: UpdateLeadInput) => api.leads.update(workspaceId, leadId, input));
+}
+
+export function useDeleteLead(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (leadId: string) => api.leads.remove(workspaceId, leadId));
+}
+
+export function useAddLeadActivity(workspaceId: string, leadId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: AddActivityInput) => api.leads.addActivity(workspaceId, leadId, input));
+}
+
+export function useSaveStages(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: SaveStagesInput) => api.leads.saveStages(workspaceId, input));
+}
+
+export function useClients(workspaceId: string, q = "") {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.clients(workspaceId, q), queryFn: () => api.clients.list(workspaceId, q || undefined) });
+}
+
+export function useClient(workspaceId: string, clientId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.client(workspaceId, clientId), queryFn: () => api.clients.get(workspaceId, clientId) });
+}
+
+export function useCreateClient(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: ClientInput) => api.clients.create(workspaceId, input));
+}
+
+export function useUpdateClient(workspaceId: string, clientId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (input: UpdateClientInput) => api.clients.update(workspaceId, clientId, input));
+}
+
+export function useTemplates(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.templates(workspaceId), queryFn: () => api.templates.list(workspaceId) });
+}
+
+function useTemplateMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.templates(workspaceId) }),
+  });
+}
+
+export function useCreateTemplate(workspaceId: string) {
+  const api = useApi();
+  return useTemplateMutation(workspaceId, (input: TemplateInput) => api.templates.create(workspaceId, input));
+}
+
+export function useUpdateTemplate(workspaceId: string) {
+  const api = useApi();
+  return useTemplateMutation(workspaceId, ({ id, ...input }: Partial<TemplateInput> & { id: string }) =>
+    api.templates.update(workspaceId, id, input),
+  );
+}
+
+export function useDeleteTemplate(workspaceId: string) {
+  const api = useApi();
+  return useTemplateMutation(workspaceId, (id: string) => api.templates.remove(workspaceId, id));
+}
+
+export function useLeadForm(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.leadForm(workspaceId), queryFn: () => api.leadForm.get(workspaceId) });
+}
+
+export function useSetLeadFormEnabled(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.leadForm.setEnabled(workspaceId, enabled),
+    onSuccess: (data) => qc.setQueryData(queryKeys.leadForm(workspaceId), data),
+  });
+}
+
+export function usePublicForm(slug: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.publicForm(slug), queryFn: () => api.leadForm.publicGet(slug), retry: false });
+}
+
+export function useSubmitPublicForm(slug: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (input: SubmitLeadFormInput) => api.leadForm.submit(slug, input) });
 }

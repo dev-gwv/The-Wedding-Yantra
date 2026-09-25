@@ -30,6 +30,6 @@ export function workspaceRoutes(app: FastifyInstance, deps: { db: Db }) {
 
   app.get<WsParams>("/workspaces/:workspaceId/home", async (request) => {
     const member = await requireMember(db, request, request.params.workspaceId);
-    return ok(await workspaces.getHome(db, member.workspaceId));
+    return ok(await workspaces.getHome(db, member));
   });
 }
