@@ -1,4 +1,7 @@
 import type {
+  ClientPortal,
+  ClientPortalLink,
+  GrowSummary,
   BillingOverview,
   Checkout,
   CheckoutInput,
@@ -228,7 +231,8 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string) => request<LeadFormSettings>("GET", `${ws(workspaceId)}/lead-form`),
       setEnabled: (workspaceId: string, enabled: boolean) =>
         request<LeadFormSettings>("PATCH", `${ws(workspaceId)}/lead-form`, { enabled }),
-      publicGet: (slug: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}`),
+      /** `ref` is the code from a client's "recommend us" link */
+      publicGet: (slug: string, ref?: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}${qs({ ref })}`),
       submit: (slug: string, input: SubmitLeadFormInput) =>
         request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
     },
@@ -357,6 +361,20 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string) => request<BillingOverview>("GET", `${ws(workspaceId)}/billing`),
       /** Starts paying online; send the owner to the returned url */
       checkout: (workspaceId: string, input: CheckoutInput) => request<Checkout>("POST", `${ws(workspaceId)}/billing/checkout`, input),
+    },
+    grow: {
+      /** Turns on the client's own page; asking again returns the same link */
+      sharePortal: (workspaceId: string, clientId: string) =>
+        request<ClientPortalLink>("POST", `${ws(workspaceId)}/clients/${encodeURIComponent(clientId)}/portal`),
+      /** The old link stops working at once */
+      stopPortal: (workspaceId: string, clientId: string) =>
+        request<{ stopped: true }>("DELETE", `${ws(workspaceId)}/clients/${encodeURIComponent(clientId)}/portal`),
+      /** What the client sees at /c/<token>, no sign-in */
+      portal: (token: string) => request<ClientPortal>("GET", `/public/clients/${encodeURIComponent(token)}`),
+      /** Notes that the client was asked for a review of this event */
+      requestReview: (workspaceId: string, eventId: string) =>
+        request<WeddingEvent>("POST", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/review-request`),
+      summary: (workspaceId: string) => request<GrowSummary>("GET", `${ws(workspaceId)}/grow`),
     },
     review: {
       /** Everyone's month for owners and managers; your own for everyone else */

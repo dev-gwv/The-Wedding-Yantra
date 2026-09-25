@@ -158,6 +158,8 @@ interface LeadRow extends SummaryRow {
   venue: string | null;
   guest_count: number | null;
   referred_by: string | null;
+  referred_by_client_id: string | null;
+  referred_by_client_name: string | null;
   requirements: string | null;
   lost_reason: LostReason | null;
   created_by: string | null;
@@ -171,10 +173,12 @@ async function loadVisible(db: Queryable, ctx: MemberContext, leadId: string): P
   const scope = scopeCondition(ctx, params);
   const { rows } = await db.query<LeadRow>(
     `SELECT ${SUMMARY_COLUMNS}, l.email, l.venue, l.guest_count, l.referred_by, l.requirements,
+            l.referred_by_client_id, rc.name AS referred_by_client_name,
             l.lost_reason, l.created_by, cu.name AS created_by_name,
             (SELECT e.id FROM events e WHERE e.lead_id = l.id AND e.deleted_at IS NULL LIMIT 1) AS event_id
        ${FROM}
        LEFT JOIN users cu ON cu.id = l.created_by
+       LEFT JOIN clients rc ON rc.id = l.referred_by_client_id
       WHERE l.workspace_id = $1 AND l.id = $2 AND l.deleted_at IS NULL AND ${scope}`,
     params,
   );
@@ -208,6 +212,7 @@ export async function getLead(db: Queryable, ctx: MemberContext, leadId: string)
     venue: r.venue,
     guestCount: r.guest_count,
     referredBy: r.referred_by,
+    referredByClient: r.referred_by_client_id ? { id: r.referred_by_client_id, name: r.referred_by_client_name } : null,
     requirements: r.requirements,
     lostReason: r.lost_reason,
     createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
@@ -287,6 +292,7 @@ export interface LeadFields {
   budget?: number | null;
   source?: string;
   referredBy?: string | null;
+  referredByClientId?: string | null;
   requirements?: string | null;
   stageId?: string;
   assignedToUserId?: string | null;
@@ -306,13 +312,28 @@ const COLUMNS: [keyof LeadFields, string][] = [
   ["budget", "budget"],
   ["source", "source"],
   ["referredBy", "referred_by"],
+  ["referredByClientId", "referred_by_client_id"],
   ["requirements", "requirements"],
 ];
+
+/** A referrer must be one of this business's clients, picked by someone who can see clients. */
+async function assertReferrer(db: Queryable, ctx: MemberContext, clientId: string | null | undefined): Promise<void> {
+  if (!clientId) return;
+  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  const { rowCount } = await db.query(`SELECT 1 FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [
+    clientId,
+    ctx.workspaceId,
+  ]);
+  if (!rowCount) {
+    throw new AppError(400, "VALIDATION_ERROR", "Choose a client from your list", { referredByClientId: "Choose a client from your list" });
+  }
+}
 
 export async function createLead(db: Db, ctx: MemberContext, input: LeadFields): Promise<Lead> {
   if (!can(ctx.role, "leads.work")) throw forbidden("Your role doesn't include leads");
 
   return withTransaction(db, async (tx) => {
+    await assertReferrer(tx, ctx, input.referredByClientId);
     const stage = input.stageId ? await loadStage(tx, ctx.workspaceId, input.stageId) : await firstOpenStage(tx, ctx.workspaceId);
     if (stage.kind !== "open") {
       throw new AppError(400, "VALIDATION_ERROR", "New leads start in an open stage", { stageId: "Pick an open stage" });
@@ -371,6 +392,7 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
 
   return withTransaction(db, async (tx) => {
     const current = await loadVisible(tx, ctx, leadId);
+    if (input.referredByClientId !== current.referred_by_client_id) await assertReferrer(tx, ctx, input.referredByClientId);
     const sets: string[] = [];
     const values: unknown[] = [];
     const set = (column: string, value: unknown) => {

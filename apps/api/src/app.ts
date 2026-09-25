@@ -11,6 +11,7 @@ import { billingGuard, billingRoutes } from "./modules/billing/routes.js";
 import { razorpayGateway, type PaymentGateway } from "./modules/billing/gateway.js";
 import { businessTypeRoutes } from "./modules/business-types/routes.js";
 import { fileRoutes } from "./modules/files/routes.js";
+import { growRoutes } from "./modules/grow/routes.js";
 import type { Files } from "./modules/files/service.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { moneyRoutes } from "./modules/money/routes.js";
@@ -106,6 +107,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       reportRoutes(v1, { db });
       taskRoutes(v1, { db });
       reviewRoutes(v1, { db });
+      growRoutes(v1, { db });
       billingRoutes(v1, { db, config, gateway });
     },
     { prefix: "/api/v1" },

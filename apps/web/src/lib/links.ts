@@ -15,3 +15,9 @@ export const inviteUrl = (token: string) => `${window.location.origin}/invite/${
 
 /** The client's link to a bill: they can see it and pay by UPI. */
 export const billUrl = (token: string) => `${window.location.origin}/b/${token}`;
+
+/** The client's own page: their events, quotes, bills and payments. */
+export const portalUrl = (token: string) => `${window.location.origin}/c/${token}`;
+
+/** A client's "recommend us" link: the enquiry form, crediting them. */
+export const referralUrl = (slug: string, code: string) => `${window.location.origin}/f/${slug}?ref=${encodeURIComponent(code)}`;

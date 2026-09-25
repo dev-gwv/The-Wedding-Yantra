@@ -806,3 +806,40 @@ with a DLT-approved template).
   blocking every sign-in.
 - **Until one is set up,** nothing changes. `docs/DEPLOYMENT.md` section 12 has the steps,
   ending with switching `AUTH_OTP_DEV_ECHO` off.
+
+---
+
+## 26. Built in Phase 6, part 1: the client's own page, reviews and referrals
+
+**Each client gets one link for everything.** From the client's screen, the owner or a
+manager taps "Make their page" and sends it on WhatsApp. At `/c/<link>` the client sees,
+without signing in:
+- their events, with every function's date, time and venue;
+- the quotes they were sent, with links to accept them;
+- their bills, with the balance and Pay by UPI;
+- what they've paid, receipt by receipt.
+
+Drafts, cancelled bills and cancelled events stay private, and the page carries no
+internal ids. Sharing again sends the same link. "Stop sharing" kills the link at once,
+and sharing later makes a new one. Search engines are told not to index the page.
+
+**Asking for a review.**
+- The business profile has a Google review link.
+- Once an event is over (its last day has passed, or it's marked done), the event shows
+  "Ask for a review". One tap opens WhatsApp with a polite message and the link, and the
+  app notes that the client was asked, so nobody asks twice by mistake.
+- The client's own page also asks for a review once an event is over.
+- **More, Reviews and referrals** lists every event that ended in the last 60 days and
+  hasn't been asked about, with a one-tap ask.
+
+**Referrals.**
+- Every client's page has a "recommend us" link: the enquiry form with the client's code.
+  Friends see "Recommended by Kavya", and their enquiry arrives as a referral credited to
+  Kavya, by itself.
+- When an enquiry is added by hand with "Referral" as the source, owners and managers can
+  pick the client who sent it.
+- The client's screen lists the enquiries they sent and how many booked. Reviews and
+  referrals shows referral enquiries for the last 12 months, how many booked, and the
+  clients who send the most work.
+
+The activity log records pages shared and stopped, and review requests.

@@ -9,6 +9,7 @@ export * from "./billing.js";
 export * from "./business-types.js";
 export * from "./common.js";
 export * from "./expenses.js";
+export * from "./grow.js";
 export * from "./home.js";
 export * from "./money.js";
 export * from "./reports.js";

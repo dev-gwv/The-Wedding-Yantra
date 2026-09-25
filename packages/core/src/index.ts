@@ -1,5 +1,6 @@
 export * from "./bills.js";
 export * from "./dates.js";
+export * from "./grow.js";
 export * from "./money.js";
 export * from "./phone.js";
 export * from "./plans.js";

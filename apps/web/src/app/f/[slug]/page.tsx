@@ -2,9 +2,9 @@
 
 import { usePublicForm, useSubmitPublicForm } from "@wedding-yantra/api-client/react";
 import { EVENT_LABELS, EVENT_TYPES, submitLeadFormInput, type EventType } from "@wedding-yantra/types";
-import { CircleCheck, MailX } from "lucide-react";
-import { useParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { CircleCheck, Heart, MailX } from "lucide-react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import { BusinessIcon } from "@/components/app/business-icon";
 import { LogoMark } from "@/components/app/logo";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,18 @@ import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 /** The page a business shares on Instagram or WhatsApp, or prints as a QR code. */
 export default function PublicEnquiryPage() {
+  return (
+    <Suspense fallback={<Splash />}>
+      <PublicEnquiry />
+    </Suspense>
+  );
+}
+
+function PublicEnquiry() {
   const { slug } = useParams<{ slug: string }>();
-  const form = usePublicForm(slug);
+  // Opened from a client's "recommend us" link: the enquiry is credited to them.
+  const ref = useSearchParams().get("ref")?.trim().slice(0, 40) || undefined;
+  const form = usePublicForm(slug, ref);
   const submit = useSubmitPublicForm(slug);
   const [values, setValues] = useState({ name: "", phone: "", eventType: "", eventDate: "", city: "", message: "", website: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -26,7 +36,7 @@ export default function PublicEnquiryPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const payload = { ...values, eventType: (values.eventType || null) as EventType | null };
+    const payload = { ...values, eventType: (values.eventType || null) as EventType | null, ...(ref && { ref }) };
     const check = validate(submitLeadFormInput, payload);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
@@ -52,6 +62,11 @@ export default function PublicEnquiryPage() {
             <p className="mt-1 text-ink-muted">
               {business.businessTypeName} · {business.city}
             </p>
+            {business.referrer && (
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-sm font-semibold text-brand-strong ring-1 ring-sun-300/60">
+                <Heart className="size-4" /> Recommended by {business.referrer}
+              </p>
+            )}
           </div>
         )}
 

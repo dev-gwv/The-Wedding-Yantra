@@ -58,6 +58,15 @@ export const updateWorkspaceInput = z
       .transform((v) => (v === "" ? null : v))
       .nullable()
       .optional(),
+    /** Where clients leave a review, e.g. the Google Business Profile review link */
+    reviewUrl: z
+      .string()
+      .trim()
+      .max(500, "That link is too long")
+      .refine((v) => v === "" || /^https:\/\/[^\s/]+\.[^\s]+$/i.test(v), "Paste the whole link, starting with https://")
+      .transform((v) => (v === "" ? null : v))
+      .nullable()
+      .optional(),
     /** Starts every bill number: INV/26-27/0001 */
     billPrefix: z
       .string()
@@ -85,6 +94,7 @@ export const workspace = z.object({
   upiId: z.string().nullable(),
   billPrefix: z.string(),
   billTerms: z.string().nullable(),
+  reviewUrl: z.string().nullable(),
   /** The time zone the business's days are counted in, e.g. Asia/Kolkata */
   timezone: z.string(),
   createdAt: z.string(),

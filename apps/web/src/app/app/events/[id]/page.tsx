@@ -10,6 +10,7 @@ import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
+import { ReviewCard } from "@/components/grow/review-card";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
 import { EventTasks, EventTeamCard } from "@/components/tasks/event-work";
@@ -99,6 +100,8 @@ function EventView({ event }: { event: WeddingEvent }) {
           </div>
         )}
       </Card>
+
+      <ReviewCard event={event} />
 
       {event.clashes.length > 0 && event.status === "confirmed" && (
         <div className="flex gap-3 rounded-2xl bg-warning-soft p-4 text-warning">

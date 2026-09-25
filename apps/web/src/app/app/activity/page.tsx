@@ -19,6 +19,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
   lead: (id) => `/app/leads/${id}`,
   bill: (id) => `/app/bills/${id}`,
   quote: (id) => `/app/quotes/${id}`,
+  client: (id) => `/app/clients/${id}`,
   team: () => "/app/team",
   expenses: () => "/app/money?view=expenses",
   tasks: () => "/app/tasks?view=team",
@@ -139,7 +140,7 @@ function Row({ item, time }: { item: ActivityItem; time: string }) {
   const text = activityText({ ...item, actorName: item.actor?.name ?? null });
   // Notes and calls carry what was said; show it under the sentence.
   const quote = item.action === "lead.note" || item.action === "lead.call" ? item.detail : null;
-  const href = item.link && (item.link.id || !["event", "lead", "bill", "quote"].includes(item.link.kind)) ? LINKS[item.link.kind](item.link.id) : null;
+  const href = item.link && (item.link.id || !["event", "lead", "bill", "quote", "client"].includes(item.link.kind)) ? LINKS[item.link.kind](item.link.id) : null;
   const body = (
     <>
       {item.actor ? (

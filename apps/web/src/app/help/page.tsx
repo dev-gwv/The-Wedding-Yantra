@@ -60,6 +60,17 @@ const GUIDES: Guide[] = [
     ],
   },
   {
+    id: "clients",
+    title: "Clients, reviews and referrals",
+    steps: [
+      "Give each client their own page: on the client, tap “Make their page” and send it on WhatsApp. It shows their event dates, quotes, bills with Pay by UPI, and what they've paid, always up to date. No sign-in needed.",
+      "Stop sharing whenever you like. The old link stops working at once.",
+      "Add your Google review link in Business profile. Once an event is over, the event shows “Ask for a review”: one tap sends a polite WhatsApp message with the link.",
+      "More, Reviews and referrals lists every finished event you haven't asked about yet, and the clients who send you the most work.",
+      "Each client's page has a “recommend us” link. Enquiries from it are marked as their referral by themselves. You can also pick the client when you add an enquiry that came from a referral.",
+    ],
+  },
+  {
     id: "events",
     title: "Events, your team and checklists",
     steps: [

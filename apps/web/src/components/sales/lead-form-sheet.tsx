@@ -11,6 +11,7 @@ import {
   type EventType,
   type Lead,
   type LeadSource,
+  type PersonRef,
 } from "@wedding-yantra/types";
 import { ChevronDown } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
+import { ClientPicker } from "./client-picker";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 interface Values {
@@ -80,6 +82,9 @@ export function LeadFormSheet({
 function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => void }) {
   const { workspace } = useCurrentWorkspace();
   const canAssign = can(workspace.role, "leads.assign");
+  // Naming a client as the referrer needs the client list, which staff don't see.
+  const canPickClient = can(workspace.role, "clients.view");
+  const [referrer, setReferrer] = useState<PersonRef | null>(lead?.referredByClient ?? null);
   const team = useTeam(canAssign ? workspace.id : null);
   const create = useCreateLead(workspace.id);
   const update = useUpdateLead(workspace.id, lead?.id ?? "");
@@ -89,6 +94,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   const busy = create.isPending || update.isPending;
 
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
+
+  const referral = values.source === "referral";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -103,14 +110,16 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
       guestCount: values.guestCount,
       budget: values.budget,
       source: (values.source || undefined) as LeadSource | undefined,
-      referredBy: values.referredBy,
+      // A picked client is the referrer; their name goes in "Referred by" too.
+      referredBy: referral && referrer ? referrer.name : values.referredBy,
+      ...(canPickClient ? { referredByClientId: referral ? (referrer?.id ?? null) : null } : {}),
       requirements: values.requirements,
       ...(canAssign && values.assignedToUserId ? { assignedToUserId: values.assignedToUserId } : {}),
     };
     const check = validate(createLeadInput, payload);
     if (check.errors) {
       setErrors(check.errors);
-      if (["email", "venue", "guestCount", "referredBy", "requirements", "city"].some((k) => check.errors[k])) setMore(true);
+      if (["email", "venue", "guestCount", "requirements", "city", ...(referral ? [] : ["referredBy"])].some((k) => check.errors[k])) setMore(true);
       return;
     }
     setErrors({});
@@ -157,6 +166,35 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
         </SelectField>
       </div>
 
+      {referral && (
+        <div className="space-y-3 rounded-2xl bg-cream/60 p-4">
+          {canPickClient ? (
+            <ClientPicker
+              label="Which client referred them?"
+              value={referrer}
+              onChange={setReferrer}
+              error={errors.referredByClientId}
+              hint="Find them by name or number. Their client page then lists who they sent you."
+            />
+          ) : (
+            referrer && (
+              <p className="text-sm">
+                <span className="font-semibold">Referred by</span> {referrer.name}
+              </p>
+            )
+          )}
+          {!referrer && (
+            <TextField
+              label={canPickClient ? "Or who referred them" : "Referred by"}
+              value={values.referredBy}
+              onChange={set("referredBy")}
+              error={errors.referredBy}
+              placeholder="A friend, a planner, a venue"
+            />
+          )}
+        </div>
+      )}
+
       {canAssign && team.data && team.data.members.length > 1 && (
         <SelectField label="Who handles it" value={values.assignedToUserId} onChange={set("assignedToUserId")} error={errors.assignedToUserId}>
           {!lead && <option value="">Me</option>}
@@ -183,7 +221,7 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
           </div>
           <TextField label="Venue" value={values.venue} onChange={set("venue")} error={errors.venue} />
           <TextField label="Email" type="email" value={values.email} onChange={set("email")} error={errors.email} />
-          <TextField label="Referred by" value={values.referredBy} onChange={set("referredBy")} error={errors.referredBy} />
+          {!referral && <TextField label="Referred by" value={values.referredBy} onChange={set("referredBy")} error={errors.referredBy} />}
           <TextAreaField
             label="What they need"
             value={values.requirements}

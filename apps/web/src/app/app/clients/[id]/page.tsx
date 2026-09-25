@@ -2,6 +2,7 @@
 
 import { can, formatPhone, whatsappLink } from "@wedding-yantra/core";
 import { useBills, useClient, useEvents, useQuotes } from "@wedding-yantra/api-client/react";
+import type { Client } from "@wedding-yantra/types";
 import { FilePlus2, FileText, MessageCircle, Pencil, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { EventCard } from "@/components/bookings/event-card";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { PortalCard } from "@/components/grow/portal-card";
 import { BillRow } from "@/components/money/rows";
 import { ClientFormSheet } from "@/components/sales/client-form-sheet";
 import { LeadCard } from "@/components/sales/lead-card";
@@ -80,6 +82,8 @@ export default function ClientPage() {
             {c.notes && <p className="mt-5 whitespace-pre-line rounded-2xl bg-cream p-4">{c.notes}</p>}
           </Card>
 
+          {can(workspace.role, "clients.manage") && <PortalCard client={c} business={workspace.name} />}
+
           {events.data && events.data.length > 0 && (
             <section>
               <h2 className="mb-3 font-display text-lg font-extrabold">Events</h2>
@@ -113,6 +117,8 @@ export default function ClientPage() {
             </section>
           )}
 
+          {c.referredLeads.length > 0 && <Referred client={c} />}
+
           <section>
             <h2 className="mb-3 font-display text-lg font-extrabold">Enquiries</h2>
             {c.leads.length === 0 ? (
@@ -139,5 +145,25 @@ export default function ClientPage() {
         />
       )}
     </>
+  );
+}
+
+/** Enquiries this client sent your way. */
+function Referred({ client }: { client: Client }) {
+  const leads = client.referredLeads;
+  const booked = leads.filter((l) => l.stageKind === "won").length;
+  return (
+    <section>
+      <h2 className="font-display text-lg font-extrabold">Sent your way</h2>
+      <p className="mb-3 text-sm text-ink-muted">
+        {client.name.split(" ")[0]} referred {leads.length === 1 ? "this enquiry" : `${leads.length} enquiries`}
+        {booked > 0 ? `, and ${booked} booked` : ""}.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {leads.map((lead) => (
+          <LeadCard key={lead.id} lead={lead} showStage />
+        ))}
+      </div>
+    </section>
   );
 }

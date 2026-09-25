@@ -82,7 +82,7 @@ export const queryKeys = {
   client: (id: string, clientId: string) => ["workspace", id, "sales", "client", clientId] as const,
   templates: (id: string) => ["workspace", id, "templates"] as const,
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
-  publicForm: (slug: string) => ["public-form", slug] as const,
+  publicForm: (slug: string, ref: string) => ["public-form", slug, ref] as const,
   catalogue: (id: string, all: boolean) => ["workspace", id, "catalogue", all] as const,
   /** Quotes, events and the calendar; invalidate this after any booking change. */
   bookings: (id: string) => ["workspace", id, "bookings"] as const,
@@ -115,6 +115,9 @@ export const queryKeys = {
   activity: (id: string, userId: string) => ["workspace", id, "review", "activity", userId] as const,
   dailySummary: (id: string, date: string) => ["workspace", id, "review", "daily-summary", date] as const,
   billing: (id: string) => ["workspace", id, "billing"] as const,
+  /** Reviews to ask for and who refers work */
+  grow: (id: string) => ["workspace", id, "grow"] as const,
+  portal: (token: string) => ["public-portal", token] as const,
 };
 
 interface QueryOpts {
@@ -388,9 +391,10 @@ export function useSetLeadFormEnabled(workspaceId: string) {
   });
 }
 
-export function usePublicForm(slug: string) {
+/** `ref` is the code from a client's "recommend us" link. */
+export function usePublicForm(slug: string, ref?: string) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.publicForm(slug), queryFn: () => api.leadForm.publicGet(slug), retry: false });
+  return useQuery({ queryKey: queryKeys.publicForm(slug, ref ?? ""), queryFn: () => api.leadForm.publicGet(slug, ref), retry: false });
 }
 
 export function useSubmitPublicForm(slug: string) {
@@ -805,4 +809,42 @@ export function useBilling(workspaceId: string, enabled = true) {
 export function useCheckout(workspaceId: string) {
   const api = useApi();
   return useMutation({ mutationFn: (input: CheckoutInput) => api.billing.checkout(workspaceId, input) });
+}
+
+// ---- Grow: the client's own page, reviews and referrals -----------------------------
+
+/** Turns on a client's page and returns its link. */
+export function useSharePortal(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (clientId: string) => api.grow.sharePortal(workspaceId, clientId));
+}
+
+/** Stops sharing a client's page; the old link stops working. */
+export function useStopPortal(workspaceId: string) {
+  const api = useApi();
+  return useSalesMutation(workspaceId, (clientId: string) => api.grow.stopPortal(workspaceId, clientId));
+}
+
+/** The client's own page, as they see it. */
+export function usePortal(token: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.portal(token), queryFn: () => api.grow.portal(token), retry: false });
+}
+
+/** Notes that a client was asked for a review of an event. */
+export function useRequestReview(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => api.grow.requestReview(workspaceId, eventId),
+    onSuccess: (event) => {
+      qc.setQueryData(queryKeys.event(workspaceId, event.id), event);
+      void qc.invalidateQueries({ queryKey: queryKeys.grow(workspaceId) });
+    },
+  });
+}
+
+export function useGrow(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.grow(workspaceId), queryFn: () => api.grow.summary(workspaceId), enabled });
 }

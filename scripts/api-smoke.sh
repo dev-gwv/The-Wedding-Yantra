@@ -59,7 +59,7 @@ start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
-  0011_billing; do
+  0011_billing 0012_client_portal; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -146,6 +146,13 @@ expect "every business starts on a free trial" '.success and .data.status == "tr
   "$(api GET "/api/v1/workspaces/$WS_ID/billing" "" "$TOKEN")"
 expect "days off can be marked" '.success and .data.startDate == "2026-12-24" and .data.endDate == "2026-12-26"' \
   "$(api POST "/api/v1/workspaces/$WS_ID/time-off" '{"startDate":"2026-12-24","endDate":"2026-12-26","note":"Smoke holiday"}' "$TOKEN")"
+CLIENT_ID="$(api GET "/api/v1/workspaces/$WS_ID/leads/$LEAD_ID" "" "$TOKEN" | jq -r '.data.clientId')"
+PORTAL="$(api POST "/api/v1/workspaces/$WS_ID/clients/$CLIENT_ID/portal" "" "$TOKEN")"
+expect "a client's own page can be shared" '.success and (.data.token | length) >= 32' "$PORTAL"
+expect "the client opens it without signing in and sees their bill" '.success and .data.client.name == "Smoke Lead" and (.data.bills | length) == 1 and .data.totals.due == 0' \
+  "$(api GET "/api/v1/public/clients/$(echo "$PORTAL" | jq -r '.data.token')")"
+expect "reviews and referrals are worked out" '.success and .data.referrals.enquiries == 0' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/grow" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

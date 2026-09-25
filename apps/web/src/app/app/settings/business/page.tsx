@@ -47,6 +47,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     upiId: workspace.upiId ?? "",
     billPrefix: workspace.billPrefix,
     billTerms: workspace.billTerms ?? "",
+    reviewUrl: workspace.reviewUrl ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -156,6 +157,20 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             error={errors.billTerms}
             placeholder={"Bank: HDFC Bank, A/c 50100123456789, IFSC HDFC0001234\nBalance due before the event."}
             hint="Printed at the bottom of every new bill."
+          />
+        </Card>
+
+        <Card id="reviews" className="scroll-mt-6 space-y-5 p-5">
+          <h2 className="font-display text-lg font-extrabold">Reviews</h2>
+          <TextField
+            label="Google review link"
+            value={values.reviewUrl}
+            onChange={set("reviewUrl")}
+            error={errors.reviewUrl}
+            placeholder="https://g.page/r/…/review"
+            inputMode="url"
+            autoCapitalize="none"
+            hint="In your Google Business Profile, tap “Ask for reviews” and copy the link. After each event, you can ask the client for a review in one tap."
           />
         </Card>
 

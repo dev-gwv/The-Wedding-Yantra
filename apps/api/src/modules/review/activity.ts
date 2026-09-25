@@ -91,7 +91,7 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
   const ids = (type: string) => new Set(page.filter((r) => r.entity_type === type && r.entity_id).map((r) => r.entity_id!));
   const metaIds = (key: string) => new Set(page.map((r) => str(r.meta[key])).filter((v): v is string => v !== null));
   const ws = ctx.workspaceId;
-  const [events, tasks, bills, payments, expenses, quotes, members, invitations, leads, users, workspace] = await Promise.all([
+  const [events, tasks, bills, payments, expenses, quotes, members, invitations, leads, clients, users, workspace] = await Promise.all([
     lookup<{ id: string; title: string }>(db, `SELECT id, title FROM events WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("event")),
     lookup<{ id: string; title: string; event_id: string | null; event_title: string | null }>(
       db,
@@ -138,6 +138,7 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
     ),
     lookup<{ id: string; name: string }>(db, `SELECT id, name FROM invitations WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("invitation")),
     lookup<{ id: string; name: string }>(db, `SELECT id, name FROM leads WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("lead")),
+    lookup<{ id: string; name: string }>(db, `SELECT id, name FROM clients WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("client")),
     // People a task went to or marked off; limited to members of this business, past or present.
     lookup<{ id: string; name: string | null }>(
       db,
@@ -188,7 +189,12 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
       }
       case "event":
         item.subject = (id && events.get(id)?.title) ?? null;
+        if (r.action === "event.review_requested") item.other = str(m.client);
         item.link = id ? { kind: "event", id } : null;
+        break;
+      case "client":
+        item.subject = (id && clients.get(id)?.name) ?? null;
+        item.link = id ? { kind: "client", id } : null;
         break;
       case "bill": {
         const bill = id ? bills.get(id) : undefined;
@@ -240,7 +246,10 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.link = id ? { kind: "lead", id } : null;
         if (r.action === "lead.stage_changed") item.detail = str(m.to);
         else if (r.action === "lead.assigned") item.other = str(m.toName);
-        else if (r.action === "lead.created") item.detail = m.source === "enquiry_form" ? "enquiry form" : null;
+        else if (r.action === "lead.created") {
+          item.detail = m.source === "enquiry_form" || m.via === "enquiry_form" ? "enquiry form" : null;
+          item.other = str(m.referrer);
+        }
         else if (r.body) item.detail = r.body.length > 140 ? `${r.body.slice(0, 139)}…` : r.body;
         break;
     }

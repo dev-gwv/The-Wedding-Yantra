@@ -40,7 +40,7 @@ export interface TeamScores {
 // Activity log
 // ---------------------------------------------------------------------------
 
-export const ACTIVITY_LINK_KINDS = ["event", "lead", "bill", "quote", "team", "expenses", "tasks"] as const;
+export const ACTIVITY_LINK_KINDS = ["event", "lead", "bill", "quote", "client", "team", "expenses", "tasks"] as const;
 export type ActivityLinkKind = (typeof ACTIVITY_LINK_KINDS)[number];
 
 /** One thing someone did. `activityText()` in core turns it into a sentence. */

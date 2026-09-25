@@ -96,6 +96,12 @@ export function activityText(a: ActivityFacts): string {
       return `confirmed ${subject} again`;
     case "event.team_changed":
       return `chose the team for ${subject}`;
+    case "event.review_requested":
+      return `asked ${a.other ?? "the client"} for a review of ${subject}`;
+    case "client.portal_shared":
+      return `shared ${subject ? `${subject}'s` : "a client's"} page with them`;
+    case "client.portal_stopped":
+      return `stopped sharing ${subject ? `${subject}'s` : "a client's"} page`;
     case "bill.created":
       return `made bill ${subject}${a.other ? ` for ${a.other}` : ""}${money ? ` (${money})` : ""}`;
     case "bill.updated":
@@ -125,7 +131,9 @@ export function activityText(a: ActivityFacts): string {
     case "time_off.added":
       return a.other ? `marked ${a.other} as off${a.detail ? ` ${a.detail}` : ""}` : `will be off${a.detail ? ` ${a.detail}` : ""}`;
     case "lead.created":
-      return a.actorName ? `added the enquiry ${subject}` : `New enquiry from ${subject}${a.detail ? ` via the ${a.detail}` : ""}`;
+      return a.actorName
+        ? `added the enquiry ${subject}`
+        : `New enquiry from ${subject}${a.detail ? ` via the ${a.detail}` : ""}${a.other ? `, recommended by ${a.other}` : ""}`;
     case "lead.note":
       return a.actorName ? `added a note on ${subject}` : `${subject} sent the enquiry form again`;
     case "lead.call":

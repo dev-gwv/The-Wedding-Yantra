@@ -142,12 +142,13 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
       lead_assigned_to: string | null;
       lead_created_by: string | null;
       client_phone: string | null;
+      review_requested_at: Date | null;
       created_at: Date;
     }
   >(
     `SELECT e.id, e.title, e.event_type, e.status, e.client_id, c.name AS client_name, c.phone AS client_phone,
             e.value, e.city, e.venue, e.notes, l.id AS live_lead_id, l.assigned_to AS lead_assigned_to,
-            l.created_by AS lead_created_by, e.created_at,
+            l.created_by AS lead_created_by, e.review_requested_at, e.created_at,
             (SELECT min(date)::text FROM event_functions WHERE event_id = e.id) AS start_date,
             (SELECT max(date)::text FROM event_functions WHERE event_id = e.id) AS end_date,
             (SELECT count(*) FROM event_functions WHERE event_id = e.id) AS function_count
@@ -223,6 +224,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
             [...new Set(functions.map((f) => f.date))],
             eventId,
           ),
+    reviewRequestedAt: r.review_requested_at?.toISOString() ?? null,
     createdAt: r.created_at.toISOString(),
   };
 }

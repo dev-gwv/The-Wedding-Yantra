@@ -140,6 +140,8 @@ export interface Lead extends LeadSummary {
   venue: string | null;
   guestCount: number | null;
   referredBy: string | null;
+  /** The client who referred them, when they're one of yours */
+  referredByClient: PersonRef | null;
   requirements: string | null;
   lostReason: LostReason | null;
   createdBy: PersonRef | null;
@@ -200,6 +202,8 @@ const leadFields = {
   budget: optionalAmount,
   source: z.enum(LEAD_SOURCES).optional(),
   referredBy: optionalText(120),
+  /** One of your clients who referred them */
+  referredByClientId: z.uuid().nullable().optional(),
   requirements: optionalText(2000),
   stageId: z.uuid().optional(),
   assignedToUserId: z.uuid().nullable().optional(),
@@ -266,6 +270,10 @@ export interface ClientSummary {
 export interface Client extends ClientSummary {
   notes: string | null;
   leads: LeadSummary[];
+  /** Enquiries this client sent your way */
+  referredLeads: LeadSummary[];
+  /** Their own page is shared at /c/<token>. Only owners and managers see it; null when not shared. */
+  portalToken: string | null;
 }
 
 export const clientInput = z.object({
@@ -312,6 +320,8 @@ export interface PublicLeadForm {
   businessTypeName: string;
   businessTypeIcon: string;
   city: string;
+  /** First name of the client whose "recommend us" link was opened */
+  referrer: string | null;
 }
 
 export const submitLeadFormInput = z.object({
@@ -323,5 +333,7 @@ export const submitLeadFormInput = z.object({
   message: optionalText(1000),
   /** Hidden from people; bots fill it in. */
   website: z.string().max(200).optional(),
+  /** The code from a client's "recommend us" link */
+  ref: z.string().trim().max(40).optional(),
 });
 export type SubmitLeadFormInput = z.input<typeof submitLeadFormInput>;

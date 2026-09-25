@@ -1,5 +1,5 @@
 import type { PublicLeadForm } from "@wedding-yantra/types";
-import { withTransaction, type Db } from "../../db.js";
+import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, notFound } from "../../lib/http.js";
 import { firstOpenStage } from "./leads.js";
 
@@ -29,13 +29,26 @@ async function loadForm(db: Db, slug: string): Promise<FormRow> {
   return rows[0];
 }
 
-export async function getPublicForm(db: Db, slug: string): Promise<PublicLeadForm> {
+/** The client whose "recommend us" link this is, if the code is theirs. */
+async function findReferrer(db: Queryable, workspaceId: string, code: string | undefined) {
+  if (!code) return null;
+  const { rows } = await db.query<{ id: string; name: string }>(
+    `SELECT id, name FROM clients WHERE workspace_id = $1 AND referral_code = $2 AND deleted_at IS NULL`,
+    [workspaceId, code.toLowerCase()],
+  );
+  return rows[0] ?? null;
+}
+
+export async function getPublicForm(db: Db, slug: string, ref?: string): Promise<PublicLeadForm> {
   const f = await loadForm(db, slug);
+  const referrer = await findReferrer(db, f.workspace_id, ref);
   return {
     businessName: f.name,
     businessTypeName: f.business_type_name,
     businessTypeIcon: f.business_type_icon,
     city: f.city,
+    // Only the first name: the link travels between friends.
+    referrer: referrer ? (referrer.name.trim().split(/\s+/)[0] ?? null) : null,
   };
 }
 
@@ -55,6 +68,7 @@ export async function submitPublicForm(
     city?: string | null;
     message?: string | null;
     website?: string;
+    ref?: string;
   },
 ): Promise<{ received: true }> {
   const form = await loadForm(db, slug);
@@ -88,11 +102,13 @@ export async function submitPublicForm(
       return;
     }
 
+    // Sent from a client's "recommend us" link: it's their referral.
+    const referrer = await findReferrer(tx, form.workspace_id, input.ref);
     const stage = await firstOpenStage(tx, form.workspace_id);
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO leads (workspace_id, stage_id, name, phone, event_type, event_date, city, requirements,
-                          source, assigned_to, next_follow_up_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'enquiry_form', $9, now())
+                          source, referred_by, referred_by_client_id, assigned_to, next_follow_up_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
        RETURNING id`,
       [
         form.workspace_id,
@@ -103,12 +119,19 @@ export async function submitPublicForm(
         input.eventDate ?? null,
         input.city ?? null,
         input.message ?? null,
+        referrer ? "referral" : "enquiry_form",
+        referrer?.name ?? null,
+        referrer?.id ?? null,
         form.owner_id,
       ],
     );
     await tx.query(
       `INSERT INTO lead_activities (workspace_id, lead_id, kind, meta) VALUES ($1, $2, 'created', $3)`,
-      [form.workspace_id, rows[0]!.id, { source: "enquiry_form" }],
+      [
+        form.workspace_id,
+        rows[0]!.id,
+        referrer ? { source: "referral", via: "enquiry_form", referrer: referrer.name } : { source: "enquiry_form" },
+      ],
     );
     // A form enquiry wants a reply the same day: that's its first follow-up.
     await tx.query(

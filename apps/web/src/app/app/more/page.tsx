@@ -14,6 +14,7 @@ import {
   CreditCard,
   History,
   MessageSquareText,
+  Star,
   Trophy,
   GitBranch,
   ListChecks,
@@ -70,6 +71,7 @@ export default function MorePage() {
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             {can(workspace.role, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
+            {can(workspace.role, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}

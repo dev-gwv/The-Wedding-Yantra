@@ -131,8 +131,9 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
   });
 
   // Public: no sign-in. Anyone with the link can see the form and send an enquiry.
-  app.get<{ Params: { slug: string } }>("/public/forms/:slug", async (request) => {
-    return ok(await publicForm.getPublicForm(db, request.params.slug));
+  app.get<{ Params: { slug: string }; Querystring: { ref?: string } }>("/public/forms/:slug", async (request) => {
+    const ref = typeof request.query.ref === "string" ? request.query.ref.trim().slice(0, 40) : undefined;
+    return ok(await publicForm.getPublicForm(db, request.params.slug, ref || undefined));
   });
 
   app.post<{ Params: { slug: string } }>("/public/forms/:slug", async (request, reply) => {

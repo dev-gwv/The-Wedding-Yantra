@@ -240,6 +240,8 @@ export interface WeddingEvent extends EventSummary {
   clashes: EventClash[];
   /** Who works this event */
   team: TeamMember[];
+  /** When the client was asked for a review of it */
+  reviewRequestedAt: string | null;
   createdAt: string;
 }
 

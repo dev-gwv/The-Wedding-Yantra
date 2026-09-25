@@ -12,6 +12,7 @@ interface ClientRow {
   email: string | null;
   city: string | null;
   notes: string | null;
+  portal_token: string | null;
   lead_count: string;
   created_at: Date;
 }
@@ -27,7 +28,7 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
 });
 
 const SELECT = `
-  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.created_at,
+  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.portal_token, c.created_at,
          (SELECT count(*) FROM leads l WHERE l.client_id = c.id AND l.deleted_at IS NULL) AS lead_count
     FROM clients c`;
 
@@ -65,8 +66,9 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
   const row = rows[0];
   if (!row) throw notFound("This client");
 
-  let leads: Client["leads"] = [];
-  if (leadScope(ctx.role) !== "none") {
+  // Their own enquiries, and the ones they sent our way.
+  const leadsWhere = async (column: "client_id" | "referred_by_client_id") => {
+    if (leadScope(ctx.role) === "none") return [];
     const params: unknown[] = [ctx.workspaceId, clientId];
     const scope = scopeCondition(ctx, params);
     const result = await db.query<SummaryRow>(
@@ -77,13 +79,21 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
          FROM leads l
          JOIN pipeline_stages s ON s.id = l.stage_id
          LEFT JOIN users au ON au.id = l.assigned_to
-        WHERE l.workspace_id = $1 AND l.client_id = $2 AND l.deleted_at IS NULL AND ${scope}
+        WHERE l.workspace_id = $1 AND l.${column} = $2 AND l.deleted_at IS NULL AND ${scope}
         ORDER BY l.created_at DESC`,
       params,
     );
-    leads = result.rows.map(toSummary);
-  }
-  return { ...toClientSummary(row), notes: row.notes, leads };
+    return result.rows.map(toSummary);
+  };
+  const [leads, referredLeads] = await Promise.all([leadsWhere("client_id"), leadsWhere("referred_by_client_id")]);
+  return {
+    ...toClientSummary(row),
+    notes: row.notes,
+    leads,
+    referredLeads,
+    // The page link lets anyone see the client's bills, so only those who share it see it.
+    portalToken: can(ctx.role, "clients.manage") ? row.portal_token : null,
+  };
 }
 
 export interface ClientFields {

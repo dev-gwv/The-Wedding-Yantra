@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { QuoteRow } from "@/components/bookings/quote-row";
@@ -312,16 +312,27 @@ function QuotesAndEvent({ lead }: { lead: Lead }) {
 }
 
 function Details({ lead }: { lead: Lead }) {
-  const rows: [string, string | null][] = [
+  const { workspace } = useCurrentWorkspace();
+  const referrer = lead.referredByClient;
+  const rows: [string, ReactNode][] = [
     ["Came from", SOURCE_LABELS[lead.source]],
     ["Venue", lead.venue],
     ["City", lead.city],
     ["Guests", lead.guestCount !== null ? lead.guestCount.toLocaleString("en-IN") : null],
     ["Email", lead.email],
-    ["Referred by", lead.referredBy],
+    [
+      "Referred by",
+      referrer && can(workspace.role, "clients.view") ? (
+        <Link href={`/app/clients/${referrer.id}`} className="text-brand-strong hover:text-brand-deep">
+          {referrer.name}
+        </Link>
+      ) : (
+        (referrer?.name ?? lead.referredBy)
+      ),
+    ],
     ["Handled by", lead.assignedTo?.name ?? (lead.assignedTo ? "Team member" : "Nobody yet")],
   ];
-  const shown = rows.filter((r): r is [string, string] => !!r[1]);
+  const shown = rows.filter((r) => !!r[1]);
   return (
     <Card className="p-5 sm:p-6">
       <h2 className="font-display text-lg font-extrabold">Details</h2>
@@ -394,6 +405,7 @@ function describe(a: LeadActivity): string {
   const m = a.meta as Record<string, string | null | undefined>;
   switch (a.kind) {
     case "created":
+      if (m.via === "enquiry_form") return `Sent your enquiry form${m.referrer ? `, recommended by ${m.referrer}` : ""}`;
       return m.source === "enquiry_form" ? "Sent your enquiry form" : `${who} added this lead`;
     case "note":
       // Notes without a person came from the client's quote link.

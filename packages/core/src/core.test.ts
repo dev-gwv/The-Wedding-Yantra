@@ -431,3 +431,35 @@ describe("plans and billing", () => {
     expect(daysLeft("2026-09-20T00:00:00Z", now)).toBe(0);
   });
 });
+
+import { eventIsOver, portalMessage, referralMessage, reviewMessage } from "./index.js";
+
+describe("reviews and referrals", () => {
+  it("counts an event as over once it's done or its last day has passed", () => {
+    expect(eventIsOver({ status: "confirmed", endDate: "2026-09-24" }, "2026-09-25")).toBe(true);
+    expect(eventIsOver({ status: "confirmed", endDate: "2026-09-25" }, "2026-09-25")).toBe(false);
+    expect(eventIsOver({ status: "confirmed", endDate: null }, "2026-09-25")).toBe(false);
+    expect(eventIsOver({ status: "completed", endDate: "2026-12-01" }, "2026-09-25")).toBe(true);
+    expect(eventIsOver({ status: "cancelled", endDate: "2026-09-01" }, "2026-09-25")).toBe(false);
+  });
+  it("writes the messages in the business's voice, by first name", () => {
+    expect(portalMessage({ clientName: "Kavya Rao", business: "Riya Studio", link: "https://x/c/t" })).toBe(
+      "Hi Kavya, here is your page with Riya Studio. It has your event dates, quotes, bills and payments, always up to date: https://x/c/t",
+    );
+    const review = reviewMessage({ clientName: " Kavya Rao ", business: "Riya Studio", link: "https://g.page/r/abc/review" });
+    expect(review.startsWith("Hi Kavya, thank you for choosing Riya Studio!")).toBe(true);
+    expect(review.endsWith("https://g.page/r/abc/review")).toBe(true);
+    expect(referralMessage({ business: "Riya Studio", link: "https://x/f/riya?ref=abc" })).toContain("send them your enquiry here: https://x/f/riya?ref=abc");
+  });
+  it("tells the activity log about pages and review requests", () => {
+    const base = { actorName: "Riya", subject: null, other: null, amount: null, detail: null, late: false };
+    expect(activityText({ ...base, action: "client.portal_shared", subject: "Kavya Rao" })).toBe("shared Kavya Rao's page with them");
+    expect(activityText({ ...base, action: "client.portal_stopped", subject: "Kavya Rao" })).toBe("stopped sharing Kavya Rao's page");
+    expect(activityText({ ...base, action: "event.review_requested", subject: "Rao wedding", other: "Kavya Rao" })).toBe(
+      "asked Kavya Rao for a review of Rao wedding",
+    );
+    expect(activityText({ ...base, actorName: null, action: "lead.created", subject: "Neha", detail: "enquiry form", other: "Kavya Rao" })).toBe(
+      "New enquiry from Neha via the enquiry form, recommended by Kavya Rao",
+    );
+  });
+});
