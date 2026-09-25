@@ -159,7 +159,29 @@ compose file; `docker network create web-proxy` once and leave it empty.
 
 ---
 
-## 4. DNS & Vercel
+## 4. No domain yet? Use sslip.io
+
+The Vercel site is HTTPS, and browsers block it from calling a plain `http://<ip>` API
+(mixed content), so the API needs an HTTPS hostname. [sslip.io](https://sslip.io) gives you
+one with no sign-up: `api.203-0-113-10.sslip.io` resolves to `203.0.113.10`.
+
+- Hostname: `api.<your-ip-with-dashes>.sslip.io`. Use it everywhere this guide says
+  `api.weddingyantra.com` (proxy host, Let's Encrypt, Vercel env var), and skip the DNS record.
+- GitHub → Settings → Secrets and variables → Actions → **Variables**:
+  `API_PUBLIC_URL=https://api.<your-ip-with-dashes>.sslip.io`
+
+When you buy a domain, you switch over without changing any code:
+
+1. Add an `A api → <VPS IP>` record.
+2. Add the new hostname to the proxy host (or create a new one) and request a certificate.
+3. Update `NEXT_PUBLIC_API_URL` in Vercel and **Redeploy**.
+4. Update `API_PUBLIC_URL` in GitHub.
+5. Add the new web origins to `CORS_ORIGINS`.
+
+sslip.io is a free third-party DNS service. It's fine for getting started, but use your own
+domain for real customers.
+
+## 5. DNS & Vercel
 
 - DNS: `A api.weddingyantra.com → <VPS IP>` (keep the Cloudflare proxy **off** until the cert is issued).
 - Vercel → New Project → import the repo → **Root Directory: `apps/web`**.
@@ -168,7 +190,7 @@ compose file; `docker network create web-proxy` once and leave it empty.
 - Add the production web origin(s) to `CORS_ORIGINS` in the VPS `.env`. Preview URLs are
   matched by `CORS_VERCEL_PREVIEW_PATTERN`; adjust the prefix to your Vercel project/team slug.
 
-## 5. GitHub Actions secrets
+## 6. GitHub Actions secrets
 
 | Name | Kind | Value |
 |---|---|---|
@@ -178,12 +200,13 @@ compose file; `docker network create web-proxy` once and leave it empty.
 | `VPS_KNOWN_HOSTS` | secret | `ssh-keyscan -p 22 <VPS_HOST>` |
 | `VPS_PORT` | variable | optional, default `22` |
 | `VPS_APP_DIR` | variable | optional, default `/opt/wedding-yantra` |
+| `API_PUBLIC_URL` | variable | public HTTPS base URL of the API, for the post-deploy smoke test |
 
 Create a GitHub **Environment** named `production` if you want a manual approval gate.
 
 ---
 
-## 6. Why the deploy can't disturb the other app
+## 7. Why the deploy can't disturb the other app
 
 | Risk | Mitigation |
 |---|---|
@@ -201,7 +224,7 @@ unless its definition changed. If you later need true zero-downtime for the API,
 replicas behind the proxy or move to blue/green. The builds also use VPS CPU; if that ever
 bothers the other app, build in Actions, push to GHCR, and have the VPS `pull` instead.
 
-## 7. Operations cheat-sheet
+## 8. Operations cheat-sheet
 
 ```bash
 cd /opt/wedding-yantra

@@ -9,9 +9,13 @@ name: Deploy API to VPS
 #   VPS_USER          non-root user in the `docker` group, e.g. deploy
 #   VPS_SSH_KEY       private key (ed25519) whose public half is in ~/.ssh/authorized_keys
 #   VPS_KNOWN_HOSTS   output of: ssh-keyscan -p <port> <host>
-# Optional repository variables:
-#   VPS_PORT          default 22
-#   VPS_APP_DIR       default /opt/wedding-yantra
+# Repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+#   API_PUBLIC_URL    public HTTPS base URL of the API, used for the smoke test,
+#                     e.g. https://api.weddingyantra.com or https://api.203-0-113-10.sslip.io
+#   VPS_PORT          optional, default 22
+#   VPS_APP_DIR       optional, default /opt/wedding-yantra
+#
+# Until VPS_HOST is set, the deploy job is skipped (not failed).
 
 on:
   push:
@@ -39,13 +43,27 @@ permissions:
 env:
   VPS_PORT: ${{ vars.VPS_PORT || '22' }}
   VPS_APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/wedding-yantra' }}
+  API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
 
 jobs:
   verify:
     name: Verify API builds
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      configured: ${{ steps.secrets.outputs.configured }}
     steps:
+      - name: Check deploy secrets
+        id: secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -n "$VPS_HOST" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::VPS secrets are not set yet; the deploy job will be skipped. See docs/DEPLOYMENT.md."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -58,11 +76,10 @@ jobs:
   deploy:
     name: Deploy to VPS
     needs: verify
+    if: needs.verify.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: production
-      url: https://api.weddingyantra.com/api/health
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -156,8 +173,12 @@ jobs:
 
       - name: Public smoke test
         run: |
+          if [ -z "$API_PUBLIC_URL" ]; then
+            echo "::notice::API_PUBLIC_URL variable not set; skipping the public smoke test."
+            exit 0
+          fi
           for i in $(seq 1 10); do
-            if curl -fsS --max-time 10 https://api.weddingyantra.com/api/health; then
+            if curl -fsS --max-time 10 "${API_PUBLIC_URL%/}/api/health"; then
               echo; echo "Deploy OK"; exit 0
             fi
             sleep 5
