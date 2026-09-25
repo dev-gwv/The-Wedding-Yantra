@@ -275,6 +275,14 @@ export interface EventMoney {
   expected: number;
   received: number;
   due: number;
+  /** What the business earns, before GST: the bills' taxable value, else the accepted quote's */
+  revenue: number;
+  /** Approved expenses for this event */
+  spent: number;
+  /** Expenses still waiting for approval */
+  pendingSpend: number;
+  /** Revenue minus approved expenses */
+  profit: number;
   bills: BillSummary[];
   payments: Payment[];
 }

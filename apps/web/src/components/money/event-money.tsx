@@ -63,6 +63,19 @@ export function EventMoneyCard({ event }: { event: WeddingEvent }) {
             <div className="mt-4">
               <ProgressBar value={share} label={`${share}% received`} />
             </div>
+            <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-4 text-sm">
+              <span className="text-ink-muted">
+                Spent <span className="font-bold text-ink tabular">{formatMoney(m.spent)}</span>
+                {m.pendingSpend > 0 && <span className="text-warning"> (+{formatMoney(m.pendingSpend)} waiting)</span>}
+              </span>
+              <span className="text-ink-muted">
+                Profit{" "}
+                <span className={`font-display text-lg font-extrabold tabular ${m.profit < 0 ? "text-danger" : "text-success"}`}>
+                  {formatMoney(m.profit)}
+                </span>
+                {m.revenue > 0 && <span className="tabular"> · {Math.round((m.profit / m.revenue) * 100)}%</span>}
+              </span>
+            </div>
           </>
         ) : (
           <p className="text-ink-muted">No booking value yet. Make a bill, or add the value to the event.</p>

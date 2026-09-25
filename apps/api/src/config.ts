@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /** Everything the API reads from the environment, in one place. */
 export interface Config {
   port: number;
@@ -15,6 +17,10 @@ export interface Config {
   otpDevEcho: boolean;
   /** Sign-in codes one IP address may request per 15 minutes. */
   otpMaxPerIp: number;
+  /** Where uploaded photos (bill photos, receipts) are kept on disk. */
+  uploadsDir: string;
+  /** Signs the short-lived links that show uploaded files. */
+  filesSecret: Buffer;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -37,5 +43,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     corsPreviewPattern: env.CORS_VERCEL_PREVIEW_PATTERN ? new RegExp(env.CORS_VERCEL_PREVIEW_PATTERN) : null,
     otpDevEcho: env.AUTH_OTP_DEV_ECHO === "true",
     otpMaxPerIp: Number(env.AUTH_OTP_MAX_PER_IP ?? 20),
+    uploadsDir: env.UPLOADS_DIR ?? "uploads",
+    // FILES_SECRET is optional: by default it's derived from the database password, which
+    // is already secret and stable across restarts.
+    filesSecret: createHash("sha256")
+      .update(env.FILES_SECRET ?? `wedding-yantra-files:${databaseUrl}`)
+      .digest(),
   };
 }

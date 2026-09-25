@@ -75,6 +75,8 @@ services:
     volumes:
       - ./infra/backup/backup.sh:/scripts/backup.sh:ro
       - ./backups:/backups
+      # Bill photos, read-only: each backup copies the new ones into ./backups/uploads
+      - wedding-yantra-uploads:/uploads:ro
     networks:
       - wy-internal
     deploy:
@@ -106,6 +108,11 @@ services:
       CORS_VERCEL_PREVIEW_PATTERN: ${CORS_VERCEL_PREVIEW_PATTERN:-}
       AUTH_OTP_DEV_ECHO: ${AUTH_OTP_DEV_ECHO:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      UPLOADS_DIR: /app/uploads
+      FILES_SECRET: ${FILES_SECRET:-}
+    # Uploaded bill photos survive redeploys in their own volume.
+    volumes:
+      - wedding-yantra-uploads:/app/uploads
     # Reachable ONLY from containers on the same Docker networks (i.e. the proxy).
     expose:
       - "4000"
@@ -159,3 +166,5 @@ networks:
 volumes:
   wedding-yantra-pgdata:
     name: wedding-yantra-pgdata
+  wedding-yantra-uploads:
+    name: wedding-yantra-uploads

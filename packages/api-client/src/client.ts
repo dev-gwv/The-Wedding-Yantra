@@ -1,4 +1,12 @@
 import type {
+  Expense,
+  ExpenseInput,
+  ExpenseListQuery,
+  ExpenseMonth,
+  ReviewExpenseInput,
+  UpdateExpenseInput,
+  UploadedFile,
+  UploadFileInput,
   Bill,
   BillDraft,
   BillInput,
@@ -135,6 +143,8 @@ export function createApiClient(options: ApiClientOptions) {
   };
 
   return {
+    /** Full link for a file path the API returned (bill photos). Works in <img src>. */
+    fileUrl: (path: string) => `${base}${path}`,
     auth: {
       requestOtp: (input: OtpRequestInput) => request<OtpRequestResult>("POST", "/auth/otp/request", input),
       verifyOtp: (input: OtpVerifyInput) => request<AuthSession>("POST", "/auth/otp/verify", input),
@@ -269,6 +279,22 @@ export function createApiClient(options: ApiClientOptions) {
         request<Payment>("PATCH", `${ws(workspaceId)}/payments/${encodeURIComponent(id)}`, input),
       remove: (workspaceId: string, id: string) =>
         request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payments/${encodeURIComponent(id)}`),
+    },
+    files: {
+      /** Upload a photo or PDF as base64. Shrink photos first: the API takes up to 5 MB. */
+      upload: (workspaceId: string, input: UploadFileInput) => request<UploadedFile>("POST", `${ws(workspaceId)}/files`, input),
+    },
+    expenses: {
+      list: (workspaceId: string, query: ExpenseListQuery = {}) =>
+        request<Expense[]>("GET", `${ws(workspaceId)}/expenses${qs(query)}`),
+      month: (workspaceId: string, month: string) => request<ExpenseMonth>("GET", `${ws(workspaceId)}/expense-month${qs({ month })}`),
+      create: (workspaceId: string, input: ExpenseInput) => request<Expense>("POST", `${ws(workspaceId)}/expenses`, input),
+      update: (workspaceId: string, id: string, input: UpdateExpenseInput) =>
+        request<Expense>("PATCH", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}`, input),
+      review: (workspaceId: string, id: string, input: ReviewExpenseInput) =>
+        request<Expense>("POST", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}/review`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}`),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

@@ -52,6 +52,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY --from=builder --chown=node:node /prod/api ./
+# Bill photos: a volume is mounted here. Created now so the volume starts owned by `node`.
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
 USER node
 
 EXPOSE 4000

@@ -2,7 +2,7 @@
 # Smoke-tests the BUILT API (apps/api/dist) against a real Postgres at $DATABASE_URL:
 #   1. first start applies every migration; health, business types and the full
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
-#      -> bill -> payment flow work over real HTTP
+#      -> bill -> payment -> bill photo -> expense flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -56,7 +56,7 @@ sign_in() {
 echo "== first start (fresh database)"
 start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
-  0005_catalogue_quotes_events 0006_bills_and_payments; do
+  0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -106,6 +106,18 @@ expect "money received is recorded against the bill" '.success and .data.number 
   "$(api POST "/api/v1/workspaces/$WS_ID/payments" "{\"billId\":\"$BILL_ID\",\"amount\":25000,\"paidOn\":\"2026-09-25\",\"method\":\"upi\"}" "$TOKEN")"
 expect "a fully paid bill leaves nothing to collect" '.success and .data.toCollect == 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/money" "" "$TOKEN")"
+# A tiny JPEG: the upload folder must be writable and files must come back byte for byte.
+PHOTO_B64="$(printf '\xff\xd8\xff\xe0smoke-bill-photo' | base64 | tr -d '\n')"
+PHOTO="$(api POST "/api/v1/workspaces/$WS_ID/files" "{\"contentType\":\"image/jpeg\",\"data\":\"$PHOTO_B64\"}" "$TOKEN")"
+expect "a bill photo can be uploaded" '.success and .data.contentType == "image/jpeg"' "$PHOTO"
+PHOTO_PATH="$(echo "$PHOTO" | jq -r '.data.path')"
+[ "$(curl -fsS "$BASE$PHOTO_PATH" | base64 | tr -d '\n')" = "$PHOTO_B64" ] || die "the uploaded photo did not come back intact"
+echo "  ok: the photo is served back through its signed link"
+EXPENSE="$(api POST "/api/v1/workspaces/$WS_ID/expenses" \
+  "{\"eventId\":\"$EVENT_ID\",\"category\":\"materials\",\"amount\":5000,\"spentOn\":\"2026-09-25\",\"receiptFileId\":\"$(echo "$PHOTO" | jq -r '.data.id')\"}" "$TOKEN")"
+expect "an owner's expense counts straight away" '.success and .data.status == "approved" and .data.receipt != null' "$EXPENSE"
+expect "profit on the event is revenue before GST minus expenses" '.success and .data.spent == 5000 and .data.profit == 20000' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/money" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

@@ -14,6 +14,7 @@ import {
   Package,
   Plus,
   QrCode,
+  ReceiptText,
   Users,
   UsersRound,
   type LucideIcon,
@@ -73,6 +74,9 @@ export default function MorePage() {
 
       <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
+        {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
+          <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
+        )}
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         <Row href="/app/team" icon={Users} label="Team" />
         {me.workspaces.length > 1 && (

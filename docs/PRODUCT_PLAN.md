@@ -554,3 +554,27 @@ everything and changes nothing. Staff don't see money.
 **Next in Phase 3:** expenses with bill photos, profit on every event, the monthly report
 and exports for the CA. Razorpay payment links can be added later for businesses that want
 card payments confirmed automatically. UPI already covers most wedding payments without it.
+
+## 18. Built in Phase 3, part 2: expenses with bill photos, and profit
+
+**What an owner can do now**
+- **Add money spent** in a few taps: the amount, what it was for, and a photo of the bill.
+  - Categories: materials, vendors & helpers, staff pay, travel, food, equipment, rent &
+    bills, ads & marketing, other.
+  - An expense can be for an event (flowers for the Sharma sangeet) or for the business
+    (studio rent).
+- **The team adds, the owner approves.** Staff add expenses from the event page or from
+  More → My expenses. The owner or a manager sees "1 expense from your team to approve" on
+  Home, looks at the bill photo, and approves it or sends it back with a reason. Staff fix it
+  and it comes back for approval. Only approved money counts.
+- **Profit on every event.** The event page shows what's been spent and the profit, with the
+  margin. Profit is what the business earns before GST (GST is the government's money)
+  minus approved expenses.
+- **Money → Expenses** shows each month's spending by category, with money waiting for
+  approval shown apart.
+- **Bill photos** are shrunk on the phone before upload, so they're quick even on a weak
+  signal. Photos and PDFs are checked for what they really are. They're only shown through
+  links that stop working after a day, and they're backed up with the database.
+
+**Roles:** owners and managers add, change and approve anything. Staff add their own and
+change them until approved. The accountant sees everything and changes nothing.

@@ -32,6 +32,12 @@ export interface HomeSummary {
   /** Confirmed events in the next 14 days, soonest first (empty for roles without events). */
   upcomingEvents: EventSummary[];
   /** Money to collect, for roles that see money; null for everyone else. */
-  money: { toCollect: number; overdue: number; due: DueItem[] } | null;
+  money: {
+    toCollect: number;
+    overdue: number;
+    due: DueItem[];
+    /** Expenses the team sent that wait for approval (for those who approve) */
+    pendingExpenses: number;
+  } | null;
   starterPack: StarterPack;
 }

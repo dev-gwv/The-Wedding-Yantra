@@ -1,5 +1,11 @@
+import { randomBytes } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
+import { localFileStore } from "../src/lib/storage.js";
+import type { Files } from "../src/modules/files/service.js";
 import { loadConfig } from "../src/config.js";
 import { createPool, type Db } from "../src/db.js";
 import { runMigrations } from "../src/db/migrate.js";
@@ -9,6 +15,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 export interface TestContext {
   app: FastifyInstance;
   db: Db;
+  files: Files;
   close: () => Promise<void>;
 }
 
@@ -27,14 +34,19 @@ export async function setup(): Promise<TestContext> {
     AUTH_OTP_MAX_PER_IP: "10000",
     LOG_LEVEL: "silent",
   });
-  const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined } });
+  // Uploads go to a throwaway folder that is removed afterwards.
+  const uploads = await mkdtemp(join(tmpdir(), "wy-uploads-"));
+  const files: Files = { store: localFileStore(uploads), secret: randomBytes(32) };
+  const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined }, files });
   await app.ready();
   return {
     app,
     db,
+    files,
     close: async () => {
       await app.close();
       await db.end();
+      await rm(uploads, { recursive: true, force: true });
     },
   };
 }

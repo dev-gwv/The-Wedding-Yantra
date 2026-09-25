@@ -9,6 +9,11 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  ExpenseInput,
+  ExpenseListQuery,
+  ReviewExpenseInput,
+  UpdateExpenseInput,
+  UploadFileInput,
   BillInput,
   PaymentInput,
   UpdateBillInput,
@@ -87,6 +92,8 @@ export const queryKeys = {
   billDraft: (id: string, query: object) => ["workspace", id, "bookings", "bill-draft", query] as const,
   payments: (id: string, query: object) => ["workspace", id, "bookings", "payments", query] as const,
   publicBill: (token: string) => ["public-bill", token] as const,
+  expenses: (id: string, query: object) => ["workspace", id, "bookings", "expenses", query] as const,
+  expenseMonth: (id: string, month: string) => ["workspace", id, "bookings", "expense-month", month] as const,
 };
 
 interface QueryOpts {
@@ -599,4 +606,48 @@ export function useUpdatePayment(workspaceId: string) {
 export function useDeletePayment(workspaceId: string) {
   const api = useApi();
   return useBookingMutation(workspaceId, (id: string) => api.payments.remove(workspaceId, id));
+}
+
+// ---------------------------------------------------------------------------
+// Expenses and bill photos
+// ---------------------------------------------------------------------------
+
+/** Uploads a photo; attach the returned id to an expense. */
+export function useUploadFile(workspaceId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (input: UploadFileInput) => api.files.upload(workspaceId, input) });
+}
+
+export function useExpenses(workspaceId: string, query: ExpenseListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.expenses(workspaceId, query), queryFn: () => api.expenses.list(workspaceId, query), enabled });
+}
+
+export function useExpenseMonth(workspaceId: string, month: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.expenseMonth(workspaceId, month), queryFn: () => api.expenses.month(workspaceId, month), enabled });
+}
+
+export function useCreateExpense(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: ExpenseInput) => api.expenses.create(workspaceId, input));
+}
+
+export function useUpdateExpense(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, ({ id, ...input }: UpdateExpenseInput & { id: string }) =>
+    api.expenses.update(workspaceId, id, input),
+  );
+}
+
+export function useReviewExpense(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, ({ id, ...input }: ReviewExpenseInput & { id: string }) =>
+    api.expenses.review(workspaceId, id, input),
+  );
+}
+
+export function useDeleteExpense(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (id: string) => api.expenses.remove(workspaceId, id));
 }

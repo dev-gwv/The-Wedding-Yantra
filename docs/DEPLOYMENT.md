@@ -259,6 +259,10 @@ apps, build in Actions, push to GHCR, and have the VPS `pull` instead.
 - `wedding-yantra-backup` dumps the DB **daily at 20:00 UTC (01:30 IST)**, when it starts, and
   before every deploy. Files: `/opt/wedding-yantra/backups/wy-<UTC time>.dump` (`pg_dump` custom format).
 - Retention: the newest 3 are always kept; others are deleted after 7 days (`BACKUP_KEEP_DAYS`).
+- **Bill photos** live in the Docker volume `wedding-yantra-uploads` (mounted at `/app/uploads`
+  in the API). Every backup also copies new photos into `/opt/wedding-yantra/backups/uploads`.
+  Photos never change once uploaded, so this is one growing copy, not a copy per day.
+  To restore, copy that folder back into the volume.
 - These backups live **on the same server**. They protect against bad migrations and mistakes,
   not against losing the VPS. Copy one off the server now and then (see below), or add
   off-site storage later.

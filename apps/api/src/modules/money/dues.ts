@@ -5,6 +5,7 @@ import { notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { requireMoneyView } from "./access.js";
 import { BILL_SELECT, toBillSummary, type BillRow } from "./bills.js";
+import { eventSpend, pendingExpenseCount } from "./expenses.js";
 import { listPayments } from "./payments.js";
 
 /**
@@ -115,7 +116,12 @@ export async function moneyOverview(db: Queryable, ctx: MemberContext): Promise<
 export async function homeMoney(db: Queryable, ctx: MemberContext): Promise<HomeSummary["money"]> {
   if (!can(ctx.role, "finance.view")) return null;
   const overview = await moneyOverview(db, ctx);
-  return { toCollect: overview.toCollect, overdue: overview.overdue, due: overview.dues.slice(0, 3) };
+  return {
+    toCollect: overview.toCollect,
+    overdue: overview.overdue,
+    due: overview.dues.slice(0, 3),
+    pendingExpenses: await pendingExpenseCount(db, ctx),
+  };
 }
 
 export async function eventMoney(db: Queryable, ctx: MemberContext, eventId: string): Promise<EventMoney> {
@@ -136,12 +142,30 @@ export async function eventMoney(db: Queryable, ctx: MemberContext, eventId: str
   const billed = round2(issued.reduce((a, b) => a + b.total, 0));
   const expected = issued.length ? billed : (bookingValue ?? 0);
   const received = round2(payments.reduce((a, p) => a + p.amount, 0));
+
+  // What the business keeps is the price before GST: GST is the government's money.
+  let revenue: number;
+  if (issued.length) {
+    revenue = round2(bills.rows.filter((b) => b.status === "issued").reduce((a, b) => a + Number(b.taxable), 0));
+  } else {
+    const quote = await db.query<{ taxable: string }>(
+      `SELECT subtotal - discount AS taxable FROM quotes
+        WHERE event_id = $1 AND status = 'accepted' AND deleted_at IS NULL ORDER BY accepted_at DESC LIMIT 1`,
+      [eventId],
+    );
+    revenue = quote.rows[0] ? Number(quote.rows[0].taxable) : (bookingValue ?? 0);
+  }
+  const spend = await eventSpend(db, eventId);
   return {
     bookingValue,
     billed,
     expected,
     received,
     due: Math.max(round2(expected - received), 0),
+    revenue,
+    spent: spend.spent,
+    pendingSpend: spend.pending,
+    profit: round2(revenue - spend.spent),
     bills: summaries,
     payments,
   };

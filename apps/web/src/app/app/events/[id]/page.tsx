@@ -11,6 +11,7 @@ import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
 import { EventMoneyCard } from "@/components/money/event-money";
+import { EventExpenses } from "@/components/money/expenses-view";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/button";
 import { Card, Notice, Pill } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
@@ -161,6 +162,8 @@ function EventView({ event }: { event: WeddingEvent }) {
       </section>
 
       <EventMoneyCard event={event} />
+
+      <EventExpenses eventId={event.id} />
 
       <Card className="divide-y divide-line overflow-hidden">
         {event.clientId && (

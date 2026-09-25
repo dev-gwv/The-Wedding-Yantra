@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { ExpensesView } from "@/components/money/expenses-view";
 import { PaymentSheet } from "@/components/money/payment-sheet";
 import { BillRow, DueRow } from "@/components/money/rows";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
@@ -16,11 +17,12 @@ import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { billUrl } from "@/lib/links";
 
-type View = "due" | "bills" | "quotes";
+type View = "due" | "bills" | "quotes" | "expenses";
 const VIEWS: [View, string][] = [
   ["due", "To collect"],
   ["bills", "Bills"],
   ["quotes", "Quotes"],
+  ["expenses", "Expenses"],
 ];
 
 function MoneyScreen() {
@@ -65,7 +67,7 @@ function MoneyScreen() {
         </Card>
       </div>
 
-      <div className="mb-5 inline-flex rounded-2xl border border-line bg-cream p-1" role="tablist" aria-label="Money view">
+      <div className="mb-5 flex w-full rounded-2xl border border-line bg-cream p-1 sm:inline-flex sm:w-auto" role="tablist" aria-label="Money view">
         {VIEWS.map(([key, label]) => (
           <button
             key={key}
@@ -73,7 +75,7 @@ function MoneyScreen() {
             aria-selected={view === key}
             onClick={() => setView(key)}
             className={cn(
-              "h-10 rounded-xl px-4 text-sm font-bold transition sm:px-5",
+              "h-10 flex-1 whitespace-nowrap rounded-xl px-2 text-sm font-bold transition sm:flex-none sm:px-5",
               view === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink",
             )}
           >
@@ -85,6 +87,7 @@ function MoneyScreen() {
       {view === "due" && <DuesView dues={o?.dues} pending={overview.isPending} error={overview.error} />}
       {view === "bills" && <BillsView />}
       {view === "quotes" && <QuotesView />}
+      {view === "expenses" && <ExpensesView />}
     </>
   );
 }

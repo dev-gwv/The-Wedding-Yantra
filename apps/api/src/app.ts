@@ -3,10 +3,13 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { AppError, fail } from "./lib/http.js";
+import { localFileStore } from "./lib/storage.js";
 import { registerAuth } from "./modules/auth/guard.js";
 import { createConsoleOtpSender, type OtpSender } from "./modules/auth/otp-sender.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { businessTypeRoutes } from "./modules/business-types/routes.js";
+import { fileRoutes } from "./modules/files/routes.js";
+import type { Files } from "./modules/files/service.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { moneyRoutes } from "./modules/money/routes.js";
 import { bookingRoutes } from "./modules/bookings/routes.js";
@@ -19,6 +22,8 @@ export interface AppDeps {
   db: Db;
   otpSender?: OtpSender;
   logger?: boolean;
+  /** Uploaded files; tests pass a temporary folder */
+  files?: Files;
 }
 
 /**
@@ -71,6 +76,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     reply.status(404).send(fail("NOT_FOUND", `Route ${request.method} ${request.url} not found`));
   });
 
+  const files: Files = deps.files ?? { store: localFileStore(config.uploadsDir), secret: config.filesSecret };
+
   registerAuth(app, db);
   healthRoutes(app, { db, config });
 
@@ -82,7 +89,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       teamRoutes(v1, { db });
       salesRoutes(v1, { db });
       bookingRoutes(v1, { db });
-      moneyRoutes(v1, { db });
+      moneyRoutes(v1, { db, files });
+      fileRoutes(v1, { db, files });
     },
     { prefix: "/api/v1" },
   );

@@ -13,6 +13,7 @@ import {
   IndianRupee,
   ListChecks,
   Package,
+  ReceiptText,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -79,6 +80,19 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
   return (
     <div className="space-y-6">
       {showSetup && <SetupCard home={home} />}
+
+      {home.money && home.money.pendingExpenses > 0 && (
+        <Link
+          href="/app/money?view=expenses"
+          className="flex items-center gap-3 rounded-2xl border border-sun-300/60 bg-cream px-4 py-3 font-semibold hover:border-sun-300"
+        >
+          <ReceiptText className="size-5 shrink-0 text-brand-strong" />
+          <span className="flex-1">
+            {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
+          </span>
+          <ChevronRight className="size-4 text-ink-subtle" />
+        </Link>
+      )}
 
       {leadScope(role) !== "none" ? (
         <Today home={home} />

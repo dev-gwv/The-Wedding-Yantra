@@ -6,6 +6,8 @@
 #
 # Connection comes from the standard PG* env vars. Files: /backups/wy-<UTC timestamp>.dump
 # (pg_dump custom format; restore with pg_restore, see docs/DEPLOYMENT.md).
+# Bill photos (mounted read-only at /uploads) are copied into /backups/uploads. They never
+# change once uploaded, so only new ones are copied, and deleted ones stay in the copy.
 set -eu
 
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-7}"
@@ -26,6 +28,14 @@ backup() {
     rm -f "$tmp"
     echo "[backup] FAILED at $ts" >&2
     return 1
+  fi
+  if [ -d /uploads ]; then
+    mkdir -p "$DIR/uploads"
+    if cp -a -n /uploads/. "$DIR/uploads/"; then
+      echo "[backup] ok: photos copied ($(du -sh "$DIR/uploads" | cut -f1) in all)"
+    else
+      echo "[backup] photo copy FAILED" >&2
+    fi
   fi
   # Retention: always keep the newest 3; of the rest, delete those older than KEEP_DAYS.
   ls -1t "$DIR"/wy-*.dump 2>/dev/null | tail -n +4 | while read -r f; do

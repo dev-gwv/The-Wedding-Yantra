@@ -40,6 +40,10 @@ export const PERMISSIONS = [
   "bills.manage",
   /** Record money received from clients */
   "payments.record",
+  /** Add money spent, with a bill photo. Staff's need approval. */
+  "expenses.submit",
+  /** Approve or reject expenses, and change anyone's */
+  "expenses.approve",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -64,8 +68,10 @@ const GRANTS: Record<Role, readonly Permission[]> = {
     "events.manage",
     "bills.manage",
     "payments.record",
+    "expenses.submit",
+    "expenses.approve",
   ],
-  staff: ["members.view", "leads.work", "events.view"],
+  staff: ["members.view", "leads.work", "events.view", "expenses.submit"],
   freelancer: [],
   accountant: ["members.view", "finance.view", "clients.view", "quotes.view", "events.view"],
 };
