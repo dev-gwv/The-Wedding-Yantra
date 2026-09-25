@@ -94,6 +94,7 @@ export const queryKeys = {
   publicBill: (token: string) => ["public-bill", token] as const,
   expenses: (id: string, query: object) => ["workspace", id, "bookings", "expenses", query] as const,
   expenseMonth: (id: string, month: string) => ["workspace", id, "bookings", "expense-month", month] as const,
+  monthReport: (id: string, month: string) => ["workspace", id, "bookings", "report", month] as const,
 };
 
 interface QueryOpts {
@@ -650,4 +651,9 @@ export function useReviewExpense(workspaceId: string) {
 export function useDeleteExpense(workspaceId: string) {
   const api = useApi();
   return useBookingMutation(workspaceId, (id: string) => api.expenses.remove(workspaceId, id));
+}
+
+export function useMonthReport(workspaceId: string, month: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.monthReport(workspaceId, month), queryFn: () => api.reports.month(workspaceId, month), enabled });
 }

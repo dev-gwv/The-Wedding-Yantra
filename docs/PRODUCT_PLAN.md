@@ -578,3 +578,26 @@ card payments confirmed automatically. UPI already covers most wedding payments 
 
 **Roles:** owners and managers add, change and approve anything. Staff add their own and
 change them until approved. The accountant sees everything and changes nothing.
+
+## 19. Built in Phase 3, part 3: the monthly report and spreadsheets for the CA
+
+**Money → Monthly report** shows one month at a time, in plain numbers:
+- **Cash:** what came in, what went out, and what's in hand.
+- **Profit:** billed before GST, minus approved expenses.
+- **Bills and GST:** taxable value, CGST, SGST, IGST and the total billed. These are the
+  numbers the CA needs for GST returns. It also shows what's still to collect and what's
+  overdue.
+- **Where the work came from:** Instagram, referrals, wedding portals, and so on, by money
+  billed. Also what sold, whose enquiries turned into bills, and where the money went.
+- **How money came in:** UPI, cash, bank.
+
+**For your CA:** one tap saves the month's bills (a sales register with GST), payments or
+expenses as a spreadsheet that opens in Excel and Google Sheets.
+- Dates are written the Indian way (25-09-2026), and ₹ and Hindi names show correctly.
+- Cancelled bills stay listed with zero amounts, so bill numbers have no gaps.
+- Anything that looks like a formula is made harmless.
+
+**Roles:** owners, managers and the accountant. Staff don't see the business's money.
+
+Phase 3 is complete. Next is Phase 4: team and accountability (tasks, checklists, My Day,
+KRAs, daily WhatsApp summary).

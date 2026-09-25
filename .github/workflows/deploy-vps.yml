@@ -222,6 +222,13 @@ jobs:
             exit 1
           fi
 
+          # ---- Bill photos: the API must be able to write to its uploads volume --
+          if docker exec wedding-yantra-api sh -c 'f=/app/uploads/.wy-write-check; touch "$f" && rm -f "$f"'; then
+            echo "uploads: writable"
+          else
+            echo "::warning::The API can't write to /app/uploads, so bill photos won't save. Fix the owner of the wedding-yantra-uploads volume (it should belong to uid 1000, the node user)."
+          fi
+
           # ---- Housekeeping: only images built by THIS project ----------------
           # Keep the 3 newest API images (current + rollback targets), drop the rest.
           docker images wedding-yantra-api --format '{{.Repository}}:{{.Tag}}' \

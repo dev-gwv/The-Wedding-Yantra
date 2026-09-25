@@ -1,4 +1,7 @@
 import type {
+  ExportFile,
+  ExportKind,
+  MonthReport,
   Expense,
   ExpenseInput,
   ExpenseListQuery,
@@ -295,6 +298,12 @@ export function createApiClient(options: ApiClientOptions) {
         request<Expense>("POST", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}/review`, input),
       remove: (workspaceId: string, id: string) =>
         request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}`),
+    },
+    reports: {
+      month: (workspaceId: string, month: string) => request<MonthReport>("GET", `${ws(workspaceId)}/reports/month${qs({ month })}`),
+      /** A month's bills, payments or expenses as a spreadsheet (CSV) */
+      export: (workspaceId: string, kind: ExportKind, month: string) =>
+        request<ExportFile>("GET", `${ws(workspaceId)}/exports${qs({ kind, month })}`),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

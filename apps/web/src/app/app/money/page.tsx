@@ -3,7 +3,7 @@
 import { can, formatMoneyShort } from "@wedding-yantra/core";
 import { useBills, useMoneyOverview, useQuotes } from "@wedding-yantra/api-client/react";
 import { QUOTE_STATUS_LABELS, type DueItem, type QuoteStatus } from "@wedding-yantra/types";
-import { FileText, Lock, PartyPopper, ReceiptIndianRupee } from "lucide-react";
+import { BarChart3, FileText, Lock, PartyPopper, ReceiptIndianRupee } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -11,6 +11,7 @@ import { QuoteRow } from "@/components/bookings/quote-row";
 import { ExpensesView } from "@/components/money/expenses-view";
 import { PaymentSheet } from "@/components/money/payment-sheet";
 import { BillRow, DueRow } from "@/components/money/rows";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
@@ -52,7 +53,14 @@ function MoneyScreen() {
 
   return (
     <>
-      <PageHeader title="Money" />
+      <PageHeader
+        title="Money"
+        action={
+          <ButtonLink href="/app/reports" variant="secondary">
+            <BarChart3 className="size-4" /> Monthly report
+          </ButtonLink>
+        }
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3">
         <Card className="p-4">

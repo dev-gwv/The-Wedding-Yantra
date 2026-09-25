@@ -2,7 +2,7 @@
 # Smoke-tests the BUILT API (apps/api/dist) against a real Postgres at $DATABASE_URL:
 #   1. first start applies every migration; health, business types and the full
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
-#      -> bill -> payment -> bill photo -> expense flow work over real HTTP
+#      -> bill -> payment -> bill photo -> expense -> monthly report flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -118,6 +118,11 @@ EXPENSE="$(api POST "/api/v1/workspaces/$WS_ID/expenses" \
 expect "an owner's expense counts straight away" '.success and .data.status == "approved" and .data.receipt != null' "$EXPENSE"
 expect "profit on the event is revenue before GST minus expenses" '.success and .data.spent == 5000 and .data.profit == 20000' \
   "$(api GET "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/money" "" "$TOKEN")"
+MONTH="$(echo "$BILL" | jq -r '.data.issueDate[0:7]')"
+expect "the monthly report adds up the bill and the payment" '.success and .data.sales.bills == 1 and .data.sales.taxable == 25000 and .data.cash.received == 25000' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/reports/month?month=$MONTH" "" "$TOKEN")"
+expect "the bills spreadsheet for the CA is ready" '.success and .data.rows == 1 and (.data.content | startswith("\ufeffBill date,Bill number"))' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/exports?kind=bills&month=$MONTH" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"
