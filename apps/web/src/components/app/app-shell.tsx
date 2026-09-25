@@ -29,25 +29,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { workspace } = useCurrentWorkspace();
 
   return (
-    <div className="min-h-dvh lg:pl-64">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
-        <div className="px-5 pb-4 pt-6">
-          <Logo />
+    <div className="min-h-dvh bg-surface lg:pl-72">
+      {/* Desktop: a floating white panel, like PhotoLancer's studio menu */}
+      <aside className="fixed inset-y-4 left-4 hidden w-60 flex-col rounded-3xl border border-line bg-surface p-3 shadow-soft lg:flex">
+        <div className="px-2 pb-5 pt-3">
+          <Logo className="[&_svg]:size-9 [&>span:last-child]:text-lg" />
         </div>
         <Link
           href="/app/more"
-          className="mx-3 mb-4 flex items-center gap-3 rounded-md border border-line px-3 py-2.5 hover:bg-surface-muted"
+          className="mb-4 flex items-center gap-3 rounded-2xl bg-cream px-3 py-2.5 transition hover:bg-sun-100"
         >
-          <span className="grid size-8 place-items-center rounded-md bg-brand-soft text-brand">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface text-brand-strong shadow-soft">
             <BusinessIcon name={workspace.businessTypeIcon} className="size-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{workspace.name}</span>
+            <span className="block truncate text-sm font-bold">{workspace.name}</span>
             <span className="block truncate text-xs text-ink-muted">{workspace.businessTypeName}</span>
           </span>
         </Link>
-        <nav className="flex flex-col gap-0.5 px-3" aria-label="Main">
+        <nav className="flex flex-col gap-1" aria-label="Main">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
@@ -56,11 +56,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
-                  active ? "bg-brand-soft text-brand-strong" : "text-ink-muted hover:bg-surface-muted hover:text-ink",
+                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
+                  active
+                    ? "bg-gradient-primary text-on-brand shadow-warm"
+                    : "text-ink-muted hover:bg-cream hover:text-brand-strong",
                 )}
               >
-                <Icon className="size-[18px]" strokeWidth={active ? 2.25 : 1.75} />
+                <Icon className="size-[18px] shrink-0" strokeWidth={2} />
                 {label}
               </Link>
             );
@@ -68,14 +70,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-6 sm:px-6 lg:pb-12 lg:pt-10">{children}</main>
+      <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10">{children}</main>
 
-      {/* Phone bottom tabs */}
+      {/* Phone: white tab bar; the active icon sits in a small gradient pill */}
       <nav
         aria-label="Main"
         className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden"
       >
-        <ul className="mx-auto grid max-w-md grid-cols-5">
+        <ul className="mx-auto grid max-w-md grid-cols-5 pt-2">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
@@ -84,11 +86,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-                    active ? "text-brand" : "text-ink-muted",
+                    "flex flex-col items-center justify-center gap-1 pb-1 text-[11px]",
+                    active ? "font-bold text-brand-strong" : "font-semibold text-ink-muted",
                   )}
                 >
-                  <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} />
+                  <span
+                    className={cn(
+                      "grid h-8 w-12 place-items-center rounded-full transition",
+                      active && "bg-gradient-primary text-on-brand shadow-soft",
+                    )}
+                  >
+                    <Icon className="size-5" strokeWidth={2} />
+                  </span>
                   {label}
                 </Link>
               </li>

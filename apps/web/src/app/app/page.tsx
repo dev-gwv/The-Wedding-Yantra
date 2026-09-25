@@ -3,12 +3,22 @@
 import { can, firstName, formatMoney, greeting, type Role } from "@wedding-yantra/core";
 import { useHome } from "@wedding-yantra/api-client/react";
 import { UNIT_LABELS, type HomeSummary } from "@wedding-yantra/types";
-import { Check, ChevronRight, Inbox } from "lucide-react";
+import { Check, ChevronRight, GitBranch, Inbox, ListChecks, Package, Sparkles, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
-import { Button } from "@/components/ui/button";
-import { Card, EmptyState, Notice } from "@/components/ui/misc";
+import {
+  Card,
+  EmptyState,
+  Eyebrow,
+  GradientTile,
+  IconSquare,
+  NextStepCard,
+  Notice,
+  PageHeader,
+  ProgressBar,
+} from "@/components/ui/misc";
+import { BusinessIcon } from "@/components/app/business-icon";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
@@ -22,13 +32,11 @@ export default function HomePage() {
 
   return (
     <>
-      <header className="mb-8">
-        <p className="text-sm text-ink-muted">{workspace.name}</p>
-        <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">
-          {hello}
-          {me.user.name ? `, ${firstName(me.user.name)}` : ""}
-        </h1>
-      </header>
+      <PageHeader
+        eyebrow={<Eyebrow>{workspace.name}</Eyebrow>}
+        title={`${hello}${me.user.name ? `, ${firstName(me.user.name)}` : ""}`}
+        subtitle="Here's what needs you today."
+      />
 
       {home.isPending && (
         <div className="flex justify-center py-16 text-brand">
@@ -43,12 +51,12 @@ export default function HomePage() {
           </button>
         </Notice>
       )}
-      {home.data && <HomeContent home={home.data} role={workspace.role} />}
+      {home.data && <HomeContent home={home.data} role={workspace.role} icon={workspace.businessTypeIcon} />}
     </>
   );
 }
 
-function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
+function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon: string }) {
   // Setup steps are the owner's and manager's job; others never see a to-do they can't do.
   const showSetup = can(role, "workspace.update") && home.setupDone < home.setupTotal;
 
@@ -63,34 +71,29 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
         </EmptyState>
       </Card>
 
-      <StarterPack home={home} />
+      <StarterPack home={home} icon={icon} />
     </div>
   );
 }
 
 function SetupCard({ home }: { home: HomeSummary }) {
-  const percent = Math.round((home.setupDone / home.setupTotal) * 100);
   return (
-    <Card className="overflow-hidden">
-      <div className="px-5 pt-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-semibold">Get set up</h2>
-          <span className="text-sm text-ink-muted tabular">
-            {home.setupDone} of {home.setupTotal} done
-          </span>
-        </div>
-        <div
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-muted"
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Setup progress"
-        >
-          <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${percent}%` }} />
+    <NextStepCard className="p-5 sm:p-6">
+      <div className="flex items-start gap-4">
+        <GradientTile icon={Sparkles} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-xl font-extrabold">Get set up</h2>
+            <span className="text-sm font-semibold text-ink-muted tabular">
+              {home.setupDone} of {home.setupTotal} done
+            </span>
+          </div>
+          <div className="mt-3">
+            <ProgressBar value={(home.setupDone / home.setupTotal) * 100} label="Setup progress" />
+          </div>
         </div>
       </div>
-      <ul className="mt-3 divide-y divide-line">
+      <ul className="mt-5 space-y-2">
         {home.setup.map((step) => {
           const href = SETUP_LINKS[step.key];
           const body = (
@@ -98,83 +101,101 @@ function SetupCard({ home }: { home: HomeSummary }) {
               <span
                 className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-full border",
-                  step.done ? "border-success bg-success text-on-brand" : "border-line-strong",
+                  step.done ? "border-success bg-success text-on-brand" : "border-line-strong bg-surface",
                 )}
               >
                 {step.done && <Check className="size-3.5" strokeWidth={3} />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className={cn("block text-sm font-medium", step.done && "text-ink-muted line-through")}>
+                <span className={cn("block text-sm font-bold", step.done && "font-semibold text-ink-muted line-through")}>
                   {step.title}
                 </span>
                 {!step.done && <span className="mt-0.5 block text-sm text-ink-muted">{step.description}</span>}
               </span>
-              {!step.done && href && <ChevronRight className="size-4 shrink-0 text-ink-subtle" />}
+              {!step.done && href && <ChevronRight className="size-4 shrink-0 text-brand-strong" />}
             </>
           );
           return (
             <li key={step.key}>
               {!step.done && href ? (
-                <Link href={href} className="flex items-center gap-3 px-5 py-4 hover:bg-surface-muted">
+                <Link
+                  href={href}
+                  className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 transition hover:border-sun-300"
+                >
                   {body}
                 </Link>
               ) : (
-                <div className="flex items-center gap-3 px-5 py-4">{body}</div>
+                <div className="flex items-center gap-3 px-4 py-2">{body}</div>
               )}
             </li>
           );
         })}
       </ul>
-    </Card>
+    </NextStepCard>
   );
 }
 
 /** What we prepared for this kind of business. Details stay folded until asked for. */
-function StarterPack({ home }: { home: HomeSummary }) {
+function StarterPack({ home, icon }: { home: HomeSummary; icon: string }) {
   const [open, setOpen] = useState(false);
   const pack = home.starterPack;
-  const counts = [
-    { label: "Services", value: pack.services.length },
-    { label: "Sales stages", value: pack.pipelineStages.length },
-    { label: "Checklist", value: pack.checklist.length },
+  const counts: { label: string; value: number; icon: LucideIcon }[] = [
+    { label: "Services", value: pack.services.length, icon: Package },
+    { label: "Sales stages", value: pack.pipelineStages.length, icon: GitBranch },
+    { label: "Checklist", value: pack.checklist.length, icon: ListChecks },
   ];
 
   return (
-    <Card className="p-5">
-      <h2 className="font-semibold">Ready for your {home.businessTypeName.toLowerCase()} business</h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        A starting set you&apos;ll use for quotes, sales and events. Every item can be changed.
-      </p>
-      <dl className="mt-4 grid grid-cols-3 gap-3">
+    <Card className="p-5 sm:p-6">
+      <div className="flex items-start gap-4">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-cream text-brand-strong">
+          <BusinessIcon name={icon} className="size-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-lg font-extrabold">Ready for your {home.businessTypeName.toLowerCase()} business</h2>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            A starting set you&apos;ll use for quotes, sales and events. Every item can be changed.
+          </p>
+        </div>
+      </div>
+      <dl className="mt-5 grid grid-cols-3 gap-3">
         {counts.map((c) => (
-          <div key={c.label} className="rounded-md bg-surface-muted px-3 py-3">
-            <dt className="text-xs text-ink-muted">{c.label}</dt>
-            <dd className="mt-1 text-xl font-semibold tabular">{c.value}</dd>
+          <div key={c.label} className="rounded-2xl border border-line p-3 sm:p-4">
+            <IconSquare icon={c.icon} className="size-9 [&_svg]:size-4" />
+            <dd className="mt-3 font-display text-2xl font-extrabold tabular">{c.value}</dd>
+            <dt className="text-xs font-semibold text-ink-muted">{c.label}</dt>
           </div>
         ))}
       </dl>
 
       {open && (
-        <div className="mt-5 space-y-5 text-sm">
+        <div className="mt-6 space-y-6 text-sm">
           <section>
-            <h3 className="font-medium">Services</h3>
-            <ul className="mt-2 divide-y divide-line rounded-md border border-line">
+            <h3 className="font-display text-base font-extrabold">Services</h3>
+            <ul className="mt-2 divide-y divide-line rounded-2xl border border-line">
               {pack.services.map((s) => (
-                <li key={s.name} className="flex items-baseline justify-between gap-4 px-3 py-2.5">
-                  <span>{s.name}</span>
+                <li key={s.name} className="flex items-baseline justify-between gap-4 px-4 py-3">
+                  <span className="font-semibold">{s.name}</span>
                   <span className="shrink-0 text-ink-muted tabular">
-                    {formatMoney(s.price)} <span className="text-xs">{UNIT_LABELS[s.unit]}</span>
+                    <span className="font-bold text-ink">{formatMoney(s.price)}</span>{" "}
+                    <span className="text-xs">{UNIT_LABELS[s.unit]}</span>
                   </span>
                 </li>
               ))}
             </ul>
           </section>
           <section>
-            <h3 className="font-medium">Sales stages</h3>
-            <p className="mt-2 text-ink-muted">{pack.pipelineStages.join("  →  ")}</p>
+            <h3 className="font-display text-base font-extrabold">Sales stages</h3>
+            <ol className="mt-2 flex flex-wrap gap-2">
+              {pack.pipelineStages.map((stage) => (
+                <li key={stage} className="rounded-full bg-cream px-3 py-1 text-xs font-semibold">
+                  {stage}
+                </li>
+              ))}
+            </ol>
           </section>
           <section>
-            <h3 className="font-medium">Event checklist</h3>
+            <h3 className="font-display text-base font-extrabold">Event checklist</h3>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-muted">
               {pack.checklist.map((c) => (
                 <li key={c.title}>{c.title}</li>
@@ -184,9 +205,14 @@ function StarterPack({ home }: { home: HomeSummary }) {
         </div>
       )}
 
-      <Button variant="ghost" size="sm" className="-ml-3 mt-3" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <button
+        type="button"
+        className="mt-4 text-sm font-bold text-brand-strong hover:text-brand-deep"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
         {open ? "Hide details" : "See what's included"}
-      </Button>
+      </button>
     </Card>
   );
 }

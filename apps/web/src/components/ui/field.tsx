@@ -2,9 +2,9 @@ import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 const INPUT =
-  "h-12 w-full rounded-md border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-subtle " +
-  "transition-colors focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10 " +
-  "disabled:bg-surface-muted disabled:text-ink-muted";
+  "h-12 w-full rounded-xl border border-line bg-surface px-4 text-base text-ink placeholder:text-ink-subtle " +
+  "transition-all focus:border-sun-300 focus:shadow-glow focus:outline-none " +
+  "disabled:bg-cream disabled:text-ink-muted";
 
 interface FieldProps {
   label: string;
@@ -20,12 +20,12 @@ export function Field({ label, hint, error, children, className }: FieldProps) {
   const noteId = `${id}-note`;
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={id} className="block text-sm font-medium text-ink">
+      <label htmlFor={id} className="block text-sm font-semibold text-ink">
         {label}
       </label>
       {children({
         id,
-        className: cn(INPUT, error && "border-danger focus:border-danger focus:ring-danger/10"),
+        className: cn(INPUT, error && "border-danger focus:border-danger"),
         ...(error ? { "aria-invalid": true } : {}),
         ...(error || hint ? { "aria-describedby": noteId } : {}),
       })}

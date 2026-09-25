@@ -33,7 +33,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-lg bg-ink px-4 py-3 text-sm text-surface shadow-lg",
+              "pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-surface shadow-warm",
             )}
           >
             {t.tone === "success" ? (

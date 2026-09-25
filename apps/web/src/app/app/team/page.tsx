@@ -21,7 +21,7 @@ import { createInvitationInput, type Invitation, type Member } from "@wedding-ya
 import { ChevronRight, Copy, Lock, MessageCircle, UserPlus, Users } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { PhoneField, SelectField, TextField } from "@/components/ui/field";
 import { Avatar, Card, EmptyState, Notice, PageHeader, Pill } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
@@ -102,7 +102,7 @@ export default function TeamPage() {
                   key={m.id}
                   type="button"
                   onClick={() => setManaging(m)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-muted"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-cream"
                 >
                   {body}
                 </button>
@@ -182,7 +182,7 @@ function PendingInvite({ invitation, onShare }: { invitation: Invitation; onShar
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <Avatar name={invitation.name} className="bg-surface-muted text-ink-muted" />
+      <Avatar name={invitation.name} muted />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{invitation.name}</span>
         <span className="block text-sm text-ink-muted tabular">
@@ -299,14 +299,14 @@ function ShareSheet({ share, onClose }: { share: Share | null; onClose: () => vo
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => setTimeout(onClose, 300)}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-brand text-base font-medium text-on-brand shadow-sm hover:bg-brand-strong"
+          className={buttonClass({ size: "lg" })}
         >
           <MessageCircle className="size-5" /> Send on WhatsApp
         </a>
         <Button variant="secondary" size="lg" onClick={copy}>
           <Copy className="size-4" /> Copy link
         </Button>
-        <p className="break-all rounded-md bg-surface-muted px-3 py-2 text-xs text-ink-muted">{url}</p>
+        <p className="break-all rounded-xl bg-cream px-3 py-2 text-xs text-ink-muted">{url}</p>
       </div>
     </Sheet>
   );
@@ -357,7 +357,7 @@ function ManageSheet({ member, myRole, onClose }: { member: Member | null; myRol
           <p className="text-sm text-ink-muted">
             {member.name ?? "They"} will lose access to {workspace.name} straight away. Their past work stays.
           </p>
-          <Button variant="primary" size="lg" className="bg-danger hover:bg-danger" onClick={removeMember} loading={remove.isPending}>
+          <Button variant="destructive" size="lg" onClick={removeMember} loading={remove.isPending}>
             Remove from team
           </Button>
           <Button variant="ghost" size="lg" onClick={() => setConfirming(false)}>

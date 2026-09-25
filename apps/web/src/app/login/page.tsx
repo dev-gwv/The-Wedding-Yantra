@@ -7,7 +7,7 @@ import { otpRequestInput, otpVerifyInput, updateMeInput } from "@wedding-yantra/
 import { ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
-import { Logo } from "@/components/app/logo";
+import { AuthScreen } from "@/components/app/auth-screen";
 import { Button } from "@/components/ui/button";
 import { PhoneField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
@@ -107,14 +107,16 @@ function LoginFlow() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col px-5 pb-10 pt-12 sm:pt-20">
-      <Logo />
+    <AuthScreen>
 
       {step === "phone" && (
-        <form onSubmit={sendCode} className="mt-12 space-y-6" noValidate>
+        <form onSubmit={sendCode} className="space-y-6" noValidate>
           <div>
-            <h1 className="font-display text-3xl font-medium tracking-tight">Run your wedding business from one place</h1>
-            <p className="mt-3 text-ink-muted">Enquiries, bookings, bills and your team. Sign in with your mobile number.</p>
+            <h1 className="font-display text-3xl font-extrabold">Welcome</h1>
+            <p className="mt-1 text-[15px] text-ink-muted">
+              Run your wedding business from <span className="font-bold text-gradient">one place</span>. Sign in
+              with your mobile number.
+            </p>
           </div>
           <PhoneField
             label="Mobile number"
@@ -126,12 +128,12 @@ function LoginFlow() {
           <Button type="submit" size="lg" loading={requestOtp.isPending}>
             Get code
           </Button>
-          <p className="text-center text-xs text-ink-subtle">New here? The same step creates your account.</p>
+          <p className="text-center text-sm text-ink-muted">New here? The same step creates your account.</p>
         </form>
       )}
 
       {step === "code" && (
-        <form onSubmit={checkCode} className="mt-12 space-y-6" noValidate>
+        <form onSubmit={checkCode} className="space-y-6" noValidate>
           <button
             type="button"
             onClick={() => setStep("phone")}
@@ -140,8 +142,8 @@ function LoginFlow() {
             <ArrowLeft className="size-4" /> Change number
           </button>
           <div>
-            <h1 className="font-display text-3xl font-medium tracking-tight">Enter the code</h1>
-            <p className="mt-3 text-ink-muted">
+            <h1 className="font-display text-3xl font-extrabold">Enter the code</h1>
+            <p className="mt-1 text-[15px] text-ink-muted">
               We sent a 6-digit code to <span className="font-medium text-ink tabular">{formatPhone(normalized)}</span>
             </p>
           </div>
@@ -169,7 +171,7 @@ function LoginFlow() {
             {resendIn > 0 ? (
               <>Didn&apos;t get it? You can ask again in {resendIn}s</>
             ) : (
-              <button type="button" onClick={() => void sendCode()} className="font-medium text-brand hover:underline">
+              <button type="button" onClick={() => void sendCode()} className="font-bold text-brand-strong hover:text-brand-deep">
                 Send a new code
               </button>
             )}
@@ -178,10 +180,10 @@ function LoginFlow() {
       )}
 
       {step === "name" && (
-        <form onSubmit={saveName} className="mt-12 space-y-6" noValidate>
+        <form onSubmit={saveName} className="space-y-6" noValidate>
           <div>
-            <h1 className="font-display text-3xl font-medium tracking-tight">Welcome! What&apos;s your name?</h1>
-            <p className="mt-3 text-ink-muted">Your team and clients will see this name.</p>
+            <h1 className="font-display text-3xl font-extrabold">What&apos;s your name?</h1>
+            <p className="mt-1 text-[15px] text-ink-muted">Your team and clients will see this name.</p>
           </div>
           <TextField
             label="Your name"
@@ -197,7 +199,7 @@ function LoginFlow() {
           </Button>
         </form>
       )}
-    </main>
+    </AuthScreen>
   );
 }
 

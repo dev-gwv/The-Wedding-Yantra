@@ -1,32 +1,41 @@
 @import "tailwindcss";
 /*
- * Colours, radii and type sizes come from packages/design-tokens. Tailwind's default
- * palette is switched off there, so every screen stays on the Marigold & Ivory palette.
- * Add or change colours in that package, never here.
+ * Sunburst design system (shared with PhotoLancer). Colours, radii, shadows, gradients and
+ * animations come from packages/design-tokens. Tailwind's default palette is switched off
+ * there, so every screen stays on the palette. Change colours in that package, never here.
  */
 @import "@wedding-yantra/design-tokens/theme.css";
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
 }
 
-html {
-  -webkit-tap-highlight-color: transparent;
-  scroll-behavior: smooth;
-}
-
-body {
-  @apply bg-ivory text-ink antialiased;
-  font-feature-settings: "cv11", "ss01";
-}
-
-::selection {
-  @apply bg-brand-soft text-brand-strong;
-}
-
-dialog::backdrop {
-  background: rgb(28 25 23 / 0.4);
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-surface text-ink;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    @apply bg-brand-soft text-brand-deep;
+  }
+  dialog::backdrop {
+    background: rgb(36 24 3 / 0.4);
+  }
 }
 
 @utility pb-safe {

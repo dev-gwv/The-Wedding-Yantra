@@ -2,7 +2,7 @@
 // - Makes the app installable and opens instantly from the home screen.
 // - Keeps built files cached; pages always come from the network when online.
 // - Shows /offline when there is no connection. API calls are never cached here.
-const CACHE = "wy-v1";
+const CACHE = "wy-v2";
 const OFFLINE_URL = "/offline";
 
 self.addEventListener("install", (event) => {

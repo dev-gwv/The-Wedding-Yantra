@@ -19,7 +19,7 @@ package that both apps import.
 | `packages/types` | Zod schemas for every request and response | API, web, mobile |
 | `packages/core` | Pure helpers: phone numbers, ₹ formatting, dates, role permissions | API, web, mobile |
 | `packages/api-client` | Typed API client + TanStack Query hooks, no browser-only code | web, mobile |
-| `packages/design-tokens` | Marigold & Ivory colours, radii, type scale | web (Tailwind), mobile |
+| `packages/design-tokens` | "Sunburst" colours, gradients, shadows, radii and type scale (shared with PhotoLancer) | web (Tailwind), mobile |
 
 Rules that keep the mobile app easy later:
 

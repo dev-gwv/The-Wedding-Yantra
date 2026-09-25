@@ -30,12 +30,12 @@ export default function MorePage() {
     <>
       <PageHeader title="More" />
 
-      <Card className="mb-6 flex items-center gap-4 p-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
+      <Card className="mb-6 flex items-center gap-4 p-5">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-cream text-brand-strong">
           <BusinessIcon name={workspace.businessTypeIcon} className="size-6" />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{workspace.name}</p>
+          <p className="truncate font-display text-lg font-extrabold">{workspace.name}</p>
           <p className="truncate text-sm text-ink-muted">
             {workspace.businessTypeName} · You are {ROLE_INFO[workspace.role].label.toLowerCase()}
           </p>
@@ -52,7 +52,7 @@ export default function MorePage() {
       </Card>
 
       <Card className="divide-y divide-line overflow-hidden">
-        <Link href="/app/settings/profile" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted">
+        <Link href="/app/settings/profile" className="flex items-center gap-3 px-5 py-4 hover:bg-cream">
           <Avatar name={me.user.name} className="size-8 text-xs" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{me.user.name ?? "Your profile"}</span>
@@ -73,9 +73,9 @@ export default function MorePage() {
                   setSwitching(false);
                   switchTo(w.id);
                 }}
-                className="flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left hover:bg-surface-muted"
+                className="flex w-full items-center gap-3 rounded-2xl px-2 py-2.5 text-left hover:bg-cream"
               >
-                <span className="grid size-9 place-items-center rounded-md bg-brand-soft text-brand">
+                <span className="grid size-9 place-items-center rounded-xl bg-cream text-brand-strong">
                   <BusinessIcon name={w.businessTypeIcon} className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ function Row({
   chevron?: boolean;
 }) {
   const className = cn(
-    "flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-medium hover:bg-surface-muted",
+    "flex w-full items-center gap-3 px-5 py-4 text-left text-[15px] font-semibold hover:bg-cream",
     tone === "danger" && "text-danger",
   );
   const body = (

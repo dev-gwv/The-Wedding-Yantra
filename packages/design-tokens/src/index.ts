@@ -1,56 +1,100 @@
 /**
- * Wedding Yantra design tokens: "Marigold & Ivory".
+ * Wedding Yantra design tokens: "Sunburst", the PhotoLancer design system.
  *
- * Warm ivory background, white cards, charcoal text, one marigold accent for actions.
- * Green means money in, red means money due or danger. Gold is used sparingly.
+ * White body, orange as the sunrise. Pages and cards are white; the saffron-to-gold
+ * gradient is kept for the few things that matter (the logo, the main button, the active
+ * menu item, small icon tiles, progress). The golden-hour glow only appears on the
+ * sign-in style pages.
  *
- * The web app turns these into Tailwind classes (`bg-brand`, `text-ink-muted`, ...).
- * The mobile app will import the same object for React Native styles.
+ * The web app turns these into Tailwind classes (`bg-surface`, `text-ink-muted`,
+ * `bg-gradient-primary`, `shadow-soft`, ...). The mobile app will import the same object
+ * for React Native styles; gradients are given as colour stops for that reason.
  */
 
+/** The warm orange scale. 600 is the brand colour. */
+export const sun = {
+  50: "#FFF8EE",
+  100: "#FFEFD6",
+  200: "#FFD874",
+  300: "#FFC02E",
+  400: "#FF9E22",
+  500: "#FF8A2B",
+  600: "#FF6A00",
+  700: "#E85C00",
+  800: "#C9430A",
+} as const;
+
 export const colors = {
-  /** Page background */
-  ivory: "#FAF7F2",
-  /** Cards, sheets, inputs */
+  /** Pages, cards, sheets, inputs */
   surface: "#FFFFFF",
-  /** Quiet fills: hovered rows, secondary buttons */
-  "surface-muted": "#F4EFE7",
+  /** Quiet warm fill: hovered rows, chips, icon squares */
+  cream: sun[50],
   /** Borders and dividers */
-  line: "#E7E2DA",
-  "line-strong": "#D6CFC4",
+  line: "#F1E6D2",
+  "line-strong": "#E6D5B8",
 
-  /** Main text */
-  ink: "#1C1917",
+  /** Main text: a deep warm brown, softer than black */
+  ink: "#241803",
   /** Secondary text */
-  "ink-muted": "#6F6862",
+  "ink-muted": "#7C6A45",
   /** Hints, placeholders */
-  "ink-subtle": "#A39D96",
+  "ink-subtle": "#B3A284",
 
-  /** Marigold: the one colour for primary actions */
-  brand: "#C2410C",
-  "brand-strong": "#9A3412",
-  "brand-soft": "#FFF1E8",
+  /** Brand saffron, for text links, icons and selected borders */
+  brand: sun[600],
+  "brand-strong": sun[700],
+  "brand-deep": sun[800],
+  /** Soft brand fill */
+  "brand-soft": sun[100],
+  /** Text on the gradient or on brand colour */
   "on-brand": "#FFFFFF",
 
   /** Money received, done */
-  success: "#15803D",
-  "success-soft": "#EAF7EE",
+  success: "#0E9C6C",
+  "success-soft": "#E6F6EF",
+  /** A live / online dot */
+  live: "#21C36B",
   /** Money due, errors, destructive actions */
-  danger: "#B91C1C",
-  "danger-soft": "#FDF0F0",
+  danger: sun[800],
+  "danger-soft": "#FDEEE6",
   /** Needs attention soon */
   warning: "#B45309",
-  "warning-soft": "#FEF6E7",
-  /** Premium touches only: plan badges, headings on client documents */
-  gold: "#B8860B",
+  "warning-soft": "#FFF4DC",
 } as const;
 
-/** Corner radius in px. */
+/** Gradients as colour stops, so both CSS and React Native can draw them. */
+export const gradients = {
+  /** Buttons, logo tile, active menu item, icon tiles, progress */
+  primary: { angle: 135, stops: ["#FF7A1A", "#FFB020"] },
+  /** Gradient words in a heading */
+  text: { angle: 135, stops: ["#FF7A1A", "#FFC02E", "#FFAE1F"] },
+} as const;
+
+/**
+ * The golden-hour glow behind sign-in style pages: a sunrise in the top-right corner
+ * fading into cream, then white.
+ */
+export const heroGlow = {
+  sun: { x: "78%", y: "-12%", width: 1100, height: 720, stops: ["#FFD24D", "#FFAE1F", "#FF7A12"] },
+  base: ["#FFF8EE", "#FFFFFF"],
+} as const;
+
+/** Warm shadows: cards never cast grey shadows. */
+export const shadows = {
+  soft: "0 10px 26px rgba(150, 90, 20, 0.14)",
+  warm: "0 22px 50px rgba(255, 120, 20, 0.2)",
+  glow: "0 0 0 4px rgba(255, 138, 43, 0.14)",
+} as const;
+
+/** Corner radius in px. Cards use 3xl, buttons and inputs xl. */
 export const radius = {
   sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  md: 10,
+  lg: 13,
+  xl: 15,
+  "2xl": 20,
+  "3xl": 24,
+  "4xl": 32,
 } as const;
 
 /** Font size and line height in px. */
@@ -71,11 +115,11 @@ export const space = 4;
 export const touchTarget = 44;
 
 export const fonts = {
+  /** Headings, bold and confident */
+  display: "Bricolage Grotesque",
   /** Interface text and numbers */
-  sans: "Inter",
-  /** Large headings and client-facing documents */
-  display: "Fraunces",
+  sans: "Plus Jakarta Sans",
 } as const;
 
-export const tokens = { colors, radius, fontSize, space, touchTarget, fonts } as const;
+export const tokens = { sun, colors, gradients, heroGlow, shadows, radius, fontSize, space, touchTarget, fonts } as const;
 export type Tokens = typeof tokens;

@@ -334,7 +334,7 @@ Subscriptions.
 | Decision | Choice |
 |---|---|
 | Backend | Keep the existing Fastify API + Postgres on the VPS; Next.js on Vercel |
-| Look and feel | Warm Marigold & Ivory (section 8) |
+| Look and feel | "Sunburst", the PhotoLancer design system (see "Design: Sunburst" below) |
 | First module after foundation | Sales: leads, pipeline, follow-ups |
 | Pricing | Monthly plans per business, 14-day free trial (section 9) |
 
@@ -404,7 +404,7 @@ lead form and follow-up reminders.
 |---|---|---|
 | Auth library `better-auth`, web uses a cookie | Own small phone sign-in (hashed codes, hashed tokens), bearer token for web and mobile | The web app (Vercel) and API (VPS) live on different domains, where cookies are unreliable. One token scheme for web and phone keeps the mobile move trivial. |
 | Drizzle ORM | Plain SQL with typed rows, same as the existing code | Kept the existing migration runner and pattern; can be added later without a rewrite. |
-| shadcn/ui | A small in-repo component kit (button, field, sheet, toast, empty state) on the shared tokens | Only a handful of pieces were needed; this keeps every screen on the Marigold & Ivory tokens only. |
+| shadcn/ui | A small in-repo component kit (button, field, sheet, toast, empty state) on the shared tokens | Only a handful of pieces were needed; this keeps every screen on the shared tokens only. |
 | Serwist service worker | A 50-line hand-written service worker | Next.js 16 builds with Turbopack; the hand-written worker needs no plugin. |
 | Email + password fallback | Not built | Waiting on the SMS/WhatsApp provider decision; phone sign-in covers everyone. |
 | Offline reading | Offline screen only | There is no business data to read offline until Phase 1. |
@@ -413,3 +413,26 @@ lead form and follow-up reminders.
 **Sign-in codes are not delivered yet.** Until a WhatsApp/SMS provider is connected, set
 `AUTH_OTP_DEV_ECHO=true` on the server to show the code on screen for testing. Anyone could
 then sign in as any number, so switch it off before real customers use the app.
+
+---
+
+## 14. Design: Sunburst (the PhotoLancer look)
+
+The first Phase 0 palette felt dull, so the app now uses PhotoLancer's "Sunburst" design
+system, balanced exactly as PhotoLancer balances it.
+
+- **Colours:** white pages and cards. Deep brown text `#241803`, muted `#7C6A45`, warm
+  lines `#F1E6D2` and cream fills `#FFF8EE`. Saffron `#FF6A00` for links and selection.
+  Success `#0E9C6C`, danger `#C9430A`.
+- **Gradient** `#FF7A1A` to `#FFB020`, only on:
+  - the logo
+  - the main button
+  - the active menu item
+  - small "do this next" icon tiles
+  - progress bars
+- **Golden-hour glow:** only on the sign-in, business setup, invite and offline pages.
+  There, one white card sits in the middle. Signed-in pages are plain white.
+- **Shapes:** cards 24px round with a soft warm shadow. Buttons and inputs 15px round.
+- **Fonts:** Bricolage Grotesque, extra-bold, for headings. Plus Jakarta Sans for text.
+- **Source of truth:** `packages/design-tokens`. It generates the Tailwind theme and will
+  feed the mobile app.
