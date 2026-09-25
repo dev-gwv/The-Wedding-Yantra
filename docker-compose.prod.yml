@@ -90,14 +90,27 @@ services:
           cpus: "1.0"
           memory: 512m
     logging: *default-logging
-    # --- Option A (Traefik only): uncomment if your shared proxy is Traefik ---
-    # labels:
-    #   - traefik.enable=true
-    #   - traefik.docker.network=${PROXY_NETWORK:-web-proxy}
-    #   - traefik.http.routers.wedding-yantra-api.rule=Host(`api.weddingyantra.com`)
-    #   - traefik.http.routers.wedding-yantra-api.entrypoints=websecure
-    #   - traefik.http.routers.wedding-yantra-api.tls.certresolver=letsencrypt
-    #   - traefik.http.services.wedding-yantra-api.loadbalancer.server.port=4000
+    # Routing for a Traefik proxy (e.g. Coolify's `coolify-proxy`). Traefik reads these
+    # live from Docker, so no proxy restart is needed. Other proxies (NPM, Caddy) ignore them.
+    # Defaults match Coolify: entrypoints `http`/`https`, cert resolver `letsencrypt`.
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${PROXY_NETWORK:-web-proxy}
+      # HTTPS router
+      - traefik.http.routers.wedding-yantra-api.rule=Host(`${API_HOST:?API_HOST is required}`)
+      - traefik.http.routers.wedding-yantra-api.entrypoints=${TRAEFIK_HTTPS_ENTRYPOINT:-https}
+      - traefik.http.routers.wedding-yantra-api.tls=true
+      - traefik.http.routers.wedding-yantra-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.wedding-yantra-api.service=wedding-yantra-api
+      # HTTP -> HTTPS redirect
+      - traefik.http.routers.wedding-yantra-api-http.rule=Host(`${API_HOST}`)
+      - traefik.http.routers.wedding-yantra-api-http.entrypoints=${TRAEFIK_HTTP_ENTRYPOINT:-http}
+      - traefik.http.routers.wedding-yantra-api-http.middlewares=wedding-yantra-https-redirect
+      - traefik.http.routers.wedding-yantra-api-http.service=wedding-yantra-api
+      - traefik.http.middlewares.wedding-yantra-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.wedding-yantra-https-redirect.redirectscheme.permanent=true
+      # Upstream
+      - traefik.http.services.wedding-yantra-api.loadbalancer.server.port=4000
 
 networks:
   # Private network for API <-> DB traffic. `internal: true` = no external routing.

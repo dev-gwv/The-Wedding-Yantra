@@ -85,9 +85,19 @@ docker network connect web-proxy <proxy-container-name>
 | Block Common Exploits | on |
 | SSL tab | Request a new Let's Encrypt certificate, Force SSL, HTTP/2 |
 
-**Traefik**: uncomment the `labels:` block on `wedding-yantra-api` in
-`docker-compose.prod.yml`. Set `entrypoints` / `certresolver` to match your Traefik static
-config. Traefik picks the labels up live, with no restart.
+**Traefik / Coolify**: the `labels:` on `wedding-yantra-api` are already active. In `.env`,
+set `API_HOST` and set `PROXY_NETWORK` to Traefik's network (`coolify` on a Coolify server).
+The defaults (`http`/`https` entrypoints, `letsencrypt` resolver) match Coolify. Check yours with:
+
+```bash
+docker inspect coolify-proxy --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+docker inspect coolify-proxy --format '{{join .Config.Cmd "\n"}}' | grep -E 'entrypoints\.|certificatesresolvers\.[a-z]+\.acme\.httpchallenge=|exposedbydefault'
+```
+
+If the names differ, set `TRAEFIK_HTTPS_ENTRYPOINT`, `TRAEFIK_HTTP_ENTRYPOINT` or
+`TRAEFIK_CERT_RESOLVER` in `.env`. Traefik picks the labels up live; neither Coolify nor
+its proxy restarts. Coolify doesn't manage these containers, so they won't appear as
+Coolify resources. That's expected.
 
 **Caddy** (existing container): add this to its Caddyfile, then `docker exec <caddy> caddy reload --config /etc/caddy/Caddyfile`:
 
