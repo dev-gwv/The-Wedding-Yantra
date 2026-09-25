@@ -8,3 +8,6 @@ export const SETUP_LINKS: Record<SetupStepKey, string | null> = {
 };
 
 export const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`;
+
+/** The client's link to a bill: they can see it and pay by UPI. */
+export const billUrl = (token: string) => `${window.location.origin}/b/${token}`;

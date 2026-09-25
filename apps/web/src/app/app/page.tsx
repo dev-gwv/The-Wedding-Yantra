@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LeadCard } from "@/components/sales/lead-card";
 import { EventCard } from "@/components/bookings/event-card";
+import { DueRow } from "@/components/money/rows";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import { useState } from "react";
@@ -89,6 +90,28 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
         </Card>
       )}
 
+      {home.money && home.money.toCollect > 0 && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-lg font-extrabold">To collect</h2>
+            <Link href="/app/money" className="text-sm font-bold text-brand-strong hover:text-brand-deep">
+              See all
+            </Link>
+          </div>
+          <Card className="divide-y divide-line overflow-hidden">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-4">
+              <span className="font-display text-2xl font-extrabold tabular">{formatMoney(home.money.toCollect)}</span>
+              {home.money.overdue > 0 && (
+                <span className="text-sm font-semibold text-danger">{formatMoney(home.money.overdue)} overdue</span>
+              )}
+            </div>
+            {home.money.due.map((d) => (
+              <DueRow key={`${d.kind}-${d.billId ?? d.eventId}`} item={d} />
+            ))}
+          </Card>
+        </section>
+      )}
+
       {home.upcomingEvents.length > 0 && (
         <section>
           <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -150,7 +173,7 @@ function Today({ home }: { home: HomeSummary }) {
         <Card>
           <EmptyState
             icon={Inbox}
-            title="Nothing needs you today"
+            title="No follow-ups due today"
             action={
               <ButtonLink href="/app/leads" variant="secondary">
                 Go to leads

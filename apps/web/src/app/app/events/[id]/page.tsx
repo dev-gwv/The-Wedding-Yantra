@@ -10,6 +10,7 @@ import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
+import { EventMoneyCard } from "@/components/money/event-money";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/button";
 import { Card, Notice, Pill } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
@@ -158,6 +159,8 @@ function EventView({ event }: { event: WeddingEvent }) {
           </ol>
         )}
       </section>
+
+      <EventMoneyCard event={event} />
 
       <Card className="divide-y divide-line overflow-hidden">
         {event.clientId && (

@@ -157,23 +157,24 @@ export interface LeadList {
 // Requests
 // ---------------------------------------------------------------------------
 
+// Not sent stays undefined (leave it alone); sent empty becomes null (clear it).
 const optionalPhone = z
   .union([z.literal(""), phone])
   .nullable()
   .optional()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v === undefined ? undefined : v || null));
 
 const optionalEmail = z
   .union([z.literal(""), z.email("Enter a valid email")])
   .nullable()
   .optional()
-  .transform((v) => (v ? v.toLowerCase() : null));
+  .transform((v) => (v === undefined ? undefined : v ? v.toLowerCase() : null));
 
 const optionalDate = z
   .union([z.literal(""), z.iso.date("Pick a valid date")])
   .nullable()
   .optional()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v === undefined ? undefined : v || null));
 
 const optionalAmount = z
   .union([z.literal(""), z.coerce.number().min(0, "Can't be negative").max(1_000_000_000)])

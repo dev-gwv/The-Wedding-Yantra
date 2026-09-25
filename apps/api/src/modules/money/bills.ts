@@ -1,0 +1,718 @@
+import { randomBytes } from "node:crypto";
+import {
+  billNumber,
+  computeBillTotals,
+  financialYear,
+  receiptNumber,
+  round2,
+  stateFromGstin,
+  type BillTaxRow,
+} from "@wedding-yantra/core";
+import type {
+  Bill,
+  BillDraft,
+  BillItem,
+  BillStatus,
+  BillSummary,
+  PayState,
+  PublicBill,
+  ServiceUnit,
+} from "@wedding-yantra/types";
+import { withTransaction, type Db, type Queryable } from "../../db.js";
+import { logActivity } from "../../lib/activity.js";
+import { AppError, notFound } from "../../lib/http.js";
+import type { MemberContext } from "../auth/guard.js";
+import { nextNumber } from "../bookings/quotes.js";
+import { requireBillsManage as requireManage, requireMoneyView } from "./access.js";
+import { listPayments } from "./payments.js";
+
+// ---------------------------------------------------------------------------
+// Reading
+// ---------------------------------------------------------------------------
+
+export interface BillRow {
+  id: string;
+  workspace_id: string;
+  fy: string;
+  number: string;
+  status: BillStatus;
+  client_id: string | null;
+  client_name: string;
+  client_phone: string | null;
+  event_id: string | null;
+  event_title: string | null;
+  issue_date: string;
+  due_date: string | null;
+  total: string;
+  received: string;
+  today: string;
+  created_at: Date;
+  bill_to_name: string;
+  bill_to_phone: string | null;
+  bill_to_address: string | null;
+  bill_to_gstin: string | null;
+  seller_gstin: string | null;
+  place_of_supply: string | null;
+  inter_state: boolean;
+  subtotal: string;
+  discount: string;
+  taxable: string;
+  cgst: string;
+  sgst: string;
+  igst: string;
+  tax: string;
+  round_off: string;
+  notes: string | null;
+  terms: string | null;
+  share_token: string;
+  quote_id: string | null;
+  cancelled_at: Date | null;
+  cancel_reason: string | null;
+}
+
+export const BILL_SELECT = `
+  SELECT b.id, b.workspace_id, b.fy, b.number, b.status, b.client_id, coalesce(c.name, b.bill_to_name) AS client_name,
+         coalesce(c.phone, b.bill_to_phone) AS client_phone,
+         b.event_id, e.title AS event_title, b.issue_date::text AS issue_date, b.due_date::text AS due_date,
+         b.total, b.created_at,
+         coalesce((SELECT sum(p.amount) FROM payments p WHERE p.bill_id = b.id AND p.deleted_at IS NULL), 0) AS received,
+         (now() AT TIME ZONE w.timezone)::date::text AS today,
+         b.bill_to_name, b.bill_to_phone, b.bill_to_address, b.bill_to_gstin, b.seller_gstin,
+         b.place_of_supply, b.inter_state, b.subtotal, b.discount, b.taxable, b.cgst, b.sgst, b.igst,
+         b.tax, b.round_off, b.notes, b.terms, b.share_token, b.quote_id, b.cancelled_at, b.cancel_reason
+    FROM bills b
+    JOIN workspaces w ON w.id = b.workspace_id
+    LEFT JOIN clients c ON c.id = b.client_id
+    LEFT JOIN events e ON e.id = b.event_id`;
+
+export function toBillSummary(r: BillRow): BillSummary {
+  const total = Number(r.total);
+  const received = Number(r.received);
+  const cancelled = r.status === "cancelled";
+  const due = cancelled ? 0 : Math.max(round2(total - received), 0);
+  const payState: PayState = received <= 0 ? "unpaid" : received < total ? "part_paid" : "paid";
+  return {
+    id: r.id,
+    number: r.number,
+    status: r.status,
+    payState,
+    overdue: due > 0 && r.due_date !== null && r.due_date < r.today,
+    clientId: r.client_id,
+    clientName: r.client_name,
+    eventId: r.event_id,
+    eventTitle: r.event_title,
+    issueDate: r.issue_date,
+    dueDate: r.due_date,
+    total,
+    received,
+    due,
+    shareToken: r.share_token,
+    createdAt: r.created_at.toISOString(),
+  };
+}
+
+async function loadItems(db: Queryable, billId: string): Promise<(BillItem & { taxRate: number })[]> {
+  const { rows } = await db.query<{
+    id: string;
+    catalogue_item_id: string | null;
+    name: string;
+    description: string | null;
+    sac: string | null;
+    unit: ServiceUnit;
+    quantity: string;
+    rate: string;
+    tax_rate: string;
+    amount: string;
+    discount: string;
+    taxable: string;
+    cgst: string;
+    sgst: string;
+    igst: string;
+  }>(
+    `SELECT id, catalogue_item_id, name, description, sac, unit, quantity, rate, tax_rate, amount, discount, taxable, cgst, sgst, igst
+       FROM bill_items WHERE bill_id = $1 ORDER BY position`,
+    [billId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    catalogueItemId: r.catalogue_item_id,
+    name: r.name,
+    description: r.description,
+    sac: r.sac,
+    unit: r.unit,
+    quantity: Number(r.quantity),
+    rate: Number(r.rate),
+    taxRate: Number(r.tax_rate),
+    amount: Number(r.amount),
+    discount: Number(r.discount),
+    taxable: Number(r.taxable),
+    cgst: Number(r.cgst),
+    sgst: Number(r.sgst),
+    igst: Number(r.igst),
+  }));
+}
+
+/** GST summary rows from the saved lines, so old bills never change. */
+function taxRows(items: BillItem[]): BillTaxRow[] {
+  const rows = new Map<number, BillTaxRow>();
+  for (const i of items) {
+    if (i.taxRate === 0) continue;
+    const row = rows.get(i.taxRate) ?? { rate: i.taxRate, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+    rows.set(i.taxRate, {
+      rate: i.taxRate,
+      taxable: round2(row.taxable + i.taxable),
+      cgst: round2(row.cgst + i.cgst),
+      sgst: round2(row.sgst + i.sgst),
+      igst: round2(row.igst + i.igst),
+    });
+  }
+  return [...rows.values()].sort((a, b) => a.rate - b.rate);
+}
+
+async function toBill(db: Queryable, ctx: MemberContext | null, r: BillRow): Promise<Bill> {
+  const items = await loadItems(db, r.id);
+  return {
+    ...toBillSummary(r),
+    billTo: { name: r.bill_to_name, phone: r.bill_to_phone, address: r.bill_to_address, gstin: r.bill_to_gstin },
+    sellerGstin: r.seller_gstin,
+    chargesGst: r.seller_gstin !== null,
+    placeOfSupply: r.place_of_supply,
+    interState: r.inter_state,
+    items,
+    subtotal: Number(r.subtotal),
+    discount: Number(r.discount),
+    taxable: Number(r.taxable),
+    cgst: Number(r.cgst),
+    sgst: Number(r.sgst),
+    igst: Number(r.igst),
+    tax: Number(r.tax),
+    roundOff: Number(r.round_off),
+    byRate: taxRows(items),
+    notes: r.notes,
+    terms: r.terms,
+    quoteId: r.quote_id,
+    payments: ctx ? await listPayments(db, ctx, { billId: r.id }) : [],
+    cancelledAt: r.cancelled_at?.toISOString() ?? null,
+    cancelReason: r.cancel_reason,
+  };
+}
+
+async function loadRow(db: Queryable, workspaceId: string, billId: string, lock = false): Promise<BillRow> {
+  const { rows } = await db.query<BillRow>(
+    `${BILL_SELECT} WHERE b.id = $1 AND b.workspace_id = $2${lock ? " FOR UPDATE OF b" : ""}`,
+    [billId, workspaceId],
+  );
+  if (!rows[0]) throw notFound("This bill");
+  return rows[0];
+}
+
+export async function getBill(db: Queryable, ctx: MemberContext, billId: string): Promise<Bill> {
+  requireMoneyView(ctx);
+  return toBill(db, ctx, await loadRow(db, ctx.workspaceId, billId));
+}
+
+export async function listBills(
+  db: Queryable,
+  ctx: MemberContext,
+  filters: { clientId?: string; eventId?: string; status?: "open" | "paid" | "cancelled" } = {},
+): Promise<BillSummary[]> {
+  requireMoneyView(ctx);
+  const params: unknown[] = [ctx.workspaceId];
+  const where = ["b.workspace_id = $1"];
+  if (filters.clientId) {
+    params.push(filters.clientId);
+    where.push(`b.client_id = $${params.length}`);
+  }
+  if (filters.eventId) {
+    params.push(filters.eventId);
+    where.push(`b.event_id = $${params.length}`);
+  }
+  if (filters.status === "cancelled") where.push("b.status = 'cancelled'");
+  else if (filters.status) where.push("b.status = 'issued'");
+  const { rows } = await db.query<BillRow>(
+    `${BILL_SELECT} WHERE ${where.join(" AND ")} ORDER BY b.issue_date DESC, b.fy DESC, b.seq DESC LIMIT 500`,
+    params,
+  );
+  const list = rows.map(toBillSummary);
+  if (filters.status === "open") return list.filter((b) => b.due > 0);
+  if (filters.status === "paid") return list.filter((b) => b.due === 0);
+  return list;
+}
+
+// ---------------------------------------------------------------------------
+// Starting values for a new bill
+// ---------------------------------------------------------------------------
+
+interface WorkspaceMoney {
+  gstin: string | null;
+  bill_prefix: string;
+  bill_terms: string | null;
+  today: string;
+}
+
+async function workspaceMoney(db: Queryable, workspaceId: string): Promise<WorkspaceMoney> {
+  const { rows } = await db.query<WorkspaceMoney>(
+    `SELECT gstin, bill_prefix, bill_terms, (now() AT TIME ZONE timezone)::date::text AS today FROM workspaces WHERE id = $1`,
+    [workspaceId],
+  );
+  return rows[0]!;
+}
+
+type DraftLine = BillDraft["items"][number];
+
+async function quoteLines(db: Queryable, quoteId: string): Promise<DraftLine[]> {
+  const { rows } = await db.query<{
+    catalogue_item_id: string | null;
+    name: string;
+    sac: string | null;
+    unit: ServiceUnit;
+    quantity: string;
+    rate: string;
+    tax_rate: string;
+  }>(
+    `SELECT qi.catalogue_item_id, qi.name, ci.sac, qi.unit, qi.quantity, qi.rate, qi.tax_rate
+       FROM quote_items qi LEFT JOIN catalogue_items ci ON ci.id = qi.catalogue_item_id
+      WHERE qi.quote_id = $1 ORDER BY qi.position`,
+    [quoteId],
+  );
+  return rows.map((r) => ({
+    catalogueItemId: r.catalogue_item_id,
+    name: r.name,
+    sac: r.sac,
+    unit: r.unit,
+    quantity: Number(r.quantity),
+    rate: Number(r.rate),
+    taxRate: Number(r.tax_rate),
+  }));
+}
+
+/**
+ * Everything a new bill starts with: the accepted quote's lines, who it's for, the due
+ * date (the event day) and the business's usual terms. The owner can change any of it.
+ */
+export async function billDraft(
+  db: Db,
+  ctx: MemberContext,
+  query: { eventId?: string; clientId?: string; quoteId?: string },
+): Promise<BillDraft> {
+  requireManage(ctx);
+  const ws = await workspaceMoney(db, ctx.workspaceId);
+  let eventId = query.eventId ?? null;
+  let clientId = query.clientId ?? null;
+  let quoteId = query.quoteId ?? null;
+  let items: DraftLine[] = [];
+  let discount = 0;
+  let dueDate: string | null = null;
+
+  if (quoteId) {
+    const q = await db.query<{ event_id: string | null; client_id: string | null; discount: string }>(
+      `SELECT event_id, client_id, discount FROM quotes WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+      [quoteId, ctx.workspaceId],
+    );
+    if (!q.rows[0]) throw notFound("This quote");
+    eventId = eventId ?? q.rows[0].event_id;
+    clientId = clientId ?? q.rows[0].client_id;
+  }
+
+  let eventTitle: string | null = null;
+  let eventValue: number | null = null;
+  if (eventId) {
+    const e = await db.query<{ client_id: string | null; title: string; value: string | null; start_date: string | null }>(
+      `SELECT e.client_id, e.title, e.value, (SELECT min(date)::text FROM event_functions WHERE event_id = e.id) AS start_date
+         FROM events e WHERE e.id = $1 AND e.workspace_id = $2 AND e.deleted_at IS NULL`,
+      [eventId, ctx.workspaceId],
+    );
+    const event = e.rows[0];
+    if (!event) throw notFound("This event");
+    clientId = clientId ?? event.client_id;
+    eventTitle = event.title;
+    eventValue = event.value === null ? null : Number(event.value);
+    // Wedding businesses usually take the balance before the big day.
+    dueDate = event.start_date && event.start_date > ws.today ? event.start_date : ws.today;
+    if (!quoteId) {
+      const accepted = await db.query<{ id: string }>(
+        `SELECT id FROM quotes WHERE event_id = $1 AND status = 'accepted' AND deleted_at IS NULL ORDER BY accepted_at DESC LIMIT 1`,
+        [eventId],
+      );
+      quoteId = accepted.rows[0]?.id ?? null;
+    }
+  }
+
+  if (quoteId) {
+    items = await quoteLines(db, quoteId);
+    discount = Number(
+      (await db.query<{ discount: string }>(`SELECT discount FROM quotes WHERE id = $1`, [quoteId])).rows[0]?.discount ?? 0,
+    );
+  } else if (eventTitle && eventValue) {
+    items = [{ catalogueItemId: null, name: eventTitle, sac: null, unit: "event", quantity: 1, rate: eventValue, taxRate: 0 }];
+  }
+
+  let billTo: BillDraft["billTo"] = { name: "", phone: null, address: null, gstin: null };
+  if (clientId) {
+    const c = await db.query<{ name: string; phone: string | null; address: string | null; gstin: string | null }>(
+      `SELECT c.name, c.phone,
+              (SELECT bill_to_address FROM bills WHERE client_id = c.id AND bill_to_address IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS address,
+              (SELECT bill_to_gstin FROM bills WHERE client_id = c.id AND bill_to_gstin IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS gstin
+         FROM clients c WHERE c.id = $1 AND c.workspace_id = $2 AND c.deleted_at IS NULL`,
+      [clientId, ctx.workspaceId],
+    );
+    if (!c.rows[0]) throw notFound("This client");
+    billTo = c.rows[0];
+  }
+
+  const advance = eventId
+    ? Number(
+        (
+          await db.query<{ sum: string }>(
+            `SELECT coalesce(sum(amount), 0) AS sum FROM payments WHERE event_id = $1 AND bill_id IS NULL AND deleted_at IS NULL`,
+            [eventId],
+          )
+        ).rows[0]!.sum,
+      )
+    : 0;
+
+  const chargesGst = ws.gstin !== null;
+  return {
+    eventId,
+    clientId,
+    quoteId,
+    billTo,
+    placeOfSupply: null,
+    issueDate: ws.today,
+    dueDate,
+    items: chargesGst ? items : items.map((i) => ({ ...i, taxRate: 0 })),
+    discount,
+    notes: null,
+    terms: ws.bill_terms,
+    chargesGst,
+    homeState: stateFromGstin(ws.gstin),
+    advance,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Writing
+// ---------------------------------------------------------------------------
+
+export interface BillLineFields {
+  catalogueItemId?: string | null;
+  name: string;
+  description?: string | null;
+  sac?: string | null;
+  unit: ServiceUnit;
+  quantity: number;
+  rate: number;
+  taxRate: number;
+}
+
+interface BillFields {
+  billTo: { name: string; phone?: string | null; address?: string | null; gstin?: string | null };
+  placeOfSupply?: string | null;
+  issueDate: string;
+  dueDate?: string | null;
+  items: BillLineFields[];
+  discount: number;
+  notes?: string | null;
+  terms?: string | null;
+}
+
+function checkDates(issueDate: string, dueDate: string | null | undefined) {
+  if (dueDate && dueDate < issueDate) {
+    throw new AppError(400, "VALIDATION_ERROR", "The due date can't be before the bill date", {
+      dueDate: "Can't be before the bill date",
+    });
+  }
+}
+
+/** Works out and saves every line and total. GST follows the business's state and the place of supply. */
+async function writeLines(
+  db: Queryable,
+  workspaceId: string,
+  billId: string,
+  lines: BillLineFields[],
+  discount: number,
+  gst: { chargesGst: boolean; interState: boolean },
+) {
+  const totals = computeBillTotals(lines, discount, gst);
+  await db.query(`DELETE FROM bill_items WHERE bill_id = $1`, [billId]);
+  for (const [i, line] of lines.entries()) {
+    const t = totals.lines[i]!;
+    await db.query(
+      `INSERT INTO bill_items (workspace_id, bill_id, catalogue_item_id, name, description, sac, unit, quantity, rate, tax_rate,
+                               amount, discount, taxable, cgst, sgst, igst, position)
+       VALUES ($1, $2, (SELECT id FROM catalogue_items WHERE id = $3 AND workspace_id = $1),
+               $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+      [
+        workspaceId,
+        billId,
+        line.catalogueItemId ?? null,
+        line.name,
+        line.description ?? null,
+        line.sac ?? null,
+        line.unit,
+        line.quantity,
+        line.rate,
+        gst.chargesGst ? line.taxRate : 0,
+        t.amount,
+        t.discount,
+        t.taxable,
+        t.cgst,
+        t.sgst,
+        t.igst,
+        i,
+      ],
+    );
+  }
+  await db.query(
+    `UPDATE bills SET subtotal = $2, discount = $3, taxable = $4, cgst = $5, sgst = $6, igst = $7, tax = $8,
+                      round_off = $9, total = $10 WHERE id = $1`,
+    [billId, totals.subtotal, totals.discount, totals.taxable, totals.cgst, totals.sgst, totals.igst, totals.tax, totals.roundOff, totals.total],
+  );
+  return totals;
+}
+
+/** Earlier money received for this event (or client) that isn't on a bill yet moves onto the new bill. */
+async function attachAdvances(db: Queryable, bill: { id: string; eventId: string | null; clientId: string | null; total: number }) {
+  const { rows } = bill.eventId
+    ? await db.query<{ id: string; amount: string }>(
+        `SELECT id, amount FROM payments WHERE event_id = $1 AND bill_id IS NULL AND deleted_at IS NULL ORDER BY paid_on, number`,
+        [bill.eventId],
+      )
+    : await db.query<{ id: string; amount: string }>(
+        `SELECT id, amount FROM payments
+          WHERE client_id = $1 AND event_id IS NULL AND bill_id IS NULL AND deleted_at IS NULL ORDER BY paid_on, number`,
+        [bill.clientId],
+      );
+  let covered = 0;
+  for (const p of rows) {
+    const amount = Number(p.amount);
+    if (covered + amount > bill.total) break;
+    covered = round2(covered + amount);
+    await db.query(`UPDATE payments SET bill_id = $2 WHERE id = $1`, [p.id, bill.id]);
+  }
+}
+
+export async function createBill(
+  db: Db,
+  ctx: MemberContext,
+  input: BillFields & { eventId?: string | null; clientId?: string | null; quoteId?: string | null },
+): Promise<Bill> {
+  requireManage(ctx);
+  checkDates(input.issueDate, input.dueDate);
+  return withTransaction(db, async (tx) => {
+    let clientId = input.clientId ?? null;
+    const eventId = input.eventId ?? null;
+    if (eventId) {
+      const e = await tx.query<{ client_id: string | null }>(
+        `SELECT client_id FROM events WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+        [eventId, ctx.workspaceId],
+      );
+      if (!e.rows[0]) throw new AppError(400, "VALIDATION_ERROR", "Choose an event from your list", { eventId: "Choose an event" });
+      clientId = clientId ?? e.rows[0].client_id;
+    }
+    if (clientId) {
+      const c = await tx.query(`SELECT 1 FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [clientId, ctx.workspaceId]);
+      if (!c.rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose a client from your list", { clientId: "Choose a client" });
+    }
+    if (input.quoteId) {
+      const q = await tx.query(`SELECT 1 FROM quotes WHERE id = $1 AND workspace_id = $2`, [input.quoteId, ctx.workspaceId]);
+      if (!q.rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose a quote from your list", { quoteId: "Choose a quote" });
+    }
+
+    const ws = await workspaceMoney(tx, ctx.workspaceId);
+    const chargesGst = ws.gstin !== null;
+    const homeState = stateFromGstin(ws.gstin);
+    const placeOfSupply = chargesGst ? (input.placeOfSupply ?? homeState) : null;
+    const interState = chargesGst && !!placeOfSupply && !!homeState && placeOfSupply !== homeState;
+
+    const fy = financialYear(input.issueDate);
+    const seq = await nextNumber(tx, ctx.workspaceId, `bill:${fy}`);
+    const { rows } = await tx.query<{ id: string }>(
+      `INSERT INTO bills (workspace_id, fy, seq, number, client_id, event_id, quote_id, issue_date, due_date,
+                          bill_to_name, bill_to_phone, bill_to_address, bill_to_gstin, seller_gstin, place_of_supply,
+                          inter_state, notes, terms, share_token, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id`,
+      [
+        ctx.workspaceId,
+        fy,
+        seq,
+        billNumber(ws.bill_prefix, fy, seq),
+        clientId,
+        eventId,
+        input.quoteId ?? null,
+        input.issueDate,
+        input.dueDate ?? null,
+        input.billTo.name,
+        input.billTo.phone ?? null,
+        input.billTo.address ?? null,
+        input.billTo.gstin ?? null,
+        ws.gstin,
+        placeOfSupply,
+        interState,
+        input.notes ?? null,
+        input.terms !== undefined ? input.terms : ws.bill_terms,
+        randomBytes(18).toString("base64url"),
+        ctx.userId,
+      ],
+    );
+    const id = rows[0]!.id;
+    const totals = await writeLines(tx, ctx.workspaceId, id, input.items, input.discount, { chargesGst, interState });
+    await attachAdvances(tx, { id, eventId, clientId, total: totals.total });
+    await logActivity(tx, {
+      workspaceId: ctx.workspaceId,
+      actorUserId: ctx.userId,
+      action: "bill.created",
+      entityType: "bill",
+      entityId: id,
+      meta: { total: totals.total, eventId },
+    });
+    return toBill(tx, ctx, await loadRow(tx, ctx.workspaceId, id));
+  });
+}
+
+export async function updateBill(db: Db, ctx: MemberContext, billId: string, input: Partial<BillFields>): Promise<Bill> {
+  requireManage(ctx);
+  return withTransaction(db, async (tx) => {
+    const current = await loadRow(tx, ctx.workspaceId, billId, true);
+    if (current.status === "cancelled") {
+      throw new AppError(409, "BILL_CANCELLED", "This bill was cancelled. Make a new one instead.");
+    }
+    const issueDate = input.issueDate ?? current.issue_date;
+    if (financialYear(issueDate) !== current.fy) {
+      throw new AppError(400, "VALIDATION_ERROR", "A bill can't move to another financial year. Cancel it and make a new one.", {
+        issueDate: "Keep the date in the same financial year",
+      });
+    }
+    checkDates(issueDate, input.dueDate !== undefined ? input.dueDate : current.due_date);
+
+    const chargesGst = current.seller_gstin !== null;
+    const homeState = stateFromGstin(current.seller_gstin);
+    const placeOfSupply = chargesGst ? (input.placeOfSupply !== undefined ? (input.placeOfSupply ?? homeState) : current.place_of_supply) : null;
+    const interState = chargesGst && !!placeOfSupply && !!homeState && placeOfSupply !== homeState;
+
+    const sets: string[] = [];
+    const values: unknown[] = [billId];
+    const set = (column: string, value: unknown) => {
+      values.push(value);
+      sets.push(`${column} = $${values.length}`);
+    };
+    if (input.issueDate !== undefined) set("issue_date", input.issueDate);
+    if (input.dueDate !== undefined) set("due_date", input.dueDate);
+    if (input.billTo) {
+      set("bill_to_name", input.billTo.name);
+      set("bill_to_phone", input.billTo.phone ?? null);
+      set("bill_to_address", input.billTo.address ?? null);
+      set("bill_to_gstin", input.billTo.gstin ?? null);
+    }
+    if (input.notes !== undefined) set("notes", input.notes);
+    if (input.terms !== undefined) set("terms", input.terms);
+    set("place_of_supply", placeOfSupply);
+    set("inter_state", interState);
+    await tx.query(`UPDATE bills SET ${sets.join(", ")} WHERE id = $1`, values);
+
+    const lines =
+      input.items ??
+      (await loadItems(tx, billId)).map((i) => ({
+        catalogueItemId: i.catalogueItemId,
+        name: i.name,
+        description: i.description,
+        sac: i.sac,
+        unit: i.unit,
+        quantity: i.quantity,
+        rate: i.rate,
+        taxRate: i.taxRate,
+      }));
+    const totals = await writeLines(tx, ctx.workspaceId, billId, lines, input.discount ?? Number(current.discount), { chargesGst, interState });
+    await logActivity(tx, {
+      workspaceId: ctx.workspaceId,
+      actorUserId: ctx.userId,
+      action: "bill.updated",
+      entityType: "bill",
+      entityId: billId,
+      meta: { total: totals.total, before: Number(current.total) },
+    });
+    return toBill(tx, ctx, await loadRow(tx, ctx.workspaceId, billId));
+  });
+}
+
+/**
+ * Cancelling keeps the number (GST numbering has no gaps) and frees any money received
+ * on it, which moves onto the next bill made for the same event.
+ */
+export async function cancelBill(db: Db, ctx: MemberContext, billId: string, reason: string | null): Promise<Bill> {
+  requireManage(ctx);
+  return withTransaction(db, async (tx) => {
+    const current = await loadRow(tx, ctx.workspaceId, billId, true);
+    if (current.status !== "cancelled") {
+      await tx.query(`UPDATE bills SET status = 'cancelled', cancelled_at = now(), cancel_reason = $2 WHERE id = $1`, [billId, reason]);
+      await tx.query(`UPDATE payments SET bill_id = NULL WHERE bill_id = $1`, [billId]);
+      await logActivity(tx, {
+        workspaceId: ctx.workspaceId,
+        actorUserId: ctx.userId,
+        action: "bill.cancelled",
+        entityType: "bill",
+        entityId: billId,
+        meta: { number: current.number, reason },
+      });
+    }
+    return toBill(tx, ctx, await loadRow(tx, ctx.workspaceId, billId));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public: the client's view at /b/<token>
+// ---------------------------------------------------------------------------
+
+export async function getPublicBill(db: Db, token: string): Promise<PublicBill> {
+  const { rows } = await db.query<BillRow>(`${BILL_SELECT} WHERE b.share_token = $1 AND w.deleted_at IS NULL`, [token]);
+  const row = rows[0];
+  if (!row) throw notFound("This bill");
+  const business = await db.query<{
+    name: string;
+    type_name: string;
+    icon: string;
+    city: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    upi_id: string | null;
+  }>(
+    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.upi_id
+       FROM workspaces w JOIN business_types bt ON bt.id = w.business_type_id WHERE w.id = $1`,
+    [row.workspace_id],
+  );
+  const b = business.rows[0]!;
+  const bill = await toBill(db, null, row);
+  const payments = await db.query<{ number: number; amount: string; paid_on: string; method: PublicBill["bill"]["payments"][number]["method"] }>(
+    `SELECT number, amount, paid_on::text AS paid_on, method FROM payments
+      WHERE bill_id = $1 AND deleted_at IS NULL ORDER BY paid_on, number`,
+    [row.id],
+  );
+  const { shareToken: _t, clientId: _c, eventId: _e, quoteId: _q, payments: _p, ...visible } = bill;
+  void _t;
+  void _c;
+  void _e;
+  void _q;
+  void _p;
+  return {
+    business: {
+      name: b.name,
+      typeName: b.type_name,
+      icon: b.icon,
+      city: b.city,
+      phone: b.phone,
+      email: b.email,
+      address: b.address,
+      upiId: row.status === "cancelled" ? null : b.upi_id,
+    },
+    bill: {
+      ...visible,
+      payments: payments.rows.map((p) => ({
+        number: receiptNumber(p.number),
+        amount: Number(p.amount),
+        paidOn: p.paid_on,
+        method: p.method,
+      })),
+    },
+  };
+}

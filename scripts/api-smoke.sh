@@ -2,7 +2,7 @@
 # Smoke-tests the BUILT API (apps/api/dist) against a real Postgres at $DATABASE_URL:
 #   1. first start applies every migration; health, business types and the full
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
-#      flow work over real HTTP
+#      -> bill -> payment flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -56,7 +56,7 @@ sign_in() {
 echo "== first start (fresh database)"
 start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
-  0005_catalogue_quotes_events; do
+  0005_catalogue_quotes_events 0006_bills_and_payments; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -94,6 +94,18 @@ expect "the client can accept it" '.success and .data.quote.status == "accepted"
   "$(api POST "/api/v1/public/quotes/$SHARE/accept" '{"name":"Smoke Lead"}')"
 expect "accepting books the lead and creates the event" '.success and .data.stageKind == "won" and .data.eventId != null' \
   "$(api GET "/api/v1/workspaces/$WS_ID/leads/$LEAD_ID" "" "$TOKEN")"
+EVENT_ID="$(api GET "/api/v1/workspaces/$WS_ID/leads/$LEAD_ID" "" "$TOKEN" | jq -r '.data.eventId')"
+DRAFT="$(api GET "/api/v1/workspaces/$WS_ID/bill-draft?eventId=$EVENT_ID" "" "$TOKEN")"
+expect "a bill starts from the accepted quote" '.success and (.data.items | length) == 1 and .data.billTo.name == "Smoke Lead"' "$DRAFT"
+BILL="$(api POST "/api/v1/workspaces/$WS_ID/bills" \
+  "$(echo "$DRAFT" | jq -c '.data | {eventId, quoteId, billTo, issueDate, dueDate, items, discount}')" "$TOKEN")"
+expect "the bill is numbered for the financial year and rounded to the rupee" \
+  '.success and (.data.number | test("^INV/[0-9]{2}-[0-9]{2}/0001$")) and .data.total == 25000 and .data.due == 25000' "$BILL"
+BILL_ID="$(echo "$BILL" | jq -r '.data.id')"
+expect "money received is recorded against the bill" '.success and .data.number == "R-0001"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/payments" "{\"billId\":\"$BILL_ID\",\"amount\":25000,\"paidOn\":\"2026-09-25\",\"method\":\"upi\"}" "$TOKEN")"
+expect "a fully paid bill leaves nothing to collect" '.success and .data.toCollect == 0' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/money" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

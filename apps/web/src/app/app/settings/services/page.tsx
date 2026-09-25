@@ -64,6 +64,7 @@ export default function ServicesPage() {
                 <span className="text-sm text-ink-muted">
                   {UNIT_LABELS[item.unit]}
                   {item.taxRate > 0 && ` · GST ${item.taxRate}%`}
+                  {item.sac && ` · SAC ${item.sac}`}
                   {!item.active && " · Hidden from quotes"}
                 </span>
               </span>
@@ -89,6 +90,7 @@ function ServiceForm({ item, onDone }: { item?: CatalogueItem; onDone: () => voi
     unit: (item?.unit ?? "event") as ServiceUnit,
     price: item ? String(item.price) : "",
     taxRate: item?.taxRate ?? 0,
+    sac: item?.sac ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -138,13 +140,24 @@ function ServiceForm({ item, onDone }: { item?: CatalogueItem; onDone: () => voi
           ))}
         </SelectField>
       </div>
-      <SelectField label="GST" value={values.taxRate} onChange={(e) => setValues((v) => ({ ...v, taxRate: Number(e.target.value) }))} error={errors.taxRate} hint="Leave as No GST if you don't charge it.">
-        {GST_RATES.map((r) => (
-          <option key={r} value={r}>
-            {r === 0 ? "No GST" : `${r}%`}
-          </option>
-        ))}
-      </SelectField>
+      <div className="grid grid-cols-2 gap-3">
+        <SelectField label="GST" value={values.taxRate} onChange={(e) => setValues((v) => ({ ...v, taxRate: Number(e.target.value) }))} error={errors.taxRate}>
+          {GST_RATES.map((r) => (
+            <option key={r} value={r}>
+              {r === 0 ? "No GST" : `${r}%`}
+            </option>
+          ))}
+        </SelectField>
+        <TextField
+          label="SAC code"
+          inputMode="numeric"
+          value={values.sac}
+          onChange={(e) => setValues((v) => ({ ...v, sac: e.target.value.replace(/\D/g, "") }))}
+          error={errors.sac}
+          placeholder="Optional"
+        />
+      </div>
+      <p className="-mt-2 text-sm text-ink-muted">Leave GST as No GST if you don&apos;t charge it. The SAC code is printed on GST bills; your CA can tell you yours.</p>
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
         Save

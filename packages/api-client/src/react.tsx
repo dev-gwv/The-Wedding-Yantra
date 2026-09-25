@@ -9,6 +9,10 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  BillInput,
+  PaymentInput,
+  UpdateBillInput,
+  UpdatePaymentInput,
   CatalogueItemInput,
   EventInput,
   EventListQuery,
@@ -75,6 +79,14 @@ export const queryKeys = {
   calendar: (id: string, month: string) => ["workspace", id, "bookings", "calendar", month] as const,
   clashes: (id: string, dates: string, exclude: string) => ["workspace", id, "bookings", "clashes", dates, exclude] as const,
   publicQuote: (token: string) => ["public-quote", token] as const,
+  /** Money lives under bookings too: a change to an event or a quote can change what's due. */
+  moneyOverview: (id: string) => ["workspace", id, "bookings", "money"] as const,
+  eventMoney: (id: string, eventId: string) => ["workspace", id, "bookings", "event-money", eventId] as const,
+  bills: (id: string, query: object) => ["workspace", id, "bookings", "bills", query] as const,
+  bill: (id: string, billId: string) => ["workspace", id, "bookings", "bill", billId] as const,
+  billDraft: (id: string, query: object) => ["workspace", id, "bookings", "bill-draft", query] as const,
+  payments: (id: string, query: object) => ["workspace", id, "bookings", "payments", query] as const,
+  publicBill: (token: string) => ["public-bill", token] as const,
 };
 
 interface QueryOpts {
@@ -497,4 +509,94 @@ export function useClashes(workspaceId: string, dates: string[], excludeEventId?
     queryFn: () => api.events.clashes(workspaceId, key.split(","), excludeEventId),
     enabled: key.length > 0,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Money: bills, payments and what's due
+// ---------------------------------------------------------------------------
+
+export function useMoneyOverview(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.moneyOverview(workspaceId), queryFn: () => api.money.overview(workspaceId), enabled });
+}
+
+export function useEventMoney(workspaceId: string, eventId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.eventMoney(workspaceId, eventId),
+    queryFn: () => api.money.forEvent(workspaceId, eventId),
+    enabled: enabled && !!eventId,
+  });
+}
+
+export function useBills(
+  workspaceId: string,
+  query: { clientId?: string; eventId?: string; status?: "open" | "paid" | "cancelled" } = {},
+  enabled = true,
+) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.bills(workspaceId, query), queryFn: () => api.bills.list(workspaceId, query), enabled });
+}
+
+export function useBill(workspaceId: string, billId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.bill(workspaceId, billId), queryFn: () => api.bills.get(workspaceId, billId), enabled: !!billId });
+}
+
+/** Starting values for a new bill. Always fetched fresh. */
+export function useBillDraft(workspaceId: string, query: { eventId?: string; clientId?: string; quoteId?: string }, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.billDraft(workspaceId, query),
+    queryFn: () => api.bills.draft(workspaceId, query),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+export function useCreateBill(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: BillInput) => api.bills.create(workspaceId, input));
+}
+
+export function useUpdateBill(workspaceId: string, billId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: UpdateBillInput) => api.bills.update(workspaceId, billId, input));
+}
+
+export function useCancelBill(workspaceId: string, billId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (reason?: string) => api.bills.cancel(workspaceId, billId, reason));
+}
+
+export function usePublicBill(token: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.publicBill(token), queryFn: () => api.bills.publicGet(token), retry: false });
+}
+
+export function usePayments(
+  workspaceId: string,
+  query: { billId?: string; eventId?: string; clientId?: string; month?: string } = {},
+  enabled = true,
+) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.payments(workspaceId, query), queryFn: () => api.payments.list(workspaceId, query), enabled });
+}
+
+export function useRecordPayment(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: PaymentInput) => api.payments.create(workspaceId, input));
+}
+
+export function useUpdatePayment(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, ({ id, ...input }: UpdatePaymentInput & { id: string }) =>
+    api.payments.update(workspaceId, id, input),
+  );
+}
+
+export function useDeletePayment(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (id: string) => api.payments.remove(workspaceId, id));
 }

@@ -11,6 +11,7 @@ interface Row {
   unit: ServiceUnit;
   price: string;
   tax_rate: string;
+  sac: string | null;
   active: boolean;
 }
 
@@ -21,10 +22,11 @@ const toItem = (r: Row): CatalogueItem => ({
   unit: r.unit,
   price: Number(r.price),
   taxRate: Number(r.tax_rate),
+  sac: r.sac,
   active: r.active,
 });
 
-const COLUMNS = "id, name, description, unit, price, tax_rate, active";
+const COLUMNS = "id, name, description, unit, price, tax_rate, sac, active";
 
 /** Everyone who can work on leads or quotes can read the price list. */
 function canRead(ctx: MemberContext) {
@@ -45,14 +47,14 @@ export async function listCatalogue(db: Db, ctx: MemberContext, includeArchived 
 export async function createCatalogueItem(
   db: Db,
   ctx: MemberContext,
-  input: { name: string; description?: string | null; unit: ServiceUnit; price: number; taxRate: number },
+  input: { name: string; description?: string | null; unit: ServiceUnit; price: number; taxRate: number; sac?: string | null },
 ): Promise<CatalogueItem> {
   if (!can(ctx.role, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
   const { rows } = await db.query<Row>(
-    `INSERT INTO catalogue_items (workspace_id, name, description, unit, price, tax_rate, position)
-     VALUES ($1, $2, $3, $4, $5, $6, (SELECT coalesce(max(position), -1) + 1 FROM catalogue_items WHERE workspace_id = $1))
+    `INSERT INTO catalogue_items (workspace_id, name, description, unit, price, tax_rate, sac, position)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT coalesce(max(position), -1) + 1 FROM catalogue_items WHERE workspace_id = $1))
      RETURNING ${COLUMNS}`,
-    [ctx.workspaceId, input.name, input.description ?? null, input.unit, input.price, input.taxRate],
+    [ctx.workspaceId, input.name, input.description ?? null, input.unit, input.price, input.taxRate, input.sac ?? null],
   );
   return toItem(rows[0]!);
 }
@@ -61,7 +63,15 @@ export async function updateCatalogueItem(
   db: Db,
   ctx: MemberContext,
   id: string,
-  input: Partial<{ name: string; description: string | null; unit: ServiceUnit; price: number; taxRate: number; active: boolean }>,
+  input: Partial<{
+    name: string;
+    description: string | null;
+    unit: ServiceUnit;
+    price: number;
+    taxRate: number;
+    sac: string | null;
+    active: boolean;
+  }>,
 ): Promise<CatalogueItem> {
   if (!can(ctx.role, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
   const map: [keyof typeof input, string][] = [
@@ -70,6 +80,7 @@ export async function updateCatalogueItem(
     ["unit", "unit"],
     ["price", "price"],
     ["taxRate", "tax_rate"],
+    ["sac", "sac"],
     ["active", "active"],
   ];
   const sets: string[] = [];

@@ -57,7 +57,7 @@ export const updateMeInput = z.object({
   email: z
     .union([z.literal(""), z.email("Enter a valid email")])
     .optional()
-    .transform((v) => (v ? v.toLowerCase() : null)),
+    .transform((v) => (v === undefined ? undefined : v ? v.toLowerCase() : null)),
 });
 export type UpdateMeInput = z.input<typeof updateMeInput>;
 

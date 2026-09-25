@@ -1,5 +1,6 @@
 import type { StarterPack } from "./business-types.js";
 import type { EventSummary } from "./bookings.js";
+import type { DueItem } from "./money.js";
 import type { LeadSummary } from "./sales.js";
 
 export type SetupStepKey = "create_business" | "business_profile" | "invite_team";
@@ -30,5 +31,7 @@ export interface HomeSummary {
   };
   /** Confirmed events in the next 14 days, soonest first (empty for roles without events). */
   upcomingEvents: EventSummary[];
+  /** Money to collect, for roles that see money; null for everyone else. */
+  money: { toCollect: number; overdue: number; due: DueItem[] } | null;
   starterPack: StarterPack;
 }

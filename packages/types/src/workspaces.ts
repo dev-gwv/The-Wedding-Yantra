@@ -25,6 +25,7 @@ export const createWorkspaceInput = z.object({
 export type CreateWorkspaceInput = z.input<typeof createWorkspaceInput>;
 
 export const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+export const UPI_ID_PATTERN = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/;
 
 export const updateWorkspaceInput = z
   .object({
@@ -35,7 +36,7 @@ export const updateWorkspaceInput = z
       .union([z.literal(""), z.email("Enter a valid email")])
       .nullable()
       .optional()
-      .transform((v) => (v ? v.toLowerCase() : null)),
+      .transform((v) => (v === undefined ? undefined : v ? v.toLowerCase() : null)),
     address: optionalText(300),
     gstin: z
       .string()
@@ -47,6 +48,22 @@ export const updateWorkspaceInput = z
       .optional(),
     /** Printed at the bottom of every new quote */
     quoteTerms: optionalText(4000),
+    /** Clients pay bills to this UPI ID, e.g. riya@okhdfc */
+    upiId: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || UPI_ID_PATTERN.test(v), "A UPI ID looks like name@bank")
+      .transform((v) => (v === "" ? null : v))
+      .nullable()
+      .optional(),
+    /** Starts every bill number: INV/26-27/0001 */
+    billPrefix: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9-]{1,5}$/, "Use up to 5 letters or numbers"),
+    /** Printed at the bottom of every bill: bank details, payment terms */
+    billTerms: optionalText(2000),
   })
   .partial();
 export type UpdateWorkspaceInput = z.input<typeof updateWorkspaceInput>;
@@ -63,6 +80,9 @@ export const workspace = z.object({
   address: z.string().nullable(),
   gstin: z.string().nullable(),
   quoteTerms: z.string().nullable(),
+  upiId: z.string().nullable(),
+  billPrefix: z.string(),
+  billTerms: z.string().nullable(),
   createdAt: z.string(),
   /** The signed-in person's role in this business. */
   role,

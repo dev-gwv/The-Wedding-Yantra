@@ -1,4 +1,15 @@
 import type {
+  Bill,
+  BillDraft,
+  BillInput,
+  BillSummary,
+  EventMoney,
+  MoneyOverview,
+  Payment,
+  PaymentInput,
+  PublicBill,
+  UpdateBillInput,
+  UpdatePaymentInput,
   CalendarEntry,
   CatalogueItem,
   CatalogueItemInput,
@@ -230,6 +241,34 @@ export function createApiClient(options: ApiClientOptions) {
         request<EventClash[]>("GET", `${ws(workspaceId)}/event-clashes${qs({ dates: dates.join(","), excludeEventId })}`),
       calendar: (workspaceId: string, month: string) =>
         request<CalendarEntry[]>("GET", `${ws(workspaceId)}/calendar${qs({ month })}`),
+    },
+    money: {
+      overview: (workspaceId: string) => request<MoneyOverview>("GET", `${ws(workspaceId)}/money`),
+      forEvent: (workspaceId: string, eventId: string) =>
+        request<EventMoney>("GET", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/money`),
+    },
+    bills: {
+      list: (workspaceId: string, query: { clientId?: string; eventId?: string; status?: "open" | "paid" | "cancelled" } = {}) =>
+        request<BillSummary[]>("GET", `${ws(workspaceId)}/bills${qs(query)}`),
+      /** Starting values for a new bill, from an event, an accepted quote or a client */
+      draft: (workspaceId: string, query: { eventId?: string; clientId?: string; quoteId?: string }) =>
+        request<BillDraft>("GET", `${ws(workspaceId)}/bill-draft${qs(query)}`),
+      get: (workspaceId: string, id: string) => request<Bill>("GET", `${ws(workspaceId)}/bills/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: BillInput) => request<Bill>("POST", `${ws(workspaceId)}/bills`, input),
+      update: (workspaceId: string, id: string, input: UpdateBillInput) =>
+        request<Bill>("PATCH", `${ws(workspaceId)}/bills/${encodeURIComponent(id)}`, input),
+      cancel: (workspaceId: string, id: string, reason?: string) =>
+        request<Bill>("POST", `${ws(workspaceId)}/bills/${encodeURIComponent(id)}/cancel`, { reason }),
+      publicGet: (token: string) => request<PublicBill>("GET", `/public/bills/${encodeURIComponent(token)}`),
+    },
+    payments: {
+      list: (workspaceId: string, query: { billId?: string; eventId?: string; clientId?: string; month?: string } = {}) =>
+        request<Payment[]>("GET", `${ws(workspaceId)}/payments${qs(query)}`),
+      create: (workspaceId: string, input: PaymentInput) => request<Payment>("POST", `${ws(workspaceId)}/payments`, input),
+      update: (workspaceId: string, id: string, input: UpdatePaymentInput) =>
+        request<Payment>("PATCH", `${ws(workspaceId)}/payments/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payments/${encodeURIComponent(id)}`),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

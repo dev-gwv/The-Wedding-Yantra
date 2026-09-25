@@ -18,6 +18,8 @@ export interface CatalogueItem {
   price: number;
   /** GST percent */
   taxRate: number;
+  /** HSN/SAC code, printed on GST bills */
+  sac: string | null;
   active: boolean;
 }
 
@@ -26,15 +28,25 @@ const gst = z.coerce
   .number()
   .refine((n) => (GST_RATES as readonly number[]).includes(n), "Pick a GST rate");
 
-export const catalogueItemInput = z.object({
+const catalogueFields = {
   name: z.string().trim().min(2, "Name the service").max(100),
   description: optionalText(300),
   unit: z.enum(SERVICE_UNITS),
   price: money,
-  taxRate: gst.default(0),
-});
+  taxRate: gst,
+  sac: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^\d{4,8}$/.test(v), "SAC codes have 4 to 8 digits")
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional(),
+};
+
+export const catalogueItemInput = z.object({ ...catalogueFields, taxRate: gst.default(0) });
 export type CatalogueItemInput = z.input<typeof catalogueItemInput>;
-export const updateCatalogueItemInput = catalogueItemInput.partial().extend({ active: z.boolean().optional() });
+/** Only the fields sent change: no defaults, so hiding a service keeps its GST rate. */
+export const updateCatalogueItemInput = z.object(catalogueFields).partial().extend({ active: z.boolean().optional() });
 export type UpdateCatalogueItemInput = z.input<typeof updateCatalogueItemInput>;
 
 // ---------------------------------------------------------------------------
@@ -112,11 +124,12 @@ export const quoteItemInput = z.object({
 });
 export type QuoteItemInput = z.input<typeof quoteItemInput>;
 
+// Not sent stays undefined (leave it alone); sent empty becomes null (clear it).
 const optionalDate = z
   .union([z.literal(""), z.iso.date("Pick a valid date")])
   .nullable()
   .optional()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v === undefined ? undefined : v || null));
 
 export const quoteInput = z
   .object({
@@ -231,7 +244,7 @@ const time = z
   .union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time like 18:30")])
   .nullable()
   .optional()
-  .transform((v) => (v ? v : null));
+  .transform((v) => (v === undefined ? undefined : v || null));
 
 export const eventFunctionInput = z.object({
   id: z.uuid().optional(),
@@ -309,3 +322,6 @@ export const clashQuery = z.object({
 });
 
 export type { ServiceUnit, EventType };
+
+/** Shared field rules for money forms (bills, payments). */
+export { money as moneyInput, gst as gstRateInput, optionalDate as optionalDateInput };

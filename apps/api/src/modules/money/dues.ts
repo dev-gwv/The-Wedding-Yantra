@@ -1,0 +1,148 @@
+import { can, round2 } from "@wedding-yantra/core";
+import type { DueItem, EventMoney, HomeSummary, MoneyOverview } from "@wedding-yantra/types";
+import type { Queryable } from "../../db.js";
+import { notFound } from "../../lib/http.js";
+import type { MemberContext } from "../auth/guard.js";
+import { requireMoneyView } from "./access.js";
+import { BILL_SELECT, toBillSummary, type BillRow } from "./bills.js";
+import { listPayments } from "./payments.js";
+
+/**
+ * Everything still to collect: bills with a balance, and bookings with a value that
+ * have no bill yet (the balance is due by the first function).
+ */
+async function dues(db: Queryable, workspaceId: string): Promise<DueItem[]> {
+  const bills = await db.query<BillRow>(
+    `SELECT * FROM (${BILL_SELECT} WHERE b.workspace_id = $1 AND b.status = 'issued') x WHERE x.total > x.received`,
+    [workspaceId],
+  );
+  const fromBills: DueItem[] = bills.rows.map((r) => {
+    const s = toBillSummary(r);
+    return {
+      kind: "bill",
+      billId: s.id,
+      billNumber: s.number,
+      eventId: s.eventId,
+      eventTitle: s.eventTitle,
+      clientId: s.clientId,
+      clientName: s.clientName,
+      clientPhone: r.client_phone,
+      total: s.total,
+      received: s.received,
+      due: s.due,
+      dueDate: s.dueDate,
+      overdue: s.overdue,
+      shareToken: r.share_token,
+    };
+  });
+
+  const events = await db.query<{
+    id: string;
+    title: string;
+    value: string;
+    client_id: string | null;
+    client_name: string | null;
+    client_phone: string | null;
+    start_date: string | null;
+    received: string;
+    today: string;
+  }>(
+    `SELECT * FROM (
+       SELECT e.id, e.title, e.value, e.client_id, c.name AS client_name, c.phone AS client_phone,
+              (SELECT min(date)::text FROM event_functions f WHERE f.event_id = e.id) AS start_date,
+              coalesce((SELECT sum(amount) FROM payments p WHERE p.event_id = e.id AND p.deleted_at IS NULL), 0) AS received,
+              (now() AT TIME ZONE w.timezone)::date::text AS today
+         FROM events e
+         JOIN workspaces w ON w.id = e.workspace_id
+         LEFT JOIN clients c ON c.id = e.client_id
+        WHERE e.workspace_id = $1 AND e.deleted_at IS NULL AND e.status <> 'cancelled' AND e.value > 0
+          AND NOT EXISTS (SELECT 1 FROM bills b WHERE b.event_id = e.id AND b.status = 'issued')
+     ) x WHERE x.value > x.received`,
+    [workspaceId],
+  );
+  const fromEvents: DueItem[] = events.rows.map((r) => {
+    const total = Number(r.value);
+    const received = Number(r.received);
+    const due = round2(total - received);
+    return {
+      kind: "event",
+      billId: null,
+      billNumber: null,
+      eventId: r.id,
+      eventTitle: r.title,
+      clientId: r.client_id,
+      clientName: r.client_name ?? r.title,
+      clientPhone: r.client_phone,
+      total,
+      received,
+      due,
+      dueDate: r.start_date,
+      overdue: r.start_date !== null && r.start_date < r.today,
+      shareToken: null,
+    };
+  });
+
+  return [...fromBills, ...fromEvents].sort(
+    (a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || b.due - a.due,
+  );
+}
+
+export async function moneyOverview(db: Queryable, ctx: MemberContext): Promise<MoneyOverview> {
+  requireMoneyView(ctx);
+  const list = await dues(db, ctx.workspaceId);
+  const { rows } = await db.query<{ received: string; billed: string }>(
+    `SELECT
+       coalesce((SELECT sum(p.amount) FROM payments p
+                  WHERE p.workspace_id = w.id AND p.deleted_at IS NULL
+                    AND date_trunc('month', p.paid_on) = date_trunc('month', (now() AT TIME ZONE w.timezone)::date)), 0) AS received,
+       coalesce((SELECT sum(b.total) FROM bills b
+                  WHERE b.workspace_id = w.id AND b.status = 'issued'
+                    AND date_trunc('month', b.issue_date) = date_trunc('month', (now() AT TIME ZONE w.timezone)::date)), 0) AS billed
+       FROM workspaces w WHERE w.id = $1`,
+    [ctx.workspaceId],
+  );
+  const sum = (items: DueItem[]) => round2(items.reduce((a, d) => a + d.due, 0));
+  return {
+    toCollect: sum(list),
+    overdue: sum(list.filter((d) => d.overdue)),
+    receivedThisMonth: Number(rows[0]?.received ?? 0),
+    billedThisMonth: Number(rows[0]?.billed ?? 0),
+    dues: list,
+  };
+}
+
+/** What Home shows about money: only for roles that see money. */
+export async function homeMoney(db: Queryable, ctx: MemberContext): Promise<HomeSummary["money"]> {
+  if (!can(ctx.role, "finance.view")) return null;
+  const overview = await moneyOverview(db, ctx);
+  return { toCollect: overview.toCollect, overdue: overview.overdue, due: overview.dues.slice(0, 3) };
+}
+
+export async function eventMoney(db: Queryable, ctx: MemberContext, eventId: string): Promise<EventMoney> {
+  requireMoneyView(ctx);
+  const e = await db.query<{ value: string | null }>(
+    `SELECT value FROM events WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+    [eventId, ctx.workspaceId],
+  );
+  if (!e.rows[0]) throw notFound("This event");
+  const bills = await db.query<BillRow>(
+    `${BILL_SELECT} WHERE b.event_id = $1 AND b.workspace_id = $2 ORDER BY b.issue_date, b.seq`,
+    [eventId, ctx.workspaceId],
+  );
+  const summaries = bills.rows.map(toBillSummary);
+  const payments = await listPayments(db, ctx, { eventId });
+  const issued = summaries.filter((b) => b.status === "issued");
+  const bookingValue = e.rows[0].value === null ? null : Number(e.rows[0].value);
+  const billed = round2(issued.reduce((a, b) => a + b.total, 0));
+  const expected = issued.length ? billed : (bookingValue ?? 0);
+  const received = round2(payments.reduce((a, p) => a + p.amount, 0));
+  return {
+    bookingValue,
+    billed,
+    expected,
+    received,
+    due: Math.max(round2(expected - received), 0),
+    bills: summaries,
+    payments,
+  };
+}

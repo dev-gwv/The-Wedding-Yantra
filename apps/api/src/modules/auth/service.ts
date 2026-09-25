@@ -172,10 +172,12 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
   };
 }
 
-export async function updateMe(db: Db, userId: string, input: { name: string; email: string | null }): Promise<User> {
+/** Email left out means keep it; sent empty means remove it. */
+export async function updateMe(db: Db, userId: string, input: { name: string; email?: string | null }): Promise<User> {
   const { rows } = await db.query<UserRow>(
-    `UPDATE users SET name = $2, email = $3 WHERE id = $1 RETURNING id, phone, name, email, created_at`,
-    [userId, input.name, input.email],
+    `UPDATE users SET name = $2, email = CASE WHEN $4 THEN $3 ELSE email END WHERE id = $1
+     RETURNING id, phone, name, email, created_at`,
+    [userId, input.name, input.email ?? null, input.email !== undefined],
   );
   return toUser(rows[0]!);
 }

@@ -36,6 +36,10 @@ export const PERMISSIONS = [
   "quotes.manage",
   "events.view",
   "events.manage",
+  /** Make, change and cancel bills */
+  "bills.manage",
+  /** Record money received from clients */
+  "payments.record",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -58,6 +62,8 @@ const GRANTS: Record<Role, readonly Permission[]> = {
     "quotes.manage",
     "events.view",
     "events.manage",
+    "bills.manage",
+    "payments.record",
   ],
   staff: ["members.view", "leads.work", "events.view"],
   freelancer: [],

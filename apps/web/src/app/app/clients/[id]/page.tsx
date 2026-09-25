@@ -1,14 +1,15 @@
 "use client";
 
 import { can, formatPhone, whatsappLink } from "@wedding-yantra/core";
-import { useClient, useEvents, useQuotes } from "@wedding-yantra/api-client/react";
-import { FileText, MessageCircle, Pencil, Phone } from "lucide-react";
+import { useBills, useClient, useEvents, useQuotes } from "@wedding-yantra/api-client/react";
+import { FilePlus2, FileText, MessageCircle, Pencil, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { EventCard } from "@/components/bookings/event-card";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { BillRow } from "@/components/money/rows";
 import { ClientFormSheet } from "@/components/sales/client-form-sheet";
 import { LeadCard } from "@/components/sales/lead-card";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function ClientPage() {
   const c = client.data;
   const quotes = useQuotes(workspace.id, { clientId: id }, can(workspace.role, "quotes.view"));
   const events = useEvents(workspace.id, { clientId: id }, can(workspace.role, "events.view"));
+  const bills = useBills(workspace.id, { clientId: id }, can(workspace.role, "finance.view"));
 
   return (
     <>
@@ -64,6 +66,11 @@ export default function ClientPage() {
                   <FileText className="size-4" /> Make a quote
                 </ButtonLink>
               )}
+              {can(workspace.role, "bills.manage") && (
+                <ButtonLink href={`/app/bills/new?clientId=${c.id}`} variant="secondary">
+                  <FilePlus2 className="size-4" /> Make bill
+                </ButtonLink>
+              )}
               {can(workspace.role, "clients.manage") && (
                 <Button variant="secondary" onClick={() => setEditing(true)}>
                   <Pencil className="size-4" /> Edit
@@ -81,6 +88,17 @@ export default function ClientPage() {
                   <EventCard key={e.id} event={e} />
                 ))}
               </div>
+            </section>
+          )}
+
+          {bills.data && bills.data.length > 0 && (
+            <section>
+              <h2 className="mb-3 font-display text-lg font-extrabold">Bills</h2>
+              <Card className="divide-y divide-line overflow-hidden">
+                {bills.data.map((b) => (
+                  <BillRow key={b.id} bill={b} showClient={false} />
+                ))}
+              </Card>
             </section>
           )}
 

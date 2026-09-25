@@ -7,6 +7,7 @@ import type { MemberContext } from "../auth/guard.js";
 import { installSalesDefaults } from "../sales/defaults.js";
 import { salesSummary } from "../sales/leads.js";
 import { listEvents } from "../bookings/events.js";
+import { homeMoney } from "../money/dues.js";
 
 interface WorkspaceRow {
   id: string;
@@ -20,6 +21,9 @@ interface WorkspaceRow {
   address: string | null;
   gstin: string | null;
   quote_terms: string | null;
+  upi_id: string | null;
+  bill_prefix: string;
+  bill_terms: string | null;
   created_at: Date;
 }
 
@@ -35,6 +39,9 @@ const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
   address: row.address,
   gstin: row.gstin,
   quoteTerms: row.quote_terms,
+  upiId: row.upi_id,
+  billPrefix: row.bill_prefix,
+  billTerms: row.bill_terms,
   createdAt: row.created_at.toISOString(),
   role,
 });
@@ -43,7 +50,7 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
             bt.icon AS business_type_icon, w.city,
-            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.created_at
+            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.created_at
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -104,6 +111,9 @@ const COLUMNS: Record<keyof UpdateWorkspaceInput, string> = {
   address: "address",
   gstin: "gstin",
   quoteTerms: "quote_terms",
+  upiId: "upi_id",
+  billPrefix: "bill_prefix",
+  billTerms: "bill_terms",
 };
 
 export async function updateWorkspace(
@@ -189,6 +199,7 @@ export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> 
     team: { members, pendingInvites },
     sales: await salesSummary(db, ctx),
     upcomingEvents: await upcomingEvents(db, ctx),
+    money: await homeMoney(db, ctx),
     starterPack: row.starter_pack,
   };
 }

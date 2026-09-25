@@ -513,3 +513,44 @@ events without changing them.
 
 **Not in Phase 2:** GST invoices, payments, expenses and profit. These are Phase 3, and
 they start from the accepted quote and the event built here.
+
+## 17. Built in Phase 3, part 1: GST bills and payments
+
+**What an owner can do now**
+- **Make a bill in one tap from a booking.** It starts from the accepted quote: the same
+  services, discount and numbers, the client's details, and the event day as the due date.
+- **Proper GST tax invoices.**
+  - Numbered per financial year as GST rules require: `INV/26-27/0001`. The prefix can be
+    changed, and numbers never repeat or leave gaps. A cancelled bill keeps its number.
+  - GST is split into CGST and SGST inside the business's state. For an event in another
+    state (the place of supply), it is IGST.
+  - SAC codes come from the price list. Each bill has a GST summary by rate and the amount
+    in words, and the grand total is rounded to the rupee.
+  - A business without a GST number makes plain bills with no GST, and is told why.
+- **Money received.** UPI, cash, bank transfer, cheque, card or other, with a reference
+  and date. Every payment gets a receipt number (`R-0001`).
+  - An advance taken before the bill waits on the event and moves onto the bill when it
+    is made.
+  - Cancelling a bill frees its payments for the next bill.
+  - One tap sends a receipt on WhatsApp with the balance left.
+- **The client's bill link** (`/b/…`) shows the bill and what's been paid. With a UPI ID set
+  in Business profile, it shows a "Pay by UPI" button that opens GPay, PhonePe, Paytm or any
+  UPI app with the amount filled in, plus a QR code for computers. The money goes straight
+  to the business. No payment gateway and no fees.
+- **To collect.** The Money tab lists every bill with a balance, and every booking with a value
+  but no bill yet, soonest due first. Overdue items are marked. One tap sends a polite WhatsApp
+  reminder, another records the money. Home shows the total to collect, and each event page
+  shows booked, received and due.
+- **Save as PDF** prints a clean A4 tax invoice, with the business's bank details and terms.
+
+**Roles:** owners and managers make bills and record payments. The accountant sees
+everything and changes nothing. Staff don't see money.
+
+**Fixed along the way (in Phase 2):**
+- Hiding a service from new quotes reset its GST rate to none.
+- Changing one detail of a quote through the API cleared its valid-until date.
+- Both now change only what was sent.
+
+**Next in Phase 3:** expenses with bill photos, profit on every event, the monthly report
+and exports for the CA. Razorpay payment links can be added later for businesses that want
+card payments confirmed automatically. UPI already covers most wedding payments without it.

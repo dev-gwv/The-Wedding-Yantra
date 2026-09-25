@@ -8,6 +8,7 @@ import { createConsoleOtpSender, type OtpSender } from "./modules/auth/otp-sende
 import { authRoutes } from "./modules/auth/routes.js";
 import { businessTypeRoutes } from "./modules/business-types/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
+import { moneyRoutes } from "./modules/money/routes.js";
 import { bookingRoutes } from "./modules/bookings/routes.js";
 import { salesRoutes } from "./modules/sales/routes.js";
 import { teamRoutes } from "./modules/team/routes.js";
@@ -81,6 +82,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       teamRoutes(v1, { db });
       salesRoutes(v1, { db });
       bookingRoutes(v1, { db });
+      moneyRoutes(v1, { db });
     },
     { prefix: "/api/v1" },
   );

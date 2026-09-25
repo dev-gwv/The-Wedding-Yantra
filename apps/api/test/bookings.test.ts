@@ -85,7 +85,12 @@ describe("price list", () => {
       (await call(t.app, "POST", `/workspaces/${ws}/catalogue`, { token: staff, body: { name: "No No", unit: "event", price: 1 } })).status,
     ).toBe(403);
 
-    await call(t.app, "PATCH", `/workspaces/${ws}/catalogue/${made.body.data.id}`, { token: owner, body: { active: false } });
+    // Hiding a service changes nothing else about it (it once reset the GST rate).
+    const hidden = await call<Item>(t.app, "PATCH", `/workspaces/${ws}/catalogue/${made.body.data.id}`, {
+      token: owner,
+      body: { active: false },
+    });
+    expect(hidden.body.data).toMatchObject({ active: false, price: 500, taxRate: 18 });
     const active = await call<Item[]>(t.app, "GET", `/workspaces/${ws}/catalogue`, { token: owner });
     expect(active.body.data.map((i) => i.name)).not.toContain("Mehendi add-on");
     const all = await call<Item[]>(t.app, "GET", `/workspaces/${ws}/catalogue?all=true`, { token: owner });
@@ -123,8 +128,12 @@ describe("quotes and booking", () => {
     });
     expect(second.body.data.number).toBe("Q-0002");
 
-    const edited = await call<Quote>(t.app, "PATCH", `/workspaces/${ws}/quotes/${q.id}`, { token: owner, body: { discount: 0 } });
-    expect(edited.body.data.total).toBe(48019.98);
+    // Changing one thing keeps the rest, including the valid-until date.
+    const edited = await call<Quote & { validUntil: string | null }>(t.app, "PATCH", `/workspaces/${ws}/quotes/${q.id}`, {
+      token: owner,
+      body: { discount: 0 },
+    });
+    expect(edited.body.data).toMatchObject({ total: 48019.98, validUntil: "2099-01-01" });
 
     const sent = await call<Quote>(t.app, "POST", `/workspaces/${ws}/quotes/${q.id}/send`, { token: owner });
     expect(sent.body.data.status).toBe("sent");

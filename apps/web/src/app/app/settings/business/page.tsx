@@ -44,6 +44,9 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     address: workspace.address ?? "",
     gstin: workspace.gstin ?? "",
     quoteTerms: workspace.quoteTerms ?? "",
+    upiId: workspace.upiId ?? "",
+    billPrefix: workspace.billPrefix,
+    billTerms: workspace.billTerms ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -108,7 +111,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             onChange={set("gstin")}
             error={errors.gstin}
             placeholder="Optional"
-            hint="Needed only if you send GST bills."
+            hint="Add it to charge GST on your bills. Without it, bills carry no GST."
             autoCapitalize="characters"
             className="[&_input]:uppercase"
           />
@@ -122,6 +125,37 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             onChange={set("quoteTerms")}
             error={errors.quoteTerms}
             hint="Printed at the bottom of every new quote. You can still change them on each quote."
+          />
+        </Card>
+
+        <Card className="space-y-5 p-5">
+          <h2 className="font-display text-lg font-extrabold">Getting paid</h2>
+          <TextField
+            label="UPI ID"
+            value={values.upiId}
+            onChange={set("upiId")}
+            error={errors.upiId}
+            placeholder="riya@okhdfc"
+            autoCapitalize="none"
+            hint="Clients get a Pay by UPI button on every bill link. Money goes straight to you."
+          />
+          <TextField
+            label="Bill numbers start with"
+            value={values.billPrefix}
+            onChange={set("billPrefix")}
+            error={errors.billPrefix}
+            autoCapitalize="characters"
+            className="[&_input]:uppercase"
+            hint={`New bills look like ${(values.billPrefix || "INV").toUpperCase()}/26-27/0001, counted afresh each financial year.`}
+          />
+          <TextAreaField
+            label="Bank details and terms on bills"
+            rows={4}
+            value={values.billTerms}
+            onChange={set("billTerms")}
+            error={errors.billTerms}
+            placeholder={"Bank: HDFC Bank, A/c 50100123456789, IFSC HDFC0001234\nBalance due before the event."}
+            hint="Printed at the bottom of every new bill."
           />
         </Card>
 
