@@ -1,4 +1,7 @@
 import type {
+  BillingOverview,
+  Checkout,
+  CheckoutInput,
   ActivityPage,
   ActivityQuery,
   DailySummary,
@@ -349,6 +352,11 @@ export function createApiClient(options: ApiClientOptions) {
     eventTeam: {
       save: (workspaceId: string, eventId: string, input: SaveEventTeamInput) =>
         request<TeamMember[]>("PUT", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/team`, input),
+    },
+    billing: {
+      get: (workspaceId: string) => request<BillingOverview>("GET", `${ws(workspaceId)}/billing`),
+      /** Starts paying online; send the owner to the returned url */
+      checkout: (workspaceId: string, input: CheckoutInput) => request<Checkout>("POST", `${ws(workspaceId)}/billing/checkout`, input),
     },
     review: {
       /** Everyone's month for owners and managers; your own for everyone else */

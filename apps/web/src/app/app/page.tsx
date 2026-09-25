@@ -7,6 +7,7 @@ import {
   AlarmClock,
   BellRing,
   Check,
+  CreditCard,
   ChevronRight,
   GitBranch,
   Inbox,
@@ -95,6 +96,8 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
     <div className="space-y-6">
       {showSetup && <SetupCard home={home} />}
 
+      <PlanBanner billing={home.billing ?? null} />
+
       {home.money && home.money.pendingExpenses > 0 && (
         <Banner href="/app/money?view=expenses" icon={ReceiptText}>
           {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
@@ -170,6 +173,33 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
       {can(role, "workspace.update") && <StarterPack home={home} icon={icon} />}
     </div>
   );
+}
+
+/** The owner hears about the plan only when it matters: the trial's last days, or a problem. */
+function PlanBanner({ billing }: { billing: HomeSummary["billing"] }) {
+  if (!billing?.enforced) return null;
+  if (billing.status === "expired") {
+    return (
+      <Banner href="/app/billing" icon={CreditCard} tone="danger">
+        Your free trial has ended. Choose a plan to keep adding things
+      </Banner>
+    );
+  }
+  if (billing.status === "past_due") {
+    return (
+      <Banner href="/app/billing" icon={CreditCard} tone="danger">
+        Your last payment didn&apos;t go through
+      </Banner>
+    );
+  }
+  if (billing.status === "trial" && billing.trialDaysLeft <= 3) {
+    return (
+      <Banner href="/app/billing" icon={CreditCard}>
+        Your free trial ends in {billing.trialDaysLeft} day{billing.trialDaysLeft === 1 ? "" : "s"}. Choose a plan
+      </Banner>
+    );
+  }
+  return null;
 }
 
 /** One line that needs someone's attention, with a way straight to it. */

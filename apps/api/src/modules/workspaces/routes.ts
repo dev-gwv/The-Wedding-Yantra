@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { can } from "@wedding-yantra/core";
 import { createWorkspaceInput, updateWorkspaceInput } from "@wedding-yantra/types";
+import type { Config } from "../../config.js";
 import type { Db } from "../../db.js";
 import { forbidden, ok, parse } from "../../lib/http.js";
 import { requireMember, requireUser } from "../auth/guard.js";
@@ -8,8 +9,8 @@ import * as workspaces from "./service.js";
 
 type WsParams = { Params: { workspaceId: string } };
 
-export function workspaceRoutes(app: FastifyInstance, deps: { db: Db }) {
-  const { db } = deps;
+export function workspaceRoutes(app: FastifyInstance, deps: { db: Db; config: Config }) {
+  const { db, config } = deps;
 
   app.post("/workspaces", async (request, reply) => {
     const { userId } = requireUser(request);
@@ -30,6 +31,6 @@ export function workspaceRoutes(app: FastifyInstance, deps: { db: Db }) {
 
   app.get<WsParams>("/workspaces/:workspaceId/home", async (request) => {
     const member = await requireMember(db, request, request.params.workspaceId);
-    return ok(await workspaces.getHome(db, member));
+    return ok(await workspaces.getHome(db, member, config));
   });
 }

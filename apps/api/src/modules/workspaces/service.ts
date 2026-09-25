@@ -9,6 +9,8 @@ import { salesSummary } from "../sales/leads.js";
 import { listEvents } from "../bookings/events.js";
 import { homeMoney } from "../money/dues.js";
 import { homeTasks, installChecklist } from "../tasks/service.js";
+import { homeBilling } from "../billing/service.js";
+import type { Config } from "../../config.js";
 
 interface WorkspaceRow {
   id: string;
@@ -147,7 +149,7 @@ export async function updateWorkspace(
 }
 
 /** Everything the Home screen needs, worked out here so every app shows the same thing. */
-export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> {
+export async function getHome(db: Db, ctx: MemberContext, config: Config): Promise<HomeSummary> {
   const workspaceId = ctx.workspaceId;
   const { rows } = await db.query<{
     name: string;
@@ -205,6 +207,7 @@ export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> 
     upcomingEvents: await upcomingEvents(db, ctx),
     money: await homeMoney(db, ctx),
     tasks: await homeTasks(db, ctx),
+    billing: await homeBilling(db, ctx, config),
     starterPack: row.starter_pack,
   };
 }

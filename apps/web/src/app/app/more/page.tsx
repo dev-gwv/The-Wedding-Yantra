@@ -10,6 +10,7 @@ import {
   Check,
   ChevronRight,
   ClipboardList,
+  CreditCard,
   History,
   MessageSquareText,
   Trophy,
@@ -97,6 +98,7 @@ export default function MorePage() {
       <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
+        {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/team" icon={Users} label="Team" />
         {can(workspace.role, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
         {me.workspaces.length > 1 && (

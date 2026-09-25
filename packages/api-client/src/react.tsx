@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  CheckoutInput,
   SaveChecklistInput,
   SaveEventTeamInput,
   TaskInput,
@@ -113,6 +114,7 @@ export const queryKeys = {
   scores: (id: string, month: string) => ["workspace", id, "review", "scores", month] as const,
   activity: (id: string, userId: string) => ["workspace", id, "review", "activity", userId] as const,
   dailySummary: (id: string, date: string) => ["workspace", id, "review", "daily-summary", date] as const,
+  billing: (id: string) => ["workspace", id, "billing"] as const,
 };
 
 interface QueryOpts {
@@ -790,4 +792,17 @@ export function useActivity(workspaceId: string, userId?: string, enabled = true
 export function useDailySummary(workspaceId: string, date: string, enabled = true) {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.dailySummary(workspaceId, date), queryFn: () => api.review.dailySummary(workspaceId, date), enabled });
+}
+
+// ---- Plan and billing ---------------------------------------------------------------
+
+export function useBilling(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.billing(workspaceId), queryFn: () => api.billing.get(workspaceId), enabled });
+}
+
+/** Starts paying online. The caller sends the owner to the returned url. */
+export function useCheckout(workspaceId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (input: CheckoutInput) => api.billing.checkout(workspaceId, input) });
 }

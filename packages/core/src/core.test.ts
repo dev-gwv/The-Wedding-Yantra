@@ -404,3 +404,30 @@ describe("daily summary message", () => {
     );
   });
 });
+
+import { billingStatus, daysLeft, PLAN_INFO } from "./index.js";
+
+describe("plans and billing", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+  const sub = (status: "created" | "active" | "past_due" | "cancelled" | "completed", currentPeriodEnd: string | null) => ({ status, currentPeriodEnd });
+  it("prices a year at ten months", () => {
+    for (const p of Object.values(PLAN_INFO)) expect(p.yearly).toBe(p.monthly * 10);
+  });
+  it("knows whether a business is on trial, paying, or has run out", () => {
+    expect(billingStatus({ trialEndsAt: "2026-10-01T00:00:00Z", subscription: null }, now)).toBe("trial");
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: null }, now)).toBe("expired");
+    // Checkout started but never paid: still the trial, or expired after it.
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("created", null) }, now)).toBe("expired");
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("active", "2026-10-20T00:00:00Z") }, now)).toBe("active");
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("past_due", "2026-10-20T00:00:00Z") }, now)).toBe("past_due");
+    // Cancelled: works until the paid period ends.
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("cancelled", "2026-10-01T00:00:00Z") }, now)).toBe("active");
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("cancelled", "2026-09-24T00:00:00Z") }, now)).toBe("expired");
+    expect(billingStatus({ trialEndsAt: "2026-09-20T00:00:00Z", subscription: sub("active", "2026-09-24T00:00:00Z") }, now)).toBe("expired");
+  });
+  it("counts days left, rounding up", () => {
+    expect(daysLeft("2026-09-26T11:00:00Z", now)).toBe(1);
+    expect(daysLeft("2026-10-09T12:00:00Z", now)).toBe(14);
+    expect(daysLeft("2026-09-20T00:00:00Z", now)).toBe(0);
+  });
+});

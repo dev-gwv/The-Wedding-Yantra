@@ -5,6 +5,7 @@
  */
 export * from "./auth.js";
 export * from "./bookings.js";
+export * from "./billing.js";
 export * from "./business-types.js";
 export * from "./common.js";
 export * from "./expenses.js";

@@ -1,3 +1,4 @@
+import type { BillingStatus } from "@wedding-yantra/core";
 import type { StarterPack } from "./business-types.js";
 import type { EventSummary } from "./bookings.js";
 import type { DueItem } from "./money.js";
@@ -41,5 +42,7 @@ export interface HomeSummary {
   } | null;
   /** Your tasks, and the team's overdue ones for those who manage tasks */
   tasks: { overdue: number; dueToday: number; teamOverdue: number | null };
+  /** The plan and trial, for the owner */
+  billing: { status: BillingStatus; trialDaysLeft: number; enforced: boolean } | null;
   starterPack: StarterPack;
 }

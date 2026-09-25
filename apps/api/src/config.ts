@@ -21,6 +21,33 @@ export interface Config {
   uploadsDir: string;
   /** Signs the short-lived links that show uploaded files. */
   filesSecret: Buffer;
+  billing: {
+    /**
+     * Lock writes when a trial ends unpaid, and hold businesses to their plan's limits.
+     * Off until prices are final and online payment works.
+     */
+    enforced: boolean;
+    /** Razorpay subscriptions; null when its keys aren't set. */
+    razorpay: {
+      keyId: string;
+      keySecret: string;
+      webhookSecret: string;
+      /** Razorpay plan ids, keyed "studio:monthly" */
+      plans: Record<string, string>;
+    } | null;
+    /** Lets whoever runs Wedding Yantra record a plan paid another way. Null turns that off. */
+    adminToken: string | null;
+  };
+}
+
+/** `starter:monthly=plan_A, studio:yearly=plan_B` -> { "starter:monthly": "plan_A", ... } */
+function parsePlanIds(value: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of (value ?? "").split(",")) {
+    const [key, id] = pair.split("=").map((s) => s.trim());
+    if (key && id) out[key] = id;
+  }
+  return out;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -49,5 +76,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     filesSecret: createHash("sha256")
       .update(env.FILES_SECRET ?? `wedding-yantra-files:${databaseUrl}`)
       .digest(),
+    billing: {
+      enforced: env.BILLING_ENFORCED === "true",
+      razorpay:
+        env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET && env.RAZORPAY_WEBHOOK_SECRET
+          ? {
+              keyId: env.RAZORPAY_KEY_ID,
+              keySecret: env.RAZORPAY_KEY_SECRET,
+              webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+              plans: parsePlanIds(env.RAZORPAY_PLANS),
+            }
+          : null,
+      // Too short to be safe is the same as not set.
+      adminToken: env.ADMIN_TOKEN && env.ADMIN_TOKEN.length >= 32 ? env.ADMIN_TOKEN : null,
+    },
   };
 }

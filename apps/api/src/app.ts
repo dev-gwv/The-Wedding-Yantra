@@ -7,6 +7,8 @@ import { localFileStore } from "./lib/storage.js";
 import { registerAuth } from "./modules/auth/guard.js";
 import { createConsoleOtpSender, type OtpSender } from "./modules/auth/otp-sender.js";
 import { authRoutes } from "./modules/auth/routes.js";
+import { billingGuard, billingRoutes } from "./modules/billing/routes.js";
+import { razorpayGateway, type PaymentGateway } from "./modules/billing/gateway.js";
 import { businessTypeRoutes } from "./modules/business-types/routes.js";
 import { fileRoutes } from "./modules/files/routes.js";
 import type { Files } from "./modules/files/service.js";
@@ -27,6 +29,8 @@ export interface AppDeps {
   logger?: boolean;
   /** Uploaded files; tests pass a temporary folder */
   files?: Files;
+  /** The payment provider; tests pass a fake. Defaults to Razorpay when its keys are set. */
+  gateway?: PaymentGateway | null;
 }
 
 /**
@@ -81,14 +85,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   const files: Files = deps.files ?? { store: localFileStore(config.uploadsDir), secret: config.filesSecret };
 
+  const gateway = deps.gateway !== undefined ? deps.gateway : config.billing.razorpay ? razorpayGateway(config.billing.razorpay) : null;
+
   registerAuth(app, db);
   healthRoutes(app, { db, config });
 
   await app.register(
     async (v1) => {
+      // First, so it covers every route below.
+      billingGuard(v1, { db, config });
       authRoutes(v1, { db, config, otpSender });
       businessTypeRoutes(v1, { db });
-      workspaceRoutes(v1, { db });
+      workspaceRoutes(v1, { db, config });
       teamRoutes(v1, { db });
       salesRoutes(v1, { db });
       bookingRoutes(v1, { db });
@@ -97,6 +105,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       reportRoutes(v1, { db });
       taskRoutes(v1, { db });
       reviewRoutes(v1, { db });
+      billingRoutes(v1, { db, config, gateway });
     },
     { prefix: "/api/v1" },
   );

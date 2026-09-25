@@ -110,6 +110,13 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       UPLOADS_DIR: /app/uploads
       FILES_SECRET: ${FILES_SECRET:-}
+      # Plans and payment (all optional; see .env.example)
+      BILLING_ENFORCED: ${BILLING_ENFORCED:-false}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      RAZORPAY_PLANS: ${RAZORPAY_PLANS:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     # Uploaded bill photos survive redeploys in their own volume.
     volumes:
       - wedding-yantra-uploads:/app/uploads

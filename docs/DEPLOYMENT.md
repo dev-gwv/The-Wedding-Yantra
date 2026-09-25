@@ -300,3 +300,43 @@ docker compose -p wedding-yantra -f docker-compose.prod.yml -f docker-compose.db
 ssh -N -L 5433:127.0.0.1:5433 deploy@<VPS_HOST>
 # ...when finished, run the normal `up -d` again to drop the port.
 ```
+
+## 11. Plans and payment
+
+Every business gets a 14-day free trial. Plans, prices and limits live in
+`packages/core/src/plans.ts`. Change them there, and the website, the billing screen and the
+API all follow.
+
+**Nothing locks until you say so.** With `BILLING_ENFORCED=false` (the default) the trial is
+only shown to owners. Turn enforcement on in `.env` once prices are final and payment works,
+then run `docker compose ... up -d` again. From then on:
+- **A trial that runs out unpaid:** nothing new can be added. Reading everything still works,
+  and so does choosing a plan.
+- **Plan limits:** a business can't go past its plan's people (invitations count) or its
+  events per year.
+
+**Paying online (Razorpay Subscriptions).**
+1. **Make the plans.** In the Razorpay dashboard, create one plan per plan and period:
+   Starter, Studio and Business, monthly and yearly. Use the prices in `plans.ts`.
+2. **Add the keys** to `.env`: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and
+   `RAZORPAY_PLANS=starter:monthly=plan_…,studio:monthly=plan_…,…`.
+3. **Add a webhook** pointing at `https://<API_HOST>/api/v1/billing/razorpay/webhook`:
+   - Events: `subscription.activated`, `.charged`, `.pending`, `.halted`, `.cancelled`,
+     `.paused`, `.resumed` and `.completed`.
+   - Secret: a long random secret, also set as `RAZORPAY_WEBHOOK_SECRET` in `.env`.
+
+   Each message is checked against Razorpay's signature and handled only once.
+4. **Restart the API.** The owner's **More → Plan and billing** then sends them to
+   Razorpay's payment page.
+
+**A plan paid another way** (UPI, bank transfer). Set `ADMIN_TOKEN` (at least 32 characters)
+in `.env`, then:
+
+```bash
+curl -X POST https://<API_HOST>/api/v1/admin/workspaces/<business id>/plan \
+  -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"plan":"studio","period":"yearly","until":"2027-09-30","note":"Paid by UPI"}'
+```
+
+The owner sees their business id at the bottom of **More → Plan and billing**, to quote when
+paying. You can also look it up with `SELECT id, name FROM workspaces;`.

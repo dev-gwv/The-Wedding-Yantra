@@ -701,4 +701,51 @@ managers can mark anyone's.
 
 Phase 4 (team and accountability) is complete.
 
-Next: Phase 5, the SaaS layer: plans, free trial, subscriptions, limits and onboarding.
+---
+
+## 23. Built in Phase 5, part 1: plans, the free trial, paying online, and the website
+
+**Plans** (in `packages/core/src/plans.ts`, the one place the website, the app and the API
+read from). These are the draft prices from section 9, still to be confirmed:
+
+| Plan | For | Monthly | Yearly (2 months free) | People | Events a year |
+|---|---|---|---|---|---|
+| Starter | A solo artist or a small vendor | ₹499 | ₹4,990 | 1 | 30 |
+| Studio | A small team | ₹1,499 | ₹14,990 | 5 | No limit |
+| Business | An established company | ₹3,499 | ₹34,990 | 15 | No limit |
+
+**Free trial.** Every business gets 14 days with everything included and no card. Businesses
+that already existed started their trial on the day this was deployed.
+
+**More → Plan and billing**, for the owner, shows:
+- where the business stands: days left in the trial, the plan and when it renews, a
+  payment that didn't go through, or a trial that has ended;
+- what it uses: people, and events this year;
+- the three plans, monthly or yearly.
+
+Choosing a plan sends the owner to Razorpay's payment page.
+
+**Paying online** uses Razorpay Subscriptions. Its messages come back to a webhook that
+checks Razorpay's signature and handles each message only once. A cancelled plan keeps
+working until the end of the time paid for. A plan paid by UPI or bank transfer can be
+recorded by whoever runs the service (see `docs/DEPLOYMENT.md`, section 11).
+
+**Limits only apply once switched on.** Until `BILLING_ENFORCED=true`, nothing is locked and
+the owner sees no warnings. Once it's on:
+- a trial that runs out unpaid stops new additions, while reading and paying still work;
+- the plan's number of people (open invitations count) and events a year apply;
+- the owner sees a note on Home in the trial's last three days, or when a payment fails.
+
+**The website** at `/` explains what Wedding Yantra does, for which trades, with prices and
+common questions:
+- **Signed-in visitors** get an "Open the app" button.
+- **The installed app** still opens straight into the app.
+- **Nothing is promised that isn't built yet:** no client portal and no Hindi.
+
+**To go live with payments:**
+1. Confirm the prices.
+2. Create the six Razorpay plans.
+3. Set the keys, the plan ids and the webhook (`docs/DEPLOYMENT.md`, section 11).
+4. Set `BILLING_ENFORCED=true`.
+
+Next: Phase 5 part 2, onboarding help and a guided first run.
