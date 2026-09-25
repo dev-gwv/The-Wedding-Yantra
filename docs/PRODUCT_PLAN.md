@@ -749,3 +749,43 @@ common questions:
 4. Set `BILLING_ENFORCED=true`.
 
 Next: Phase 5 part 2, onboarding help and a guided first run.
+
+---
+
+## 24. Built in Phase 5, part 2: a guided first run, and help
+
+**"Get set up" on Home now takes a new business to its first quote and payment.** Each step
+ticks itself off when it's done, with no box to tick:
+
+1. Create the business.
+2. Add your phone and address.
+3. Set your prices (change one, or add a service).
+4. Add your first enquiry.
+5. Send your first quote.
+6. Add your UPI ID, so every bill carries a QR code.
+7. Invite your team.
+
+Each step links straight to where it's done.
+
+**Help** at `/help` is public, so people can read it before they sign up. It has plain
+step-by-step guides:
+- getting started and adding the app to the home screen;
+- enquiries and follow-ups;
+- quotes;
+- bills, GST and payments;
+- events, the team and checklists;
+- expenses and reports;
+- the team, and your data;
+- who can do what in each role.
+
+Help is linked from More, the website's header and footer, and the questions section.
+
+The role descriptions now match what each role really does. For example, staff see every
+event and freelancers only their own; the old descriptions mentioned payroll, which doesn't
+exist.
+
+Phase 5 is built. What's left for launch is outside the code:
+- confirm the prices;
+- set up Razorpay and switch billing on;
+- connect a WhatsApp or SMS provider for sign-in codes and turn `AUTH_OTP_DEV_ECHO` off;
+- choose the domain.

@@ -191,6 +191,13 @@ export default function HomePage() {
             </details>
           ))}
         </div>
+        <p className="mt-6 text-center text-ink-muted">
+          More questions?{" "}
+          <Link href="/help" className="font-bold text-brand-strong hover:text-brand-deep">
+            Help has step-by-step guides
+          </Link>
+          .
+        </p>
       </section>
 
       <section className="bg-hero">
@@ -213,9 +220,14 @@ export default function HomePage() {
       <footer className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-ink-muted sm:flex-row sm:px-6">
         <Logo className="[&_svg]:size-7 [&>span:last-child]:text-base" />
         <span>Made in India for wedding businesses.</span>
-        <Link href="/login" className="font-semibold text-brand-strong hover:text-brand-deep">
-          Sign in
-        </Link>
+        <span className="flex gap-5">
+          <Link href="/help" className="font-semibold text-brand-strong hover:text-brand-deep">
+            Help
+          </Link>
+          <Link href="/login" className="font-semibold text-brand-strong hover:text-brand-deep">
+            Sign in
+          </Link>
+        </span>
       </footer>
     </div>
   );

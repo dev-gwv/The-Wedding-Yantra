@@ -48,7 +48,7 @@ describe("businesses", () => {
     type Home = { setupDone: number; setupTotal: number; starterPack: { services: unknown[] } };
     const before = await call<Home>(t.app, "GET", `/workspaces/${id}/home`, { token });
     expect(before.body.data.setupDone).toBe(1);
-    expect(before.body.data.setupTotal).toBe(3);
+    expect(before.body.data.setupTotal).toBe(7);
     expect(before.body.data.starterPack.services.length).toBeGreaterThan(0);
 
     const badGst = await call(t.app, "PATCH", `/workspaces/${id}`, { token, body: { gstin: "123" } });
@@ -64,5 +64,22 @@ describe("businesses", () => {
 
     const after = await call<Home>(t.app, "GET", `/workspaces/${id}/home`, { token });
     expect(after.body.data.setupDone).toBe(2);
+
+    // The first run is done by doing it: a price, an enquiry, a quote, a UPI ID.
+    type Step = { key: string; done: boolean };
+    const steps = async () =>
+      Object.fromEntries(
+        (await call<{ setup: Step[] }>(t.app, "GET", `/workspaces/${id}/home`, { token })).body.data.setup.map((s) => [s.key, s.done]),
+      );
+    expect(await steps()).toMatchObject({ price_list: false, first_enquiry: false, first_quote: false, getting_paid: false });
+    const services = await call<{ id: string }[]>(t.app, "GET", `/workspaces/${id}/catalogue`, { token });
+    await call(t.app, "PATCH", `/workspaces/${id}/catalogue/${services.body.data[0]!.id}`, { token, body: { price: 55000 } });
+    const lead = await call<{ id: string }>(t.app, "POST", `/workspaces/${id}/leads`, { token, body: { name: "First Client" } });
+    await call(t.app, "POST", `/workspaces/${id}/quotes`, {
+      token,
+      body: { leadId: lead.body.data.id, title: "Decor", items: [{ name: "Mandap", unit: "event", quantity: 1, rate: 50000 }] },
+    });
+    await call(t.app, "PATCH", `/workspaces/${id}`, { token, body: { upiId: "arjundecor@okicici" } });
+    expect(await steps()).toMatchObject({ price_list: true, first_enquiry: true, first_quote: true, getting_paid: true });
   });
 });

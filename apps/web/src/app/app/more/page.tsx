@@ -9,6 +9,7 @@ import {
   CalendarOff,
   Check,
   ChevronRight,
+  CircleHelp,
   ClipboardList,
   CreditCard,
   History,
@@ -116,6 +117,7 @@ export default function MorePage() {
           </span>
           <ChevronRight className="size-4 text-ink-subtle" />
         </Link>
+        <Row href="/help" icon={CircleHelp} label="Help" />
         <Row onClick={signOut} icon={LogOut} label="Sign out" tone="danger" chevron={false} />
       </Card>
 

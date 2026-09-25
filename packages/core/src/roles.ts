@@ -7,11 +7,11 @@ export const ROLES = ["owner", "manager", "staff", "freelancer", "accountant"] a
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_INFO: Record<Role, { label: string; description: string }> = {
-  owner: { label: "Owner", description: "Everything, including money and subscription" },
-  manager: { label: "Manager", description: "Runs the business day to day. No subscription or payroll" },
-  staff: { label: "Staff", description: "Sees their own events and tasks, logs expenses" },
-  freelancer: { label: "Freelancer", description: "Sees only the events they are booked on" },
-  accountant: { label: "Accountant", description: "Read-only access to money, can export" },
+  owner: { label: "Owner", description: "Everything, including the plan and billing" },
+  manager: { label: "Manager", description: "Runs the business day to day: everything except the plan and billing" },
+  staff: { label: "Staff", description: "Works their own enquiries and tasks, sees every event, adds expenses" },
+  freelancer: { label: "Freelancer", description: "Sees only the events they're booked on, and their tasks" },
+  accountant: { label: "Accountant", description: "Sees the money, read-only, and downloads the spreadsheets" },
 };
 
 export const PERMISSIONS = [

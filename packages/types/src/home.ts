@@ -4,7 +4,14 @@ import type { EventSummary } from "./bookings.js";
 import type { DueItem } from "./money.js";
 import type { LeadSummary } from "./sales.js";
 
-export type SetupStepKey = "create_business" | "business_profile" | "invite_team";
+export type SetupStepKey =
+  | "create_business"
+  | "business_profile"
+  | "price_list"
+  | "first_enquiry"
+  | "first_quote"
+  | "getting_paid"
+  | "invite_team";
 
 export interface SetupStep {
   key: SetupStepKey;

@@ -4,6 +4,10 @@ import type { SetupStepKey } from "@wedding-yantra/types";
 export const SETUP_LINKS: Record<SetupStepKey, string | null> = {
   create_business: null,
   business_profile: "/app/settings/business",
+  price_list: "/app/settings/services",
+  first_enquiry: "/app/leads",
+  first_quote: "/app/quotes/new",
+  getting_paid: "/app/settings/business",
   invite_team: "/app/team",
 };
 

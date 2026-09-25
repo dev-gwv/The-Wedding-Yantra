@@ -14,9 +14,12 @@ export function SiteHeader() {
         <Logo className="[&_svg]:size-9 [&>span:last-child]:text-lg sm:[&>span:last-child]:text-xl" />
       </Link>
       <nav className="flex items-center gap-2">
-        <a href="#pricing" className="hidden px-3 text-sm font-semibold text-ink-muted hover:text-ink sm:inline">
+        <Link href="/#pricing" className="hidden px-3 text-sm font-semibold text-ink-muted hover:text-ink sm:inline">
           Prices
-        </a>
+        </Link>
+        <Link href="/help" className="hidden px-3 text-sm font-semibold text-ink-muted hover:text-ink sm:inline">
+          Help
+        </Link>
         {token ? (
           <Link href="/app" className={buttonClass({ size: "sm" })}>
             Open the app

@@ -159,12 +159,21 @@ export async function getHome(db: Db, ctx: MemberContext, config: Config): Promi
     starter_pack: StarterPack;
     members: string;
     pending_invites: string;
+    upi_id: string | null;
+    prices_checked: boolean;
+    has_lead: boolean;
+    has_quote: boolean;
   }>(
-    `SELECT w.name, w.phone, w.address, bt.name AS business_type_name, bt.starter_pack,
+    `SELECT w.name, w.phone, w.address, bt.name AS business_type_name, bt.starter_pack, w.upi_id,
             (SELECT count(*) FROM memberships m WHERE m.workspace_id = w.id AND m.removed_at IS NULL) AS members,
             (SELECT count(*) FROM invitations i
               WHERE i.workspace_id = w.id AND i.accepted_at IS NULL AND i.revoked_at IS NULL
-                AND i.expires_at > now()) AS pending_invites
+                AND i.expires_at > now()) AS pending_invites,
+            -- A price changed, or a service added, after the starter list was set up with the business.
+            EXISTS (SELECT 1 FROM catalogue_items c WHERE c.workspace_id = w.id
+                     AND (c.updated_at > c.created_at OR c.created_at > w.created_at)) AS prices_checked,
+            EXISTS (SELECT 1 FROM leads l WHERE l.workspace_id = w.id) AS has_lead,
+            EXISTS (SELECT 1 FROM quotes q WHERE q.workspace_id = w.id) AS has_quote
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -187,6 +196,30 @@ export async function getHome(db: Db, ctx: MemberContext, config: Config): Promi
       title: "Complete your business profile",
       description: "Add your phone and address. They appear on your quotes and bills.",
       done: !!row.phone && !!row.address,
+    },
+    {
+      key: "price_list",
+      title: "Set your prices",
+      description: "Your usual services came ready. Put in your own prices; quotes and bills start from them.",
+      done: row.prices_checked,
+    },
+    {
+      key: "first_enquiry",
+      title: "Add your first enquiry",
+      description: "Type one in, or share your enquiry form on Instagram and WhatsApp.",
+      done: row.has_lead,
+    },
+    {
+      key: "first_quote",
+      title: "Send your first quote",
+      description: "Pick services from your price list and share it on WhatsApp. The client accepts with a tap.",
+      done: row.has_quote,
+    },
+    {
+      key: "getting_paid",
+      title: "Add your UPI ID",
+      description: "Every bill then carries a QR code, so clients pay in one scan.",
+      done: !!row.upi_id,
     },
     {
       key: "invite_team",
