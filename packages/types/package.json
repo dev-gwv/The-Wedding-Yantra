@@ -23,5 +23,10 @@
   },
   "devDependencies": {
     "typescript": "^5.9.2"
+  },
+  "description": "API contracts (Zod schemas + types) shared by the API, web and mobile apps.",
+  "dependencies": {
+    "@wedding-yantra/core": "workspace:*",
+    "zod": "^4.6.5"
   }
 }

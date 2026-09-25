@@ -104,7 +104,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@wedding-yantra-db:5432/${POSTGRES_DB}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       CORS_VERCEL_PREVIEW_PATTERN: ${CORS_VERCEL_PREVIEW_PATTERN:-}
-      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      AUTH_OTP_DEV_ECHO: ${AUTH_OTP_DEV_ECHO:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     # Reachable ONLY from containers on the same Docker networks (i.e. the proxy).
     expose:

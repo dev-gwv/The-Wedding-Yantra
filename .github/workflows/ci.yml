@@ -55,7 +55,7 @@ jobs:
           NEXT_PUBLIC_API_URL: https://api.weddingyantra.com
 
   api-smoke:
-    name: API smoke test (real Postgres)
+    name: API tests (real Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -81,7 +81,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build --filter=@wedding-yantra/api...
-      - name: Migrations, health, bookings, restart idempotency
+      - name: Create test database
+        run: PGPASSWORD=wy psql -h 127.0.0.1 -U wy -d wy -c "CREATE DATABASE wy_test"
+      - name: Unit tests (shared business rules)
+        run: pnpm --filter @wedding-yantra/core test
+      - name: API integration tests (auth, teams, tenant isolation)
+        run: pnpm --filter @wedding-yantra/api test
+        env:
+          TEST_DATABASE_URL: postgres://wy:wy@127.0.0.1:5432/wy_test
+      - name: Migrations, sign-in flow, restart idempotency
         run: bash scripts/api-smoke.sh
         env:
           DATABASE_URL: postgres://wy:wy@127.0.0.1:5432/wy

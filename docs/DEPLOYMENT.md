@@ -200,6 +200,14 @@ domain for real customers.
 - Add the production web origin(s) to `CORS_ORIGINS` in the VPS `.env`. Preview URLs are
   matched by `CORS_VERCEL_PREVIEW_PATTERN`; adjust the prefix to your Vercel project/team slug.
 
+### Sign-in codes
+
+People sign in with their mobile number and a 6-digit code. No SMS/WhatsApp provider is
+connected yet, so codes are not delivered. To try the live app yourself, set
+`AUTH_OTP_DEV_ECHO=true` in the VPS `.env` and run `up -d` again: the code then appears on
+screen. **Anyone could sign in as any number while it is on**, so set it back to `false`
+before real customers use the app.
+
 ## 6. GitHub Actions secrets
 
 | Name | Kind | Value |

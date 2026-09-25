@@ -23,6 +23,7 @@ on:
     paths:
       - "apps/api/**"
       - "packages/types/**"
+      - "packages/core/**"
       - "docker-compose.prod.yml"
       - "infra/backup/**"
       - "scripts/api-smoke.sh"

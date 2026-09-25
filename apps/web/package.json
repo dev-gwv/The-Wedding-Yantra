@@ -11,20 +11,27 @@
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "next": "^15.5.3",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "@tanstack/react-query": "^5.103.2",
+    "@wedding-yantra/api-client": "workspace:*",
+    "@wedding-yantra/core": "workspace:*",
+    "@wedding-yantra/types": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.48.0",
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
-    "@tailwindcss/postcss": "^4.1.13",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.18.0",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "@wedding-yantra/types": "workspace:*",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@wedding-yantra/design-tokens": "workspace:*",
     "eslint": "^9.35.0",
-    "eslint-config-next": "^15.5.3",
-    "tailwindcss": "^4.1.13",
+    "eslint-config-next": "^16.3.6",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.2"
   }
 }
