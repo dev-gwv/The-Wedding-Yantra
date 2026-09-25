@@ -147,8 +147,14 @@ jobs:
         env:
           APP_VERSION: ${{ github.sha }}
         run: |
-          ssh vps "APP_VERSION='${APP_VERSION}' VPS_APP_DIR='${VPS_APP_DIR}' bash -s" <<'REMOTE'
+          set -o pipefail
+          # The script travels over ssh's stdin (`bash -s`). It is wrapped in main(), so bash reads
+          # all of it before running anything, and main runs with stdin from /dev/null, so no
+          # command inside (e.g. `docker compose exec`) can swallow the rest of the script.
+          # The final WY_DEPLOY_COMPLETE line proves the script really reached the end.
+          ssh vps "APP_VERSION='${APP_VERSION}' VPS_APP_DIR='${VPS_APP_DIR}' bash -s" <<'REMOTE' | tee /tmp/deploy.log
           set -euo pipefail
+          main() {
           cd "$VPS_APP_DIR"
 
           COMPOSE="docker compose -p wedding-yantra -f docker-compose.prod.yml"
@@ -164,11 +170,13 @@ jobs:
 
           mkdir -p backups
 
-          wait_healthy() {
+          # Healthy AND running the expected version, not just "some container with that name".
+          wait_healthy() { # <expected version>
             for i in $(seq 1 30); do
+              image="$(docker inspect -f '{{.Config.Image}}' wedding-yantra-api 2>/dev/null || echo missing)"
               status="$(docker inspect -f '{{.State.Health.Status}}' wedding-yantra-api 2>/dev/null || echo missing)"
-              echo "health: $status ($i/30)"
-              [ "$status" = "healthy" ] && return 0
+              echo "health: $status, running: ${image##*:} ($i/30)"
+              [ "$status" = "healthy" ] && [ "$image" = "wedding-yantra-api:$1" ] && return 0
               sleep 4
             done
             return 1
@@ -196,14 +204,14 @@ jobs:
           $COMPOSE up -d --remove-orphans
 
           # ---- Health gate with automatic rollback ----------------------------
-          if ! wait_healthy; then
+          if ! wait_healthy "$APP_VERSION"; then
             echo "::error::New version ${APP_VERSION:0:7} did not become healthy"
             $COMPOSE logs --tail=100 wedding-yantra-api || true
             if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$APP_VERSION" ] \
                && docker image inspect "wedding-yantra-api:$PREV_VERSION" >/dev/null 2>&1; then
               echo "::warning::Rolling back to ${PREV_VERSION:0:7}"
               APP_VERSION="$PREV_VERSION" $COMPOSE up -d --no-build wedding-yantra-api
-              if wait_healthy; then
+              if wait_healthy "$PREV_VERSION"; then
                 echo "::error::Deploy failed, rolled back: the API is running the previous version ${PREV_VERSION:0:7}. Fix the problem and push again."
               else
                 echo "::error::Rollback to ${PREV_VERSION:0:7} is ALSO unhealthy; the API is down. Check the logs above."
@@ -221,21 +229,28 @@ jobs:
           docker image prune -f --filter "label=com.weddingyantra.project=wedding-yantra" >/dev/null || true
 
           $COMPOSE ps
+          echo "WY_DEPLOY_COMPLETE $APP_VERSION"
+          }
+          main </dev/null
           REMOTE
+          grep -qx "WY_DEPLOY_COMPLETE ${APP_VERSION}" /tmp/deploy.log \
+            || { echo "::error::The remote deploy script ended early without finishing; treat this deploy as NOT rolled out."; exit 1; }
 
-      - name: Public smoke test
+      - name: Public smoke test (the new version must be live)
         run: |
           if [ -z "$API_PUBLIC_URL" ]; then
             echo "::notice::API_PUBLIC_URL variable not set; skipping the public smoke test."
             exit 0
           fi
           for i in $(seq 1 10); do
-            if curl -fsS --max-time 10 "${API_PUBLIC_URL%/}/api/health"; then
-              echo; echo "Deploy OK"; exit 0
+            body="$(curl -fsS --max-time 10 "${API_PUBLIC_URL%/}/api/health" || true)"
+            if echo "$body" | jq -e --arg v "$GITHUB_SHA" '.data.version == $v and .data.status == "ok"' >/dev/null 2>&1; then
+              echo "$body"; echo "Deploy OK: ${GITHUB_SHA:0:7} is live"; exit 0
             fi
+            echo "not live yet (public API reports: $(echo "$body" | jq -r '.data.version // "no response"' 2>/dev/null | cut -c1-7))"
             sleep 5
           done
-          echo "::warning::API is healthy on the VPS but not reachable publicly yet; check the reverse proxy route."
+          echo "::error::The public API is not serving ${GITHUB_SHA:0:7}. Check the deploy log above and the reverse proxy route."
           exit 1
 
       - name: Clean up SSH key
