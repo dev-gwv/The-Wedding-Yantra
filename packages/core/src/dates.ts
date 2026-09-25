@@ -13,6 +13,15 @@ export function formatDate(isoDate: string, options: { year?: boolean } = {}): s
   return options.year === false ? `${day} ${month}` : `${day} ${month} ${y}`;
 }
 
+/**
+ * The viewer's local calendar date as `YYYY-MM-DD`, moved by `days` if given.
+ * Unlike `toISOString()`, this never slips to yesterday in the early hours in India.
+ */
+export function localISODate(from: Date = new Date(), days = 0): string {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Greeting for the Home screen, based on the local hour (0–23). */
 export function greeting(hour: number): string {
   if (hour < 12) return "Good morning";

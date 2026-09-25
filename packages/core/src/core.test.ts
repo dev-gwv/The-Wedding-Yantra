@@ -7,6 +7,7 @@ import {
   formatMoney,
   formatMoneyShort,
   formatPhone,
+  localISODate,
   maskPhone,
   normalizePhone,
   whatsappLink,
@@ -56,6 +57,13 @@ describe("money", () => {
 });
 
 describe("formatDate", () => {
+  it("gives local calendar dates, moved by whole days", () => {
+    const lateNight = new Date(2026, 11, 31, 23, 50);
+    expect(localISODate(lateNight)).toBe("2026-12-31");
+    expect(localISODate(lateNight, 1)).toBe("2027-01-01");
+    expect(localISODate(new Date(2026, 2, 1, 0, 5), -1)).toBe("2026-02-28");
+  });
+
   it("formats calendar dates without time zone shifts", () => {
     expect(formatDate("2026-11-14")).toBe("14 Nov 2026");
     expect(formatDate("2026-01-01T00:30:00.000Z", { year: false })).toBe("1 Jan");
@@ -121,5 +129,37 @@ describe("follow-up times", () => {
   it("says how long ago things happened", () => {
     expect(timeAgo(new Date(2026, 10, 12, 8, 30).toISOString(), now)).toBe("2 hours ago");
     expect(timeAgo(new Date(2026, 10, 9, 10, 0).toISOString(), now)).toBe("3 days ago");
+  });
+});
+
+import { computeQuoteTotals, quoteNumber } from "./index.js";
+
+describe("quote totals", () => {
+  it("adds lines, takes the discount before GST", () => {
+    const t = computeQuoteTotals(
+      [
+        { quantity: 1, rate: 25000, taxRate: 18 },
+        { quantity: 4, rate: 3500, taxRate: 18 },
+        { quantity: 2, rate: 999.99, taxRate: 0 },
+      ],
+      3900,
+    );
+    expect(t.lineAmounts).toEqual([25000, 14000, 1999.98]);
+    expect(t.subtotal).toBe(40999.98);
+    expect(t.discount).toBe(3900);
+    // GST is 18% of the taxable lines (39,000) after their share of the discount: 35,290.24
+    expect(t.tax).toBe(6352.24);
+    expect(t.total).toBe(43452.22);
+  });
+
+  it("never lets the discount go negative or above the subtotal", () => {
+    expect(computeQuoteTotals([{ quantity: 1, rate: 100, taxRate: 0 }], 500).total).toBe(0);
+    expect(computeQuoteTotals([{ quantity: 1, rate: 100, taxRate: 0 }], -5).discount).toBe(0);
+    expect(computeQuoteTotals([], 0)).toEqual({ lineAmounts: [], subtotal: 0, discount: 0, tax: 0, total: 0 });
+  });
+
+  it("numbers quotes", () => {
+    expect(quoteNumber(7)).toBe("Q-0007");
+    expect(quoteNumber(12345)).toBe("Q-12345");
   });
 });

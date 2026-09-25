@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { StarterPack } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
+import { DEFAULT_QUOTE_TERMS, installCatalogue } from "../bookings/catalogue.js";
 
 /** The quick replies every business starts with. Same text as migration 0004. */
 export const DEFAULT_TEMPLATES = [
@@ -63,4 +64,6 @@ export async function installSalesDefaults(
     ]);
   }
   await db.query(`INSERT INTO lead_forms (workspace_id, slug) VALUES ($1, $2)`, [workspace.id, formSlug(workspace.name)]);
+  await installCatalogue(db, workspace.id, workspace.starterPack.services);
+  await db.query(`UPDATE workspaces SET quote_terms = $2 WHERE id = $1`, [workspace.id, DEFAULT_QUOTE_TERMS]);
 }

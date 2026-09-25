@@ -3,3 +3,4 @@ export * from "./money.js";
 export * from "./phone.js";
 export * from "./roles.js";
 export * from "./templates.js";
+export * from "./quotes.js";

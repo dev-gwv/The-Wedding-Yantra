@@ -4,6 +4,7 @@
  * schemas so every client validates exactly like the server does.
  */
 export * from "./auth.js";
+export * from "./bookings.js";
 export * from "./business-types.js";
 export * from "./common.js";
 export * from "./home.js";

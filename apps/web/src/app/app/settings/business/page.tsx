@@ -43,6 +43,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     email: workspace.email ?? "",
     address: workspace.address ?? "",
     gstin: workspace.gstin ?? "",
+    quoteTerms: workspace.quoteTerms ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -110,6 +111,17 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             hint="Needed only if you send GST bills."
             autoCapitalize="characters"
             className="[&_input]:uppercase"
+          />
+        </Card>
+
+        <Card className="space-y-5 p-5">
+          <TextAreaField
+            label="Terms on quotes"
+            rows={4}
+            value={values.quoteTerms}
+            onChange={set("quoteTerms")}
+            error={errors.quoteTerms}
+            hint="Printed at the bottom of every new quote. You can still change them on each quote."
           />
         </Card>
 

@@ -162,6 +162,7 @@ interface LeadRow extends SummaryRow {
   lost_reason: LostReason | null;
   created_by: string | null;
   created_by_name: string | null;
+  event_id: string | null;
 }
 
 /** Loads one lead the person is allowed to see, or throws "not found". */
@@ -170,7 +171,8 @@ async function loadVisible(db: Queryable, ctx: MemberContext, leadId: string): P
   const scope = scopeCondition(ctx, params);
   const { rows } = await db.query<LeadRow>(
     `SELECT ${SUMMARY_COLUMNS}, l.email, l.venue, l.guest_count, l.referred_by, l.requirements,
-            l.lost_reason, l.created_by, cu.name AS created_by_name
+            l.lost_reason, l.created_by, cu.name AS created_by_name,
+            (SELECT e.id FROM events e WHERE e.lead_id = l.id AND e.deleted_at IS NULL LIMIT 1) AS event_id
        ${FROM}
        LEFT JOIN users cu ON cu.id = l.created_by
       WHERE l.workspace_id = $1 AND l.id = $2 AND l.deleted_at IS NULL AND ${scope}`,
@@ -208,6 +210,7 @@ export async function getLead(db: Queryable, ctx: MemberContext, leadId: string)
     requirements: r.requirements,
     lostReason: r.lost_reason,
     createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
+    eventId: r.event_id,
     activities: activities.rows.map((a) => ({
       id: a.id,
       kind: a.kind,

@@ -1,4 +1,4 @@
-import type { Role } from "@wedding-yantra/core";
+import { can, type Role } from "@wedding-yantra/core";
 import type { HomeSummary, StarterPack, UpdateWorkspaceInput, Workspace } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
@@ -6,6 +6,7 @@ import { AppError, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { installSalesDefaults } from "../sales/defaults.js";
 import { salesSummary } from "../sales/leads.js";
+import { listEvents } from "../bookings/events.js";
 
 interface WorkspaceRow {
   id: string;
@@ -18,6 +19,7 @@ interface WorkspaceRow {
   email: string | null;
   address: string | null;
   gstin: string | null;
+  quote_terms: string | null;
   created_at: Date;
 }
 
@@ -32,6 +34,7 @@ const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
   email: row.email,
   address: row.address,
   gstin: row.gstin,
+  quoteTerms: row.quote_terms,
   createdAt: row.created_at.toISOString(),
   role,
 });
@@ -40,7 +43,7 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
             bt.icon AS business_type_icon, w.city,
-            w.phone, w.email, w.address, w.gstin, w.created_at
+            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.created_at
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -100,6 +103,7 @@ const COLUMNS: Record<keyof UpdateWorkspaceInput, string> = {
   email: "email",
   address: "address",
   gstin: "gstin",
+  quoteTerms: "quote_terms",
 };
 
 export async function updateWorkspace(
@@ -184,6 +188,22 @@ export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> 
     setupTotal: setup.length,
     team: { members, pendingInvites },
     sales: await salesSummary(db, ctx),
+    upcomingEvents: await upcomingEvents(db, ctx),
     starterPack: row.starter_pack,
   };
+}
+
+/** Confirmed events with a function in the next 14 days (business time zone). */
+async function upcomingEvents(db: Db, ctx: MemberContext) {
+  if (!can(ctx.role, "events.view")) return [];
+  const { rows } = await db.query<{ today: string; until: string }>(
+    `SELECT (now() AT TIME ZONE timezone)::date::text AS today,
+            ((now() AT TIME ZONE timezone)::date + 14)::text AS until
+       FROM workspaces WHERE id = $1`,
+    [ctx.workspaceId],
+  );
+  const range = rows[0]!;
+  const list = await listEvents(db, ctx, { from: range.today, to: range.until, status: "confirmed", limit: 50 });
+  // Events without dates are listed elsewhere; Home shows only what's actually coming up.
+  return list.filter((e) => e.startDate !== null).slice(0, 6);
 }

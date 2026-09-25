@@ -471,3 +471,45 @@ and the enquiry form (share, QR code, switch off).
 
 **Not in Phase 1:** drag-and-drop on the board, and lead-source reports. Both come with
 the reports in Phase 3.
+
+## 16. Built in Phase 2: price list, quotes and events
+
+**What an owner can do now**
+- **Price list.** Each trade starts with its own services and prices. Every service has a
+  unit (per event, day, hour, plate, piece, set or person) and a GST rate (none, 5, 12, 18
+  or 28%). Hidden services stay on old quotes but leave the picker.
+- **Quotes in a few taps.** From a lead or client, tap "Make a quote" and pick services.
+  Change the quantity, rate, unit or GST on any line, or add a one-off line.
+  - The total updates as you type. A discount lowers every line before GST, so GST is
+    charged on the discounted price.
+  - Quotes are numbered on their own: Q-0001, Q-0002 and so on.
+  - Every quote carries the business's usual terms, set once under Business profile.
+  - A new quote stays valid for 30 days unless changed.
+- **Send and accept.** "Send on WhatsApp" opens a message with the quote link, and "Copy
+  link" copies it. The client opens the link on their phone without signing in and sees a
+  clean, branded quote. They accept by typing their name, or decline with a reason.
+  - A sent quote past its valid-until date shows as Expired. The client can't accept it
+    on the link until it gets a new date.
+  - The owner can also mark a quote accepted or declined after a phone call.
+- **Accepting books the job.** One step moves the lead to Booked, saves the client
+  (matched by phone), and creates the event on the lead's date. The lead's history
+  says who accepted it and when.
+- **Events with functions.** One event holds every function (haldi, mehendi, sangeet,
+  wedding and so on) with its date, time and venue. Events can also be added by hand for
+  bookings that came without a quote.
+- **Date clash warning.** While entering dates, the form warns when another booking has
+  a function on the same day. The event page and the calendar keep showing it.
+- **Calendar.** A month view with dots on busy days. Tap a day to see what's on. The
+  Events tab also lists upcoming and past events.
+- **Home** shows the events coming up in the next two weeks.
+- **Money tab** lists every quote with its status, plus the value accepted and the value
+  still waiting for an answer.
+- **PDF.** "Save as PDF" prints a clean A4 quote on any phone or computer, with the app's
+  menus hidden.
+
+**Roles:** owners and managers make quotes and events. Staff see events with their dates,
+venues and client contacts, but not booking values or quotes. Accountants see quotes and
+events without changing them.
+
+**Not in Phase 2:** GST invoices, payments, expenses and profit. These are Phase 3, and
+they start from the accepted quote and the event built here.

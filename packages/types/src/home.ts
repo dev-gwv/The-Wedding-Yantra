@@ -1,4 +1,5 @@
 import type { StarterPack } from "./business-types.js";
+import type { EventSummary } from "./bookings.js";
 import type { LeadSummary } from "./sales.js";
 
 export type SetupStepKey = "create_business" | "business_profile" | "invite_team";
@@ -27,5 +28,7 @@ export interface HomeSummary {
     /** Up to five leads to act on first: overdue, then due today. */
     due: LeadSummary[];
   };
+  /** Confirmed events in the next 14 days, soonest first (empty for roles without events). */
+  upcomingEvents: EventSummary[];
   starterPack: StarterPack;
 }

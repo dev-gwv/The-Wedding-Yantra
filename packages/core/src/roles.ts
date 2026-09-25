@@ -30,6 +30,12 @@ export const PERMISSIONS = [
   "leads.delete",
   "clients.view",
   "clients.manage",
+  /** Change the price list */
+  "catalogue.manage",
+  "quotes.view",
+  "quotes.manage",
+  "events.view",
+  "events.manage",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -47,10 +53,15 @@ const GRANTS: Record<Role, readonly Permission[]> = {
     "leads.delete",
     "clients.view",
     "clients.manage",
+    "catalogue.manage",
+    "quotes.view",
+    "quotes.manage",
+    "events.view",
+    "events.manage",
   ],
-  staff: ["members.view", "leads.work"],
+  staff: ["members.view", "leads.work", "events.view"],
   freelancer: [],
-  accountant: ["members.view", "finance.view", "clients.view"],
+  accountant: ["members.view", "finance.view", "clients.view", "quotes.view", "events.view"],
 };
 
 export function can(role: Role, permission: Permission): boolean {

@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { LeadCard } from "@/components/sales/lead-card";
+import { EventCard } from "@/components/bookings/event-card";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import { useState } from "react";
@@ -86,6 +87,22 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
             Your events and tasks will show up here, so you know what to do first each morning.
           </EmptyState>
         </Card>
+      )}
+
+      {home.upcomingEvents.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-lg font-extrabold">Coming up in two weeks</h2>
+            <Link href="/app/events?view=calendar" className="text-sm font-bold text-brand-strong hover:text-brand-deep">
+              Calendar
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {home.upcomingEvents.map((e) => (
+              <EventCard key={e.id} event={e} />
+            ))}
+          </div>
+        </section>
       )}
 
       <StarterPack home={home} icon={icon} />

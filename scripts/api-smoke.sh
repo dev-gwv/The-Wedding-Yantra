@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Smoke-tests the BUILT API (apps/api/dist) against a real Postgres at $DATABASE_URL:
 #   1. first start applies every migration; health, business types and the full
-#      sign-in -> create business -> Home flow work over real HTTP
+#      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
+#      flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -54,7 +55,8 @@ sign_in() {
 
 echo "== first start (fresh database)"
 start_api
-for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients; do
+for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
+  0005_catalogue_quotes_events; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -74,6 +76,24 @@ LEAD="$(api POST "/api/v1/workspaces/$WS_ID/leads" '{"name":"Smoke Lead","phone"
 expect "a lead can be added to the first stage" '.success and .data.stageName == "New enquiry" and .data.budget == 50000' "$LEAD"
 expect "the pipeline counts it" '.success and .data.stages[0].leadCount == 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/leads" "" "$TOKEN")"
+LEAD_ID="$(echo "$LEAD" | jq -r '.data.id')"
+expect "the trade's starter price list is installed" '.success and (.data | length) >= 3' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/catalogue" "" "$TOKEN")"
+QUOTE="$(api POST "/api/v1/workspaces/$WS_ID/quotes" \
+  "{\"leadId\":\"$LEAD_ID\",\"title\":\"Bridal package\",\"items\":[{\"name\":\"Bridal makeup\",\"unit\":\"event\",\"quantity\":1,\"rate\":25000,\"taxRate\":18}]}" \
+  "$TOKEN")"
+expect "a quote is numbered and totalled by the server" \
+  '.success and .data.number == "Q-0001" and .data.subtotal == 25000 and .data.tax == 4500 and .data.total == 29500' "$QUOTE"
+QUOTE_ID="$(echo "$QUOTE" | jq -r '.data.id')"
+SHARE="$(echo "$QUOTE" | jq -r '.data.shareToken')"
+expect "the quote can be marked sent" '.success and .data.status == "sent"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/quotes/$QUOTE_ID/send" "" "$TOKEN")"
+expect "the client can open the shared link without signing in" \
+  '.success and .data.quote.number == "Q-0001" and (.data.quote | has("shareToken") | not)' "$(api GET "/api/v1/public/quotes/$SHARE")"
+expect "the client can accept it" '.success and .data.quote.status == "accepted"' \
+  "$(api POST "/api/v1/public/quotes/$SHARE/accept" '{"name":"Smoke Lead"}')"
+expect "accepting books the lead and creates the event" '.success and .data.stageKind == "won" and .data.eventId != null' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/leads/$LEAD_ID" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

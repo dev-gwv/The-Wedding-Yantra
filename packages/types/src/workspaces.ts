@@ -45,6 +45,8 @@ export const updateWorkspaceInput = z
       .transform((v) => (v === "" ? null : v))
       .nullable()
       .optional(),
+    /** Printed at the bottom of every new quote */
+    quoteTerms: optionalText(4000),
   })
   .partial();
 export type UpdateWorkspaceInput = z.input<typeof updateWorkspaceInput>;
@@ -60,6 +62,7 @@ export const workspace = z.object({
   email: z.string().nullable(),
   address: z.string().nullable(),
   gstin: z.string().nullable(),
+  quoteTerms: z.string().nullable(),
   createdAt: z.string(),
   /** The signed-in person's role in this business. */
   role,

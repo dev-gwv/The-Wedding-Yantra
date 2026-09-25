@@ -6,6 +6,7 @@ import {
   useDeleteLead,
   useLead,
   useLeads,
+  useQuotes,
   useUpdateLead,
 } from "@wedding-yantra/api-client/react";
 import {
@@ -20,7 +21,10 @@ import {
 import {
   ArrowRightLeft,
   BellRing,
+  CalendarDays,
+  ChevronRight,
   CircleCheck,
+  FileText,
   MessageCircle,
   NotebookPen,
   Pencil,
@@ -34,12 +38,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { QuoteRow } from "@/components/bookings/quote-row";
 import { FollowUpBadge } from "@/components/sales/follow-up-badge";
 import { FollowUpSheet } from "@/components/sales/follow-up-picker";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
 import { LostSheet } from "@/components/sales/lost-sheet";
 import { WhatsAppSheet } from "@/components/sales/whatsapp-sheet";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, Notice, Pill } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
@@ -201,6 +206,8 @@ function LeadView({ lead }: { lead: Lead }) {
         </section>
       )}
 
+      <QuotesAndEvent lead={lead} />
+
       {/* Details */}
       <Details lead={lead} />
 
@@ -262,6 +269,45 @@ function LeadView({ lead }: { lead: Lead }) {
         }}
       />
     </div>
+  );
+}
+
+/** The lead's quotes and, once booked, its event. */
+function QuotesAndEvent({ lead }: { lead: Lead }) {
+  const { workspace } = useCurrentWorkspace();
+  const canView = can(workspace.role, "quotes.view");
+  const quotes = useQuotes(workspace.id, { leadId: lead.id }, canView);
+  if (!canView && !lead.eventId) return null;
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-display text-lg font-extrabold">Quotes</h2>
+        {can(workspace.role, "quotes.manage") && lead.stageKind !== "lost" && (
+          <ButtonLink href={`/app/quotes/new?leadId=${lead.id}`} variant={quotes.data?.length ? "secondary" : "primary"} size="sm">
+            <FileText className="size-4" /> Make a quote
+          </ButtonLink>
+        )}
+      </div>
+      {lead.eventId && (
+        <Link
+          href={`/app/events/${lead.eventId}`}
+          className="mb-3 flex items-center gap-3 rounded-2xl bg-success-soft px-4 py-3 font-semibold text-success"
+        >
+          <CalendarDays className="size-5" /> Booked. Open the event
+          <ChevronRight className="ml-auto size-4" />
+        </Link>
+      )}
+      {quotes.data && quotes.data.length > 0 ? (
+        <Card className="divide-y divide-line overflow-hidden">
+          {quotes.data.map((q) => (
+            <QuoteRow key={q.id} quote={q} />
+          ))}
+        </Card>
+      ) : (
+        canView && quotes.data && <p className="text-sm text-ink-muted">No quotes yet. Pick services from your price list and send it on WhatsApp.</p>
+      )}
+    </section>
   );
 }
 
@@ -350,12 +396,14 @@ function describe(a: LeadActivity): string {
     case "created":
       return m.source === "enquiry_form" ? "Sent your enquiry form" : `${who} added this lead`;
     case "note":
-      return who;
+      // Notes without a person came from the client's quote link.
+      return a.actor?.name ?? (m.quoteId ? "Quote link" : who);
     case "call":
       return `${who} called`;
     case "whatsapp":
       return `${who} sent a WhatsApp${a.body ? `: ${a.body}` : ""}`;
     case "stage_changed":
+      if (m.kind === "won" && m.via === "quote" && !a.actor) return `${m.by ?? "The client"} accepted quote ${m.quote ?? ""} on the link`;
       return m.kind === "won"
         ? `${who} marked it Booked`
         : `${who} moved it from ${m.from ?? "?"} to ${m.to ?? "?"}${m.reason ? ` (${LOST_LABELS[m.reason as LostReason] ?? m.reason})` : ""}`;

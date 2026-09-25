@@ -1,4 +1,20 @@
 import type {
+  CalendarEntry,
+  CatalogueItem,
+  CatalogueItemInput,
+  EventClash,
+  EventInput,
+  EventListQuery,
+  EventSummary,
+  PublicQuote,
+  Quote,
+  QuoteInput,
+  QuoteStatus,
+  QuoteSummary,
+  UpdateCatalogueItemInput,
+  UpdateEventInput,
+  UpdateQuoteInput,
+  WeddingEvent,
   AcceptedInvitation,
   AddActivityInput,
   Client,
@@ -172,6 +188,48 @@ export function createApiClient(options: ApiClientOptions) {
       publicGet: (slug: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}`),
       submit: (slug: string, input: SubmitLeadFormInput) =>
         request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
+    },
+    catalogue: {
+      list: (workspaceId: string, all = false) =>
+        request<CatalogueItem[]>("GET", `${ws(workspaceId)}/catalogue${all ? "?all=true" : ""}`),
+      create: (workspaceId: string, input: CatalogueItemInput) =>
+        request<CatalogueItem>("POST", `${ws(workspaceId)}/catalogue`, input),
+      update: (workspaceId: string, id: string, input: UpdateCatalogueItemInput) =>
+        request<CatalogueItem>("PATCH", `${ws(workspaceId)}/catalogue/${encodeURIComponent(id)}`, input),
+    },
+    quotes: {
+      list: (workspaceId: string, query: { leadId?: string; clientId?: string; status?: QuoteStatus } = {}) =>
+        request<QuoteSummary[]>("GET", `${ws(workspaceId)}/quotes${qs(query)}`),
+      get: (workspaceId: string, id: string) => request<Quote>("GET", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: QuoteInput) => request<Quote>("POST", `${ws(workspaceId)}/quotes`, input),
+      update: (workspaceId: string, id: string, input: UpdateQuoteInput) =>
+        request<Quote>("PATCH", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}`),
+      send: (workspaceId: string, id: string) => request<Quote>("POST", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}/send`),
+      accept: (workspaceId: string, id: string) =>
+        request<Quote>("POST", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}/accept`),
+      decline: (workspaceId: string, id: string, reason?: string) =>
+        request<Quote>("POST", `${ws(workspaceId)}/quotes/${encodeURIComponent(id)}/decline`, { reason }),
+      publicGet: (token: string) => request<PublicQuote>("GET", `/public/quotes/${encodeURIComponent(token)}`),
+      publicAccept: (token: string, name: string) =>
+        request<PublicQuote>("POST", `/public/quotes/${encodeURIComponent(token)}/accept`, { name }),
+      publicDecline: (token: string, reason?: string) =>
+        request<PublicQuote>("POST", `/public/quotes/${encodeURIComponent(token)}/decline`, { reason }),
+    },
+    events: {
+      list: (workspaceId: string, query: EventListQuery = {}) =>
+        request<EventSummary[]>("GET", `${ws(workspaceId)}/events${qs(query)}`),
+      get: (workspaceId: string, id: string) => request<WeddingEvent>("GET", `${ws(workspaceId)}/events/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: EventInput) => request<WeddingEvent>("POST", `${ws(workspaceId)}/events`, input),
+      update: (workspaceId: string, id: string, input: UpdateEventInput) =>
+        request<WeddingEvent>("PATCH", `${ws(workspaceId)}/events/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/events/${encodeURIComponent(id)}`),
+      clashes: (workspaceId: string, dates: string[], excludeEventId?: string) =>
+        request<EventClash[]>("GET", `${ws(workspaceId)}/event-clashes${qs({ dates: dates.join(","), excludeEventId })}`),
+      calendar: (workspaceId: string, month: string) =>
+        request<CalendarEntry[]>("GET", `${ws(workspaceId)}/calendar${qs({ month })}`),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

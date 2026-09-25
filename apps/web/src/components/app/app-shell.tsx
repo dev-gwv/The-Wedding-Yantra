@@ -21,6 +21,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
   if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/clients"].some((p) => pathname.startsWith(p));
+  if (href === "/app/money") return ["/app/money", "/app/quotes"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
 
@@ -29,9 +30,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { workspace } = useCurrentWorkspace();
 
   return (
-    <div className="min-h-dvh bg-surface lg:pl-72">
+    <div className="min-h-dvh bg-surface lg:pl-72 print:pl-0">
       {/* Desktop: a floating white panel, like PhotoLancer's studio menu */}
-      <aside className="fixed inset-y-4 left-4 hidden w-60 flex-col rounded-3xl border border-line bg-surface p-3 shadow-soft lg:flex">
+      <aside className="fixed inset-y-4 left-4 hidden w-60 print:!hidden flex-col rounded-3xl border border-line bg-surface p-3 shadow-soft lg:flex">
         <div className="px-2 pb-5 pt-3">
           <Logo className="[&_svg]:size-9 [&>span:last-child]:text-lg" />
         </div>
@@ -70,12 +71,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10">{children}</main>
+      <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10 print:max-w-none print:p-0">{children}</main>
 
       {/* Phone: white tab bar; the active icon sits in a small gradient pill */}
       <nav
         aria-label="Main"
-        className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden"
+        className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden print:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5 pt-2">
           {NAV.map(({ href, label, icon: Icon }) => {

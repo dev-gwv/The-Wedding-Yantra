@@ -143,6 +143,8 @@ export interface Lead extends LeadSummary {
   requirements: string | null;
   lostReason: LostReason | null;
   createdBy: PersonRef | null;
+  /** The booking made from this lead, once a quote is accepted */
+  eventId: string | null;
   activities: LeadActivity[];
 }
 

@@ -9,6 +9,14 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  CatalogueItemInput,
+  EventInput,
+  EventListQuery,
+  QuoteInput,
+  QuoteStatus,
+  UpdateCatalogueItemInput,
+  UpdateEventInput,
+  UpdateQuoteInput,
   AddActivityInput,
   ClientInput,
   CreateLeadInput,
@@ -57,6 +65,16 @@ export const queryKeys = {
   templates: (id: string) => ["workspace", id, "templates"] as const,
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
   publicForm: (slug: string) => ["public-form", slug] as const,
+  catalogue: (id: string, all: boolean) => ["workspace", id, "catalogue", all] as const,
+  /** Quotes, events and the calendar; invalidate this after any booking change. */
+  bookings: (id: string) => ["workspace", id, "bookings"] as const,
+  quotes: (id: string, query: object) => ["workspace", id, "bookings", "quotes", query] as const,
+  quote: (id: string, quoteId: string) => ["workspace", id, "bookings", "quote", quoteId] as const,
+  events: (id: string, query: object) => ["workspace", id, "bookings", "events", query] as const,
+  event: (id: string, eventId: string) => ["workspace", id, "bookings", "event", eventId] as const,
+  calendar: (id: string, month: string) => ["workspace", id, "bookings", "calendar", month] as const,
+  clashes: (id: string, dates: string, exclude: string) => ["workspace", id, "bookings", "clashes", dates, exclude] as const,
+  publicQuote: (token: string) => ["public-quote", token] as const,
 };
 
 interface QueryOpts {
@@ -230,7 +248,11 @@ export function useLeads(workspaceId: string, query: LeadListQuery = {}) {
 
 export function useLead(workspaceId: string, leadId: string) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.lead(workspaceId, leadId), queryFn: () => api.leads.get(workspaceId, leadId) });
+  return useQuery({
+    queryKey: queryKeys.lead(workspaceId, leadId),
+    queryFn: () => api.leads.get(workspaceId, leadId),
+    enabled: !!leadId,
+  });
 }
 
 export function useCreateLead(workspaceId: string) {
@@ -265,7 +287,11 @@ export function useClients(workspaceId: string, q = "") {
 
 export function useClient(workspaceId: string, clientId: string) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.client(workspaceId, clientId), queryFn: () => api.clients.get(workspaceId, clientId) });
+  return useQuery({
+    queryKey: queryKeys.client(workspaceId, clientId),
+    queryFn: () => api.clients.get(workspaceId, clientId),
+    enabled: !!clientId,
+  });
 }
 
 export function useCreateClient(workspaceId: string) {
@@ -330,4 +356,145 @@ export function usePublicForm(slug: string) {
 export function useSubmitPublicForm(slug: string) {
   const api = useApi();
   return useMutation({ mutationFn: (input: SubmitLeadFormInput) => api.leadForm.submit(slug, input) });
+}
+
+// ---- Price list, quotes, events ---------------------------------------------
+
+export function useCatalogue(workspaceId: string, all = false) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.catalogue(workspaceId, all), queryFn: () => api.catalogue.list(workspaceId, all) });
+}
+
+function useCatalogueMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "catalogue"] }),
+  });
+}
+
+export function useCreateCatalogueItem(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, (input: CatalogueItemInput) => api.catalogue.create(workspaceId, input));
+}
+
+export function useUpdateCatalogueItem(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, ({ id, ...input }: UpdateCatalogueItemInput & { id: string }) =>
+    api.catalogue.update(workspaceId, id, input),
+  );
+}
+
+/** Refreshes quotes, events, calendar, leads and Home after a booking change. */
+function useBookingMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.bookings(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.sales(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useQuotes(workspaceId: string, query: { leadId?: string; clientId?: string; status?: QuoteStatus } = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.quotes(workspaceId, query), queryFn: () => api.quotes.list(workspaceId, query), enabled });
+}
+
+export function useQuote(workspaceId: string, quoteId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.quote(workspaceId, quoteId),
+    queryFn: () => api.quotes.get(workspaceId, quoteId),
+    enabled: !!quoteId,
+  });
+}
+
+export function useCreateQuote(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: QuoteInput) => api.quotes.create(workspaceId, input));
+}
+
+export function useUpdateQuote(workspaceId: string, quoteId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: UpdateQuoteInput) => api.quotes.update(workspaceId, quoteId, input));
+}
+
+export function useQuoteAction(workspaceId: string, quoteId: string) {
+  const api = useApi();
+type QuoteAction = { kind: "send" } | { kind: "accept" } | { kind: "decline"; reason?: string } | { kind: "delete" };
+  return useBookingMutation(workspaceId, (action: QuoteAction): Promise<unknown> => {
+    switch (action.kind) {
+      case "send":
+        return api.quotes.send(workspaceId, quoteId);
+      case "accept":
+        return api.quotes.accept(workspaceId, quoteId);
+      case "decline":
+        return api.quotes.decline(workspaceId, quoteId, action.reason);
+      case "delete":
+        return api.quotes.remove(workspaceId, quoteId);
+    }
+  });
+}
+
+export function usePublicQuote(token: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.publicQuote(token), queryFn: () => api.quotes.publicGet(token), retry: false });
+}
+
+export function usePublicQuoteAnswer(token: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (answer: { accept: true; name: string } | { accept: false; reason?: string }) =>
+      answer.accept ? api.quotes.publicAccept(token, answer.name) : api.quotes.publicDecline(token, answer.reason),
+    onSuccess: (data) => qc.setQueryData(queryKeys.publicQuote(token), data),
+  });
+}
+
+export function useEvents(workspaceId: string, query: EventListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.events(workspaceId, query), queryFn: () => api.events.list(workspaceId, query), enabled });
+}
+
+export function useEvent(workspaceId: string, eventId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.event(workspaceId, eventId),
+    queryFn: () => api.events.get(workspaceId, eventId),
+    enabled: !!eventId,
+  });
+}
+
+export function useCreateEvent(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: EventInput) => api.events.create(workspaceId, input));
+}
+
+export function useUpdateEvent(workspaceId: string, eventId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (input: UpdateEventInput) => api.events.update(workspaceId, eventId, input));
+}
+
+export function useDeleteEvent(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, (eventId: string) => api.events.remove(workspaceId, eventId));
+}
+
+export function useCalendar(workspaceId: string, month: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.calendar(workspaceId, month), queryFn: () => api.events.calendar(workspaceId, month), enabled });
+}
+
+/** Other events already on these dates. Re-checks as the dates change. */
+export function useClashes(workspaceId: string, dates: string[], excludeEventId?: string) {
+  const api = useApi();
+  const key = [...new Set(dates)].sort().join(",");
+  return useQuery({
+    queryKey: queryKeys.clashes(workspaceId, key, excludeEventId ?? ""),
+    queryFn: () => api.events.clashes(workspaceId, key.split(","), excludeEventId),
+    enabled: key.length > 0,
+  });
 }
