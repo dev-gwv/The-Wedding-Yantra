@@ -1,0 +1,30 @@
+{
+  "name": "@wedding-yantra/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "next": "^15.5.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@wedding-yantra/types": "workspace:*",
+    "eslint": "^9.35.0",
+    "eslint-config-next": "^15.5.3",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2"
+  }
+}

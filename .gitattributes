@@ -1,0 +1,5 @@
+# Keep LF everywhere: these files run on Linux (GitHub runners, Docker, the VPS)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.vercel
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+docs
+infra
+apps/web

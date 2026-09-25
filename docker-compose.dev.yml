@@ -1,0 +1,24 @@
+# Local development database only. Uses 127.0.0.1:5433 so it never collides
+# with a Postgres already running on 5432.
+#   pnpm db:up    /   pnpm db:down
+name: wedding-yantra-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wedding_yantra
+      POSTGRES_PASSWORD: wedding_yantra
+      POSTGRES_DB: wedding_yantra
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - wedding-yantra-dev-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wedding_yantra -d wedding_yantra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  wedding-yantra-dev-pgdata:

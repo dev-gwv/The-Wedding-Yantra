@@ -1,0 +1,43 @@
+# =============================================================================
+# OPTION B – lightweight shared gateway (Caddy, automatic HTTPS)
+#
+# Use this ONLY if no reverse proxy exists yet and the existing app currently
+# binds 80/443 itself. This gateway becomes the single owner of 80/443 and
+# routes by hostname to every app on the `web-proxy` network.
+#
+# Deploy it from its own directory (e.g. /opt/gateway), NOT from the
+# wedding-yantra directory, so the app deploy never touches it.
+# See docs/DEPLOYMENT.md -> "Option B" for the one-time cut-over steps.
+# =============================================================================
+
+name: gateway
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: gateway-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - web-proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  web-proxy:
+    name: web-proxy
+    external: true
+
+volumes:
+  caddy-data:
+  caddy-config:

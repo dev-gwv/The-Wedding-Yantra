@@ -1,0 +1,117 @@
+# =============================================================================
+# Wedding Yantra – production stack for a SHARED VPS
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Guarantees for the other app already on this host:
+#   * No host ports are published (no 80/443/5432/4000 on the host).
+#   * Everything is namespaced under the compose project "wedding-yantra",
+#     so `up`, `down` and `--remove-orphans` only ever touch these containers.
+#   * The DB sits on an `internal: true` network: no route in or out.
+#   * Only the API joins the shared proxy network, and only with `expose`.
+#   * CPU/memory caps and log rotation keep this stack from starving the host.
+#
+# Prerequisite (one-time): the proxy network must already exist, e.g.
+#   docker network create web-proxy
+# and your reverse proxy container must be attached to it (docs/DEPLOYMENT.md).
+# =============================================================================
+
+name: wedding-yantra
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  wedding-yantra-db:
+    image: postgres:16-alpine
+    container_name: wedding-yantra-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    volumes:
+      - wedding-yantra-pgdata:/var/lib/postgresql/data
+    networks:
+      - wy-internal
+    # NO `ports:` on purpose. Containers attached only to an internal network
+    # cannot publish ports anyway. For admin access see docker-compose.db-access.yml.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    shm_size: 128mb
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+    logging: *default-logging
+
+  wedding-yantra-api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: wedding-yantra-api:${APP_VERSION:-latest}
+    container_name: wedding-yantra-api
+    restart: unless-stopped
+    init: true
+    depends_on:
+      wedding-yantra-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      APP_VERSION: ${APP_VERSION:-dev}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@wedding-yantra-db:5432/${POSTGRES_DB}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      CORS_VERCEL_PREVIEW_PATTERN: ${CORS_VERCEL_PREVIEW_PATTERN:-}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Reachable ONLY from containers on the same Docker networks (i.e. the proxy).
+    expose:
+      - "4000"
+    networks:
+      wy-internal: {}
+      web-proxy:
+        aliases:
+          - wedding-yantra-api
+    stop_grace_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+    logging: *default-logging
+    # --- Option A (Traefik only): uncomment if your shared proxy is Traefik ---
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.docker.network=${PROXY_NETWORK:-web-proxy}
+    #   - traefik.http.routers.wedding-yantra-api.rule=Host(`api.weddingyantra.com`)
+    #   - traefik.http.routers.wedding-yantra-api.entrypoints=websecure
+    #   - traefik.http.routers.wedding-yantra-api.tls.certresolver=letsencrypt
+    #   - traefik.http.services.wedding-yantra-api.loadbalancer.server.port=4000
+
+networks:
+  # Private network for API <-> DB traffic. `internal: true` = no external routing.
+  wy-internal:
+    name: wedding-yantra-internal
+    driver: bridge
+    internal: true
+
+  # The EXISTING network your reverse proxy lives on. Never created or removed by
+  # this file, so `docker compose down` here can't break the other app.
+  web-proxy:
+    name: ${PROXY_NETWORK:-web-proxy}
+    external: true
+
+volumes:
+  wedding-yantra-pgdata:
+    name: wedding-yantra-pgdata

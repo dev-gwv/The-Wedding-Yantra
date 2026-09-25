@@ -1,0 +1,170 @@
+name: Deploy API to VPS
+
+# Deploys ONLY the Wedding Yantra backend stack. Every remote command is scoped
+# to $VPS_APP_DIR and the compose project "wedding-yantra"; nothing here touches
+# other containers, networks or volumes on the host.
+#
+# Required repository secrets:
+#   VPS_HOST          e.g. 203.0.113.10
+#   VPS_USER          non-root user in the `docker` group, e.g. deploy
+#   VPS_SSH_KEY       private key (ed25519) whose public half is in ~/.ssh/authorized_keys
+#   VPS_KNOWN_HOSTS   output of: ssh-keyscan -p <port> <host>
+# Optional repository variables:
+#   VPS_PORT          default 22
+#   VPS_APP_DIR       default /opt/wedding-yantra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/types/**"
+      - "docker-compose.prod.yml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "tsconfig.base.json"
+      - ".github/workflows/deploy-vps.yml"
+  workflow_dispatch:
+
+# Never run two deploys at once; don't cancel one mid-flight either.
+concurrency:
+  group: deploy-vps-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+  VPS_APP_DIR: ${{ vars.VPS_APP_DIR || '/opt/wedding-yantra' }}
+
+jobs:
+  verify:
+    name: Verify API builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run lint typecheck build --filter=@wedding-yantra/api...
+
+  deploy:
+    name: Deploy to VPS
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://api.weddingyantra.com/api/health
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          HOST: ${{ secrets.VPS_HOST }}
+          USER_NAME: ${{ secrets.VPS_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName ${HOST}
+            User ${USER_NAME}
+            Port ${VPS_PORT}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+
+      - name: Sync source to the Wedding Yantra directory only
+        run: |
+          ssh vps "mkdir -p '${VPS_APP_DIR}'"
+          # --delete keeps the dir identical to the repo, but excluded paths
+          # (.env, backups) are protected from deletion.
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'node_modules/' \
+            --exclude '.turbo/' \
+            --exclude '.next/' \
+            --exclude 'dist/' \
+            --exclude '.env' \
+            --exclude 'backups/' \
+            ./ "vps:${VPS_APP_DIR}/"
+
+      - name: Build and roll out (project-scoped)
+        env:
+          APP_VERSION: ${{ github.sha }}
+        run: |
+          ssh vps "APP_VERSION='${APP_VERSION}' VPS_APP_DIR='${VPS_APP_DIR}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$VPS_APP_DIR"
+
+          COMPOSE="docker compose -p wedding-yantra -f docker-compose.prod.yml"
+
+          # ---- Preflight -----------------------------------------------------
+          test -f .env || { echo "::error::$VPS_APP_DIR/.env is missing (copy .env.example and fill it in)"; exit 1; }
+          # Read just this one key; never `source` .env (compose parses it itself).
+          PROXY_NETWORK="$(sed -n 's/^PROXY_NETWORK=//p' .env | tail -n1 | tr -d "\"'\r")"
+          PROXY_NETWORK="${PROXY_NETWORK:-web-proxy}"
+          docker network inspect "$PROXY_NETWORK" >/dev/null 2>&1 \
+            || { echo "::error::Docker network '$PROXY_NETWORK' not found. Create it once: docker network create $PROXY_NETWORK"; exit 1; }
+          $COMPOSE config --quiet
+
+          # ---- Build first, while the current API keeps serving ---------------
+          export APP_VERSION
+          $COMPOSE build --pull wedding-yantra-api
+
+          # ---- Roll out: recreates only containers whose image/config changed --
+          # The DB is left running unless its definition changed.
+          $COMPOSE up -d --build --remove-orphans
+
+          # ---- Wait for the new API to report healthy -------------------------
+          for i in $(seq 1 30); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' wedding-yantra-api 2>/dev/null || echo missing)"
+            echo "health: $status ($i/30)"
+            [ "$status" = "healthy" ] && break
+            if [ "$i" = 30 ]; then
+              echo "::error::wedding-yantra-api did not become healthy"
+              $COMPOSE ps
+              $COMPOSE logs --tail=100 wedding-yantra-api
+              exit 1
+            fi
+            sleep 4
+          done
+
+          # ---- Housekeeping: only images built by THIS project ----------------
+          docker image prune -af \
+            --filter "label=com.weddingyantra.project=wedding-yantra" \
+            --filter "until=168h" || true
+
+          $COMPOSE ps
+          REMOTE
+
+      - name: Public smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 10 https://api.weddingyantra.com/api/health; then
+              echo; echo "Deploy OK"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::API is healthy on the VPS but not reachable publicly yet; check the reverse proxy route."
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

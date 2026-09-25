@@ -1,0 +1,27 @@
+# =============================================================================
+# OPTIONAL override: expose Postgres on the VPS loopback ONLY (127.0.0.1:5433)
+# so you can reach it through an SSH tunnel from your laptop:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.db-access.yml up -d
+#   ssh -N -L 5433:127.0.0.1:5433 deploy@your-vps     # then connect to localhost:5433
+#
+# Why a separate network: Docker will not publish ports for a container that is
+# attached only to `internal: true` networks, so we add a tiny non-internal
+# bridge just for the loopback binding. 5433 avoids clashing with any existing
+# Postgres on the host's default 5432.
+#
+# Leave this OFF in normal operation; the CI deploy never uses it.
+# =============================================================================
+
+services:
+  wedding-yantra-db:
+    networks:
+      - wy-internal
+      - wy-db-admin
+    ports:
+      - "127.0.0.1:5433:5432"
+
+networks:
+  wy-db-admin:
+    name: wedding-yantra-db-admin
+    driver: bridge

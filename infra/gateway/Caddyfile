@@ -1,0 +1,20 @@
+{
+	# Used for Let's Encrypt registration / expiry notices
+	email ops@weddingyantra.com
+}
+
+# --- Wedding Yantra API -------------------------------------------------------
+api.weddingyantra.com {
+	encode zstd gzip
+	reverse_proxy wedding-yantra-api:4000 {
+		health_uri /api/health
+		health_interval 30s
+	}
+}
+
+# --- Existing application (adjust hostname / container / port) ----------------
+# After removing its `ports: 80/443` and attaching it to `web-proxy`:
+#
+# existing-app.example.com {
+# 	reverse_proxy existing-app-container:3000
+# }

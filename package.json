@@ -1,0 +1,21 @@
+{
+  "name": "wedding-yantra",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d",
+    "db:down": "docker compose -f docker-compose.dev.yml down"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.4",
+    "typescript": "^5.9.2"
+  }
+}
