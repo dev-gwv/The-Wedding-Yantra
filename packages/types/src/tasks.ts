@@ -136,3 +136,36 @@ export interface MyDay {
   /** Events you're on the team for, today and the next seven days */
   events: (EventSummary & { callTime: string | null; roleNote: string | null })[];
 }
+
+// ---------------------------------------------------------------------------
+// Days off
+// ---------------------------------------------------------------------------
+
+export interface TimeOff {
+  id: string;
+  user: PersonRef;
+  startDate: string;
+  endDate: string;
+  note: string | null;
+  createdBy: PersonRef | null;
+}
+
+export const timeOffInput = z
+  .object({
+    /** Whose days off. Leave empty for yourself; owners and managers can choose anyone. */
+    userId: z.uuid().optional(),
+    startDate: z.iso.date("Pick the first day"),
+    endDate: z.iso.date("Pick the last day"),
+    note: optionalText(200),
+  })
+  .refine((v) => v.endDate >= v.startDate, { message: "The last day can't be before the first", path: ["endDate"] });
+export type TimeOffInput = z.input<typeof timeOffInput>;
+
+export const timeOffQuery = z.object({
+  /** Days off that end on or after this day */
+  from: z.iso.date().optional(),
+  /** Days off that start on or before this day */
+  to: z.iso.date().optional(),
+  userId: z.uuid().optional(),
+});
+export type TimeOffQuery = z.input<typeof timeOffQuery>;

@@ -145,7 +145,7 @@ describe("follow-up times", () => {
   });
 });
 
-import { checklistDays, daysBetween, formatClock, formatDueDay, todayIn } from "./index.js";
+import { checklistDays, daysBetween, formatClock, formatDateRange, formatDueDay, todayIn } from "./index.js";
 
 describe("due days and times", () => {
   it("counts calendar days, across months and years", () => {
@@ -175,6 +175,13 @@ describe("due days and times", () => {
     expect(w("before", "before", "before", "on_day", "on_day", "after", "after")).toEqual([7, 4, 1, 0, 0, 1, 7]);
     expect(w("before", "on_day", "after", "after", "after", "after")).toEqual([3, 0, 1, 3, 5, 7]);
     expect(w("after", "before", "before", "before", "before", "before")).toEqual([2, 7, 6, 4, 3, 1]);
+  });
+  it("writes a span of days briefly", () => {
+    expect(formatDateRange("2026-10-03", "2026-10-03")).toBe("3 Oct");
+    expect(formatDateRange("2026-10-03", "2026-10-05")).toBe("3–5 Oct");
+    expect(formatDateRange("2026-09-30", "2026-10-02")).toBe("30 Sep – 2 Oct");
+    expect(formatDateRange("2026-12-30", "2027-01-02", "2026")).toBe("30 Dec – 2 Jan 2027");
+    expect(formatDateRange("2027-01-04", "2027-01-06", "2026")).toBe("4–6 Jan 2027");
   });
   it("reads times the way people say them", () => {
     expect(formatClock("18:30")).toBe("6:30 pm");
@@ -374,6 +381,7 @@ describe("daily summary message", () => {
           date: "2026-09-26",
           events: [{ title: "Kavya's wedding", functions: [{ name: "Mehendi", time: "16:00" }], team: ["Aman Verma", "Pooja Singh"] }],
           tasksDue: 3,
+          off: ["Ravi Kumar"],
         },
       },
       "Riya Makeup Studio",
@@ -391,6 +399,7 @@ describe("daily summary message", () => {
         "*Tomorrow, Sat 26 Sep*",
         "Kavya's wedding: Mehendi 4 pm. Team: Aman, Pooja",
         "3 tasks due",
+        "Off: Ravi",
       ].join("\n"),
     );
   });

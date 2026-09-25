@@ -318,3 +318,55 @@ describe("tasks", () => {
     expect((await call<Step[]>(t.app, "GET", `/workspaces/${a.ws}/checklist`, { token: a.owner })).body.data[0]!.title).toBe(stepsA[0]!.title);
   });
 });
+
+describe("days off", () => {
+  type Off = { id: string; user: { id: string; name: string | null }; startDate: string; endDate: string; note: string | null };
+  it("lets people mark days off, and shows them to whoever plans the team", async () => {
+    const { owner, staff, freelancer, ws, ids } = await team("967");
+    const mine = await call<Off>(t.app, "POST", `/workspaces/${ws}/time-off`, {
+      token: staff,
+      body: { startDate: day(3), endDate: day(5), note: "Cousin's wedding" },
+    });
+    expect(mine.status).toBe(201);
+    expect(mine.body.data).toMatchObject({ user: { id: ids.staff }, startDate: day(3), endDate: day(5), note: "Cousin's wedding" });
+    expect((await call(t.app, "POST", `/workspaces/${ws}/time-off`, { token: staff, body: { userId: ids.freelancer, startDate: day(1), endDate: day(1) } })).status).toBe(403);
+    expect((await call(t.app, "POST", `/workspaces/${ws}/time-off`, { token: staff, body: { startDate: day(5), endDate: day(3) } })).status).toBe(400);
+
+    // Owners mark anyone in the team, and only the team.
+    const hers = await call<Off>(t.app, "POST", `/workspaces/${ws}/time-off`, { token: owner, body: { userId: ids.freelancer, startDate: day(1), endDate: day(1) } });
+    expect(hers.status).toBe(201);
+    const stranger = await signIn(t.app, "9670000099", "Stranger");
+    const strangerId = (await call<{ user: { id: string } }>(t.app, "GET", "/auth/me", { token: stranger })).body.data.user.id;
+    expect((await call(t.app, "POST", `/workspaces/${ws}/time-off`, { token: owner, body: { userId: strangerId, startDate: day(1), endDate: day(1) } })).status).toBe(400);
+
+    // Owners see everyone's; others only their own. Dates narrow it down.
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${ws}/time-off`, { token: owner })).body.data.map((o) => o.user.name)).toEqual(["Freelance Artist", "Staff Person"]);
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${ws}/time-off`, { token: staff })).body.data.map((o) => o.id)).toEqual([mine.body.data.id]);
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${ws}/time-off?from=${day(2)}&to=${day(2)}`, { token: owner })).body.data).toEqual([]);
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${ws}/time-off?from=${day(4)}`, { token: owner })).body.data.map((o) => o.id)).toEqual([mine.body.data.id]);
+
+    // Tomorrow's summary says who's off, and the activity log says who marked it.
+    const summary = await call<{ tomorrow: { off: string[] } }>(t.app, "GET", `/workspaces/${ws}/daily-summary`, { token: owner });
+    expect(summary.body.data.tomorrow.off).toEqual(["Freelance Artist"]);
+    const feed = await call<{ items: { action: string; other: string | null; detail: string | null; actor: { name: string | null } | null }[] }>(
+      t.app,
+      "GET",
+      `/workspaces/${ws}/activity`,
+      { token: owner },
+    );
+    const [marked, own] = feed.body.data.items.filter((i) => i.action === "time_off.added");
+    expect(marked).toMatchObject({ other: "Freelance Artist", actor: { name: "Owner Person" } });
+    expect(own).toMatchObject({ other: null, actor: { name: "Staff Person" } });
+    expect(own!.detail).toMatch(/–/);
+
+    // Only your own can be removed, unless you manage the team.
+    expect((await call(t.app, "DELETE", `/workspaces/${ws}/time-off/${hers.body.data.id}`, { token: staff })).status).toBe(404);
+    expect((await call(t.app, "DELETE", `/workspaces/${ws}/time-off/${hers.body.data.id}`, { token: freelancer })).status).toBe(200);
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${ws}/time-off`, { token: owner })).body.data).toHaveLength(1);
+
+    // Another business can't touch them.
+    const other = await team("968");
+    expect((await call(t.app, "DELETE", `/workspaces/${other.ws}/time-off/${mine.body.data.id}`, { token: other.owner })).status).toBe(404);
+    expect((await call<Off[]>(t.app, "GET", `/workspaces/${other.ws}/time-off`, { token: other.owner })).body.data).toEqual([]);
+  });
+});

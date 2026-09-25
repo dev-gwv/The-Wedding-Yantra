@@ -1,7 +1,7 @@
 "use client";
 
 import { can, eventScope, formatDate, localISODate } from "@wedding-yantra/core";
-import { useCalendar, useEvents } from "@wedding-yantra/api-client/react";
+import { useCalendar, useEvents, useTimeOff } from "@wedding-yantra/api-client/react";
 import type { CalendarEntry, EventSummary } from "@wedding-yantra/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Lock, Plus } from "lucide-react";
 import Link from "next/link";
@@ -143,6 +143,9 @@ function CalendarView() {
   const month = `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}`;
   const entries = useCalendar(workspace.id, month);
   const [selected, setSelected] = useState(() => localISODate(now));
+  // Who's off, for whoever plans the team.
+  const lastDay = `${month}-${String(new Date(cursor.y, cursor.m + 1, 0).getDate()).padStart(2, "0")}`;
+  const off = useTimeOff(workspace.id, { from: `${month}-01`, to: lastDay }, can(workspace.role, "tasks.manage"));
 
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
@@ -161,6 +164,7 @@ function CalendarView() {
   const move = (by: number) => setCursor((c) => ({ y: c.y + Math.floor((c.m + by) / 12), m: (((c.m + by) % 12) + 12) % 12 }));
   const today = localISODate(now);
   const selectedEntries = byDate.get(selected) ?? [];
+  const offThatDay = (off.data ?? []).filter((o) => o.startDate <= selected && o.endDate >= selected);
 
   return (
     <div className="space-y-5">
@@ -219,6 +223,11 @@ function CalendarView() {
 
       <section>
         <h2 className="mb-3 font-display text-lg font-extrabold">{formatDate(selected)}</h2>
+        {offThatDay.length > 0 && (
+          <p className="mb-3 text-sm text-ink-muted">
+            <span className="font-semibold text-warning">Off:</span> {offThatDay.map((o) => o.user.name ?? "A team member").join(", ")}
+          </p>
+        )}
         {selectedEntries.length === 0 ? (
           <p className="text-ink-muted">Free. Nothing booked on this day.</p>
         ) : (

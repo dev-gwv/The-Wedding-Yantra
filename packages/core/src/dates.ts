@@ -158,3 +158,13 @@ export function checklistDays(items: readonly { when: "before" | "on_day" | "aft
     return Math.round(i.when === "before" ? 7 - step : 1 + step);
   });
 }
+
+/** A span of days, short: "3 Oct", "3–5 Oct", "30 Sep – 2 Oct", with the year when it isn't `thisYear`. */
+export function formatDateRange(start: string, end: string, thisYear?: string): string {
+  const year = (iso: string) => (thisYear && iso.slice(0, 4) !== thisYear ? ` ${iso.slice(0, 4)}` : "");
+  if (start === end) return `${formatDate(start, { year: false })}${year(start)}`;
+  const [, sm, sd] = start.split("-").map(Number);
+  const [, em, ed] = end.split("-").map(Number);
+  if (start.slice(0, 7) === end.slice(0, 7)) return `${sd}–${ed} ${MONTHS[em! - 1]}${year(end)}`;
+  return `${sd} ${MONTHS[sm! - 1]}${start.slice(0, 4) !== end.slice(0, 4) ? year(start) : ""} – ${ed} ${MONTHS[em! - 1]}${year(end)}`;
+}

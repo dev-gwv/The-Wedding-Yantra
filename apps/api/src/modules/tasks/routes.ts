@@ -1,9 +1,19 @@
 import type { FastifyInstance } from "fastify";
-import { saveChecklistInput, saveEventTeamInput, setTaskDoneInput, taskInput, taskListQuery, updateTaskInput } from "@wedding-yantra/types";
+import {
+  saveChecklistInput,
+  saveEventTeamInput,
+  setTaskDoneInput,
+  taskInput,
+  taskListQuery,
+  timeOffInput,
+  timeOffQuery,
+  updateTaskInput,
+} from "@wedding-yantra/types";
 import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as tasks from "./service.js";
+import * as timeOff from "./time-off.js";
 
 type Ws = { Params: { workspaceId: string } };
 type WsId = { Params: { workspaceId: string; id: string } };
@@ -52,6 +62,21 @@ export function taskRoutes(app: FastifyInstance, deps: { db: Db }) {
   app.post<WsId>("/workspaces/:workspaceId/events/:id/checklist", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     return ok(await tasks.applyChecklist(db, ctx, assertId(request.params.id, "This event")));
+  });
+
+  // ---- Days off --------------------------------------------------------------------
+  app.get<Ws>("/workspaces/:workspaceId/time-off", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await timeOff.listTimeOff(db, ctx, parse(timeOffQuery, request.query)));
+  });
+  app.post<Ws>("/workspaces/:workspaceId/time-off", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return reply.status(201).send(ok(await timeOff.addTimeOff(db, ctx, parse(timeOffInput, request.body))));
+  });
+  app.delete<WsId>("/workspaces/:workspaceId/time-off/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    await timeOff.removeTimeOff(db, ctx, assertId(request.params.id, "These days off"));
+    return ok({ deleted: true as const });
   });
 
   // ---- Who works an event ------------------------------------------------------

@@ -14,6 +14,8 @@ import type {
   SaveEventTeamInput,
   TaskInput,
   TaskListQuery,
+  TimeOffInput,
+  TimeOffQuery,
   UpdateTaskInput,
   ExpenseInput,
   ExpenseListQuery,
@@ -105,6 +107,7 @@ export const queryKeys = {
   work: (id: string) => ["workspace", id, "work"] as const,
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
+  timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
   /** Scores, the activity log and the daily summary: read-only views over everything. */
   scores: (id: string, month: string) => ["workspace", id, "review", "scores", month] as const,
@@ -715,6 +718,21 @@ export function useSetTaskDone(workspaceId: string) {
 export function useDeleteTask(workspaceId: string) {
   const api = useApi();
   return useTaskMutation(workspaceId, (id: string) => api.tasks.remove(workspaceId, id));
+}
+
+export function useTimeOff(workspaceId: string, query: TimeOffQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.timeOff(workspaceId, query), queryFn: () => api.timeOff.list(workspaceId, query), enabled });
+}
+
+export function useAddTimeOff(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, (input: TimeOffInput) => api.timeOff.add(workspaceId, input));
+}
+
+export function useRemoveTimeOff(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, (id: string) => api.timeOff.remove(workspaceId, id));
 }
 
 export function useChecklist(workspaceId: string, enabled = true) {

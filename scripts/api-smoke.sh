@@ -58,7 +58,7 @@ echo "== first start (fresh database)"
 start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
-  0008_tasks_and_team 0009_team_review; do
+  0008_tasks_and_team 0009_team_review 0010_time_off; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -141,6 +141,8 @@ expect "the activity log tells who did what" '.success and (.data.items | map(.a
   "$(api GET "/api/v1/workspaces/$WS_ID/activity" "" "$TOKEN")"
 expect "the daily summary adds up the day" '.success and (.data.tomorrow.date | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
   "$(api GET "/api/v1/workspaces/$WS_ID/daily-summary" "" "$TOKEN")"
+expect "days off can be marked" '.success and .data.startDate == "2026-12-24" and .data.endDate == "2026-12-26"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/time-off" '{"startDate":"2026-12-24","endDate":"2026-12-26","note":"Smoke holiday"}' "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

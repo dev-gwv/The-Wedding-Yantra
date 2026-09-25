@@ -1,6 +1,7 @@
 import { can } from "@wedding-yantra/core";
 import type { DailySummary } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
+import { offOn } from "../tasks/time-off.js";
 import { requireReview } from "./activity.js";
 
 /**
@@ -19,7 +20,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
   const { day, tomorrow, tz } = rows[0]!;
   const seesMoney = can(ctx.role, "finance.view");
 
-  const [received, sales, done, late, waiting, events, dueTomorrow] = await Promise.all([
+  const [received, sales, done, late, waiting, events, dueTomorrow, off] = await Promise.all([
     db.query<{ total: string; count: number }>(
       `SELECT coalesce(sum(amount), 0) AS total, count(*) AS count FROM payments
         WHERE workspace_id = $1 AND deleted_at IS NULL AND paid_on = $2::date`,
@@ -70,6 +71,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
           AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))`,
       [ws, tomorrow],
     ),
+    offOn(db, ws, tomorrow),
   ]);
 
   return {
@@ -84,6 +86,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
       date: tomorrow,
       events: events.rows.map((e) => ({ title: e.title, functions: e.functions ?? [], team: e.team })),
       tasksDue: Number(dueTomorrow.rows[0]!.count),
+      off,
     },
   };
 }

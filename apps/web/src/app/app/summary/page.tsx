@@ -132,6 +132,11 @@ function Summary({ s, businessName, onSent }: { s: DailySummary; businessName: s
               </div>
             </div>
           ))}
+          {(s.tomorrow.off ?? []).length > 0 && (
+            <p className="px-5 py-3 text-sm text-ink-muted">
+              <span className="font-semibold text-warning">Off:</span> {s.tomorrow.off.join(", ")}
+            </p>
+          )}
           {s.tomorrow.tasksDue > 0 && (
             <p className="px-5 py-3 text-sm text-ink-muted">
               {s.tomorrow.tasksDue} task{s.tomorrow.tasksDue === 1 ? "" : "s"} due

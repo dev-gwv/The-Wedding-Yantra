@@ -1,7 +1,7 @@
 "use client";
 
-import { can, formatClock, ROLE_INFO } from "@wedding-yantra/core";
-import { useApplyChecklist, useChecklist, useSaveEventTeam, useTasks, useTeam } from "@wedding-yantra/api-client/react";
+import { can, formatClock, formatDate, ROLE_INFO } from "@wedding-yantra/core";
+import { useApplyChecklist, useChecklist, useSaveEventTeam, useTasks, useTeam, useTimeOff } from "@wedding-yantra/api-client/react";
 import { saveEventTeamInput, type TaskItem, type WeddingEvent } from "@wedding-yantra/types";
 import { Check, ListChecks, Plus, UsersRound } from "lucide-react";
 import Link from "next/link";
@@ -79,6 +79,11 @@ function TeamForm({ event, onDone }: { event: WeddingEvent; onDone: () => void }
   const team = useTeam(workspace.id);
   const save = useSaveEventTeam(workspace.id, event.id);
   const toast = useToast();
+  // Who is off on any of the event's days.
+  const dates = [...new Set(event.functions.map((f) => f.date))].sort();
+  const off = useTimeOff(workspace.id, { from: dates[0], to: dates[dates.length - 1] }, dates.length > 0);
+  const offDays = (userId: string) =>
+    dates.filter((d) => (off.data ?? []).some((o) => o.user.id === userId && o.startDate <= d && o.endDate >= d));
   const [picks, setPicks] = useState<Record<string, Pick>>(() =>
     Object.fromEntries(event.team.map((m) => [m.userId, { on: true, roleNote: m.roleNote ?? "", callTime: m.callTime ?? "" }])),
   );
@@ -142,6 +147,11 @@ function TeamForm({ event, onDone }: { event: WeddingEvent; onDone: () => void }
                   </span>
                   <span className="block text-xs text-ink-muted">{ROLE_INFO[m.role].label}</span>
                 </span>
+                {offDays(m.userId).length > 0 && (
+                  <span className="shrink-0 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold text-warning">
+                    Off {offDays(m.userId).map((d) => formatDate(d, { year: false })).join(", ")}
+                  </span>
+                )}
               </label>
               {on && (
                 <div className="grid grid-cols-[1fr_8.5rem] gap-2 pb-2 pl-9">

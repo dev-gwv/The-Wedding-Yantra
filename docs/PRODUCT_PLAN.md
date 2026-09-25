@@ -686,4 +686,19 @@ plain sentences, for example "Aman ticked off “Pack the bridal kit” for Kavy
 
 Sending it automatically every evening needs the WhatsApp provider, which is still open.
 
+---
+
+## 22. Built in Phase 4, part 3: days off
+
+**More → Days off.** People mark the days they'll be away, with an optional reason. Owners and
+managers can mark anyone's.
+- **Who sees them:** owners and managers see everyone's; everyone else sees only their own.
+- **Choosing an event's team:** anyone off on one of the event's days shows "Off 28 Sep". They
+  can still be picked, but not by accident.
+- **The calendar:** for owners and managers, each day lists who's off.
+- **The daily summary:** tomorrow's section lists who's off.
+- **The activity log:** it records who marked the days.
+
+Phase 4 (team and accountability) is complete.
+
 Next: Phase 5, the SaaS layer: plans, free trial, subscriptions, limits and onboarding.

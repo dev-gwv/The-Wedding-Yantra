@@ -1,4 +1,4 @@
-import { can, ROLE_INFO, type Role } from "@wedding-yantra/core";
+import { can, formatDateRange, ROLE_INFO, type Role } from "@wedding-yantra/core";
 import type { ActivityItem, ActivityPage } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { AppError, forbidden } from "../../lib/http.js";
@@ -138,13 +138,13 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
     ),
     lookup<{ id: string; name: string }>(db, `SELECT id, name FROM invitations WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("invitation")),
     lookup<{ id: string; name: string }>(db, `SELECT id, name FROM leads WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, ids("lead")),
-    // People a task went to; limited to members of this business, past or present.
+    // People a task went to or marked off; limited to members of this business, past or present.
     lookup<{ id: string; name: string | null }>(
       db,
       `SELECT u.id, u.name FROM users u WHERE u.id = ANY($2::uuid[])
           AND EXISTS (SELECT 1 FROM memberships m WHERE m.workspace_id = $1 AND m.user_id = u.id)`,
       ws,
-      metaIds("assigneeId"),
+      new Set([...metaIds("assigneeId"), ...metaIds("userId")]),
     ),
     db.query<{ name: string }>(`SELECT name FROM workspaces WHERE id = $1`, [ws]),
   ]);
@@ -224,6 +224,15 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.detail = r.action === "task.done" ? (t?.event_title ?? null) : null;
         item.late = m.late === true;
         item.link = t?.event_id ? { kind: "event", id: t.event_id } : { kind: "tasks", id: null };
+        break;
+      }
+      case "time_off": {
+        const whose = str(m.userId);
+        // Your own days off read "will be off 3–5 Oct"; someone else's name them.
+        item.other = whose && whose !== r.actor_user_id ? (users.get(whose)?.name ?? null) : null;
+        const [start, end] = [str(m.startDate), str(m.endDate)];
+        item.detail = start && end ? formatDateRange(start, end) : null;
+        item.link = { kind: "team", id: null };
         break;
       }
       case "lead":

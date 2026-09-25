@@ -11,6 +11,9 @@ import type {
   TaskItem,
   TaskListQuery,
   TeamMember,
+  TimeOff,
+  TimeOffInput,
+  TimeOffQuery,
   UpdateTaskInput,
   ExportFile,
   ExportKind,
@@ -336,6 +339,12 @@ export function createApiClient(options: ApiClientOptions) {
       /** Adds the checklist to an event as dated tasks; steps already there are skipped */
       applyToEvent: (workspaceId: string, eventId: string) =>
         request<TaskItem[]>("POST", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/checklist`),
+    },
+    timeOff: {
+      list: (workspaceId: string, query: TimeOffQuery = {}) => request<TimeOff[]>("GET", `${ws(workspaceId)}/time-off${qs(query)}`),
+      add: (workspaceId: string, input: TimeOffInput) => request<TimeOff>("POST", `${ws(workspaceId)}/time-off`, input),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/time-off/${encodeURIComponent(id)}`),
     },
     eventTeam: {
       save: (workspaceId: string, eventId: string, input: SaveEventTeamInput) =>

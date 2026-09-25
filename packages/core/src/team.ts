@@ -122,6 +122,8 @@ export function activityText(a: ActivityFacts): string {
       return `gave ${a.other ?? "someone"} a task: ${q(a.subject)}`;
     case "task.done":
       return `ticked off ${q(a.subject)}${a.detail ? ` for ${a.detail}` : ""}${a.late ? ", late" : ""}`;
+    case "time_off.added":
+      return a.other ? `marked ${a.other} as off${a.detail ? ` ${a.detail}` : ""}` : `will be off${a.detail ? ` ${a.detail}` : ""}`;
     case "lead.created":
       return a.actorName ? `added the enquiry ${subject}` : `New enquiry from ${subject}${a.detail ? ` via the ${a.detail}` : ""}`;
     case "lead.note":
@@ -159,6 +161,8 @@ export interface DailySummaryFacts {
     date: string;
     events: { title: string; functions: { name: string; time: string | null }[]; team: string[] }[];
     tasksDue: number;
+    /** Who is off that day */
+    off: string[];
   };
 }
 
@@ -189,5 +193,8 @@ export function dailySummaryMessage(s: DailySummaryFacts, businessName: string):
     lines.push(`${e.title}${fns ? `: ${fns}` : ""}${team}`);
   }
   if (s.tomorrow.tasksDue) lines.push(`${plural(s.tomorrow.tasksDue, "task")} due`);
+  // `off` can be missing from an older API during a deploy.
+  const off = s.tomorrow.off ?? [];
+  if (off.length) lines.push(`Off: ${off.map((n) => n.split(" ")[0]).join(", ")}`);
   return lines.join("\n");
 }
