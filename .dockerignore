@@ -4,9 +4,10 @@
 **/.turbo
 **/.vercel
 **/*.tsbuildinfo
+# No "!" exceptions here: with one, Docker walks into ignored folders too, and the
+# private backups folder on the server can't be read, which fails the build.
 **/.env
 **/.env.*
-!**/.env.example
 .git
 .github
 docs
