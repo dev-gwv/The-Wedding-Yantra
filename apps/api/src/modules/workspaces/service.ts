@@ -1,4 +1,4 @@
-import { can, type Role } from "@wedding-yantra/core";
+import { eventScope, type Role } from "@wedding-yantra/core";
 import type { HomeSummary, StarterPack, UpdateWorkspaceInput, Workspace } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
@@ -8,6 +8,7 @@ import { installSalesDefaults } from "../sales/defaults.js";
 import { salesSummary } from "../sales/leads.js";
 import { listEvents } from "../bookings/events.js";
 import { homeMoney } from "../money/dues.js";
+import { homeTasks, installChecklist } from "../tasks/service.js";
 
 interface WorkspaceRow {
   id: string;
@@ -24,6 +25,7 @@ interface WorkspaceRow {
   upi_id: string | null;
   bill_prefix: string;
   bill_terms: string | null;
+  timezone: string;
   created_at: Date;
 }
 
@@ -42,6 +44,7 @@ const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
   upiId: row.upi_id,
   billPrefix: row.bill_prefix,
   billTerms: row.bill_terms,
+  timezone: row.timezone,
   createdAt: row.created_at.toISOString(),
   role,
 });
@@ -50,7 +53,7 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
             bt.icon AS business_type_icon, w.city,
-            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.created_at
+            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.timezone, w.created_at
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -88,6 +91,7 @@ export async function createWorkspace(
       userId,
     ]);
     await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack });
+    await installChecklist(tx, workspaceId, type.rows[0].starter_pack);
     await logActivity(tx, {
       workspaceId,
       actorUserId: userId,
@@ -200,13 +204,14 @@ export async function getHome(db: Db, ctx: MemberContext): Promise<HomeSummary> 
     sales: await salesSummary(db, ctx),
     upcomingEvents: await upcomingEvents(db, ctx),
     money: await homeMoney(db, ctx),
+    tasks: await homeTasks(db, ctx),
     starterPack: row.starter_pack,
   };
 }
 
-/** Confirmed events with a function in the next 14 days (business time zone). */
+/** Confirmed events with a function in the next 14 days (business time zone). Freelancers see the ones they're on. */
 async function upcomingEvents(db: Db, ctx: MemberContext) {
-  if (!can(ctx.role, "events.view")) return [];
+  if (eventScope(ctx.role) === "none") return [];
   const { rows } = await db.query<{ today: string; until: string }>(
     `SELECT (now() AT TIME ZONE timezone)::date::text AS today,
             ((now() AT TIME ZONE timezone)::date + 14)::text AS until

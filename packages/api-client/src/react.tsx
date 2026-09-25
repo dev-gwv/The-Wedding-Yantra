@@ -9,6 +9,11 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  SaveChecklistInput,
+  SaveEventTeamInput,
+  TaskInput,
+  TaskListQuery,
+  UpdateTaskInput,
   ExpenseInput,
   ExpenseListQuery,
   ReviewExpenseInput,
@@ -95,6 +100,11 @@ export const queryKeys = {
   expenses: (id: string, query: object) => ["workspace", id, "bookings", "expenses", query] as const,
   expenseMonth: (id: string, month: string) => ["workspace", id, "bookings", "expense-month", month] as const,
   monthReport: (id: string, month: string) => ["workspace", id, "bookings", "report", month] as const,
+  /** Tasks and My Day; invalidate this after any task change. */
+  work: (id: string) => ["workspace", id, "work"] as const,
+  tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
+  myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
+  checklist: (id: string) => ["workspace", id, "checklist"] as const,
 };
 
 interface QueryOpts {
@@ -656,4 +666,81 @@ export function useDeleteExpense(workspaceId: string) {
 export function useMonthReport(workspaceId: string, month: string, enabled = true) {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.monthReport(workspaceId, month), queryFn: () => api.reports.month(workspaceId, month), enabled });
+}
+
+// ---- Tasks, checklist and event team ---------------------------------------------
+
+export function useTasks(workspaceId: string, query: TaskListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.tasks(workspaceId, query), queryFn: () => api.tasks.list(workspaceId, query), enabled });
+}
+
+export function useMyDay(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.myDay(workspaceId), queryFn: () => api.tasks.myDay(workspaceId), enabled });
+}
+
+/** Refreshes task lists, My Day and Home's counts after a task change. */
+function useTaskMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useCreateTask(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, (input: TaskInput) => api.tasks.create(workspaceId, input));
+}
+
+export function useUpdateTask(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, ({ id, ...input }: UpdateTaskInput & { id: string }) => api.tasks.update(workspaceId, id, input));
+}
+
+export function useSetTaskDone(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, ({ id, done }: { id: string; done: boolean }) => api.tasks.setDone(workspaceId, id, done));
+}
+
+export function useDeleteTask(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, (id: string) => api.tasks.remove(workspaceId, id));
+}
+
+export function useChecklist(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.checklist(workspaceId), queryFn: () => api.checklist.get(workspaceId), enabled });
+}
+
+export function useSaveChecklist(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveChecklistInput) => api.checklist.save(workspaceId, input),
+    onSuccess: (data) => qc.setQueryData(queryKeys.checklist(workspaceId), data),
+  });
+}
+
+export function useApplyChecklist(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, (eventId: string) => api.checklist.applyToEvent(workspaceId, eventId));
+}
+
+/** Who works an event. Changes what freelancers see, so events and My Day refresh too. */
+export function useSaveEventTeam(workspaceId: string, eventId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveEventTeamInput) => api.eventTeam.save(workspaceId, eventId, input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.bookings(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
 }

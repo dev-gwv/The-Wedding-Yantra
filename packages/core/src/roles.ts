@@ -44,6 +44,10 @@ export const PERMISSIONS = [
   "expenses.submit",
   /** Approve or reject expenses, and change anyone's */
   "expenses.approve",
+  /** Give tasks to anyone, edit the checklist, choose who works each event */
+  "tasks.manage",
+  /** See and finish your own tasks, add tasks for yourself */
+  "tasks.work",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -70,9 +74,12 @@ const GRANTS: Record<Role, readonly Permission[]> = {
     "payments.record",
     "expenses.submit",
     "expenses.approve",
+    "tasks.manage",
+    "tasks.work",
   ],
-  staff: ["members.view", "leads.work", "events.view", "expenses.submit"],
-  freelancer: [],
+  staff: ["members.view", "leads.work", "events.view", "expenses.submit", "tasks.work"],
+  // Freelancers see only the events they're booked on (see eventScope) and their tasks.
+  freelancer: ["tasks.work"],
   accountant: ["members.view", "finance.view", "clients.view", "quotes.view", "events.view"],
 };
 
@@ -104,5 +111,15 @@ export function canManageMember(actor: Role, target: Role): boolean {
 export function leadScope(role: Role): "all" | "own" | "none" {
   if (can(role, "leads.view_all")) return "all";
   if (can(role, "leads.work")) return "own";
+  return "none";
+}
+
+/**
+ * Which events someone sees: all of them, only the ones they're on the team for
+ * (freelancers), or none.
+ */
+export function eventScope(role: Role): "all" | "own" | "none" {
+  if (can(role, "events.view")) return "all";
+  if (can(role, "tasks.work")) return "own";
   return "none";
 }

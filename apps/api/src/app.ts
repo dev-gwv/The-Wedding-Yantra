@@ -15,6 +15,7 @@ import { moneyRoutes } from "./modules/money/routes.js";
 import { reportRoutes } from "./modules/reports/routes.js";
 import { bookingRoutes } from "./modules/bookings/routes.js";
 import { salesRoutes } from "./modules/sales/routes.js";
+import { taskRoutes } from "./modules/tasks/routes.js";
 import { teamRoutes } from "./modules/team/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/routes.js";
 
@@ -93,6 +94,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       moneyRoutes(v1, { db, files });
       fileRoutes(v1, { db, files });
       reportRoutes(v1, { db });
+      taskRoutes(v1, { db });
     },
     { prefix: "/api/v1" },
   );

@@ -149,9 +149,10 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
     business_type_id: string;
     business_type_name: string;
     business_type_icon: string;
+    timezone: string;
     role: Me["workspaces"][number]["role"];
   }>(
-    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, m.role
+    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, m.role
        FROM memberships m
        JOIN workspaces w ON w.id = m.workspace_id AND w.deleted_at IS NULL
        JOIN business_types bt ON bt.id = w.business_type_id
@@ -167,6 +168,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       businessTypeId: r.business_type_id,
       businessTypeName: r.business_type_name,
       businessTypeIcon: r.business_type_icon,
+      timezone: r.timezone,
       role: r.role,
     })),
   };

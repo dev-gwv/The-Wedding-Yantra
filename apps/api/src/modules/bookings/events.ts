@@ -1,4 +1,4 @@
-import { can, leadScope, quoteNumber } from "@wedding-yantra/core";
+import { can, eventScope, leadScope, quoteNumber } from "@wedding-yantra/core";
 import type {
   CalendarEntry,
   EventClash,
@@ -6,6 +6,7 @@ import type {
   EventStatus,
   EventSummary,
   EventType,
+  TeamMember,
   WeddingEvent,
 } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
@@ -13,9 +14,18 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 
+/** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
-  if (!can(ctx.role, "events.view")) throw forbidden("Your role doesn't include events");
+  if (eventScope(ctx.role) === "none") throw forbidden("Your role doesn't include events");
 };
+const requireViewAll = (ctx: MemberContext) => {
+  if (eventScope(ctx.role) !== "all") throw forbidden("Your role doesn't include all events");
+};
+/** SQL to AND in: only events this person may see. */
+function scopeSql(ctx: MemberContext, add: (v: unknown) => string, alias = "e"): string {
+  if (eventScope(ctx.role) === "all") return "TRUE";
+  return `${alias}.id IN (SELECT event_id FROM event_team WHERE user_id = ${add(ctx.userId)})`;
+}
 const requireManage = (ctx: MemberContext) => {
   if (!can(ctx.role, "events.manage")) throw forbidden("Only the owner or a manager can change events");
 };
@@ -62,6 +72,8 @@ export interface EventFilters {
   to?: string;
   status?: EventStatus;
   clientId?: string;
+  /** Only events this person is on the team for */
+  teamUserId?: string;
   limit?: number;
 }
 
@@ -73,8 +85,10 @@ export async function listEvents(db: Queryable, ctx: MemberContext, filters: Eve
     params.push(v);
     return `$${params.length}`;
   };
+  where.push(scopeSql(ctx, add));
   if (filters.status) where.push(`e.status = ${add(filters.status)}`);
   if (filters.clientId) where.push(`e.client_id = ${add(filters.clientId)}`);
+  if (filters.teamUserId) where.push(`e.id IN (SELECT event_id FROM event_team WHERE user_id = ${add(filters.teamUserId)})`);
   const having: string[] = [];
   // An event is "in range" when any of its functions falls in it. Events without dates
   // yet are always shown so they aren't forgotten.
@@ -114,7 +128,7 @@ export async function findClashes(
 }
 
 export async function clashesFor(db: Db, ctx: MemberContext, dates: string[], excludeEventId?: string) {
-  requireView(ctx);
+  requireViewAll(ctx);
   return findClashes(db, ctx.workspaceId, dates, excludeEventId);
 }
 
@@ -145,6 +159,10 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
   );
   const r = rows[0];
   if (!r) throw notFound("This event");
+  const team = await eventTeam(db, eventId);
+  const all = eventScope(ctx.role) === "all";
+  // Freelancers see only the events they're on, and not the client's number.
+  if (!all && !team.some((m) => m.userId === ctx.userId)) throw notFound("This event");
 
   const fns = await db.query<{
     id: string;
@@ -193,10 +211,11 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
     leadId: opensLead ? r.live_lead_id : null,
     quoteId: quote?.id ?? null,
     quoteNumber: quote ? quoteNumber(quote.number) : null,
-    clientPhone: r.client_phone,
+    clientPhone: all ? r.client_phone : null,
     functions,
+    team,
     clashes:
-      r.status === "cancelled"
+      r.status === "cancelled" || !all
         ? []
         : await findClashes(
             db,
@@ -362,6 +381,8 @@ export async function deleteEvent(db: Db, ctx: MemberContext, eventId: string): 
   );
   if (!rowCount) throw notFound("This event");
   await db.query(`UPDATE quotes SET event_id = NULL WHERE event_id = $1`, [eventId]);
+  // Its checklist and tasks go with it.
+  await db.query(`UPDATE tasks SET deleted_at = now() WHERE event_id = $1 AND deleted_at IS NULL`, [eventId]);
 }
 
 /** Every function in a month, for the calendar. `month` is YYYY-MM. */
@@ -370,6 +391,7 @@ export async function calendar(db: Db, ctx: MemberContext, month: string): Promi
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
     throw new AppError(400, "VALIDATION_ERROR", "Month should look like 2026-11", { month: "Pick a month" });
   }
+  const params: unknown[] = [ctx.workspaceId, month];
   const { rows } = await db.query<{
     date: string;
     event_id: string;
@@ -386,8 +408,9 @@ export async function calendar(db: Db, ctx: MemberContext, month: string): Promi
       WHERE f.workspace_id = $1
         AND f.date >= to_date($2, 'YYYY-MM')
         AND f.date < to_date($2, 'YYYY-MM') + interval '1 month'
+        AND ${scopeSql(ctx, (v) => (params.push(v), `$${params.length}`))}
       ORDER BY f.date, f.start_time NULLS LAST, e.title`,
-    [ctx.workspaceId, month],
+    params,
   );
   return rows.map((r) => ({
     date: r.date,
@@ -398,4 +421,15 @@ export async function calendar(db: Db, ctx: MemberContext, month: string): Promi
     startTime: r.start_time,
     venue: r.venue,
   }));
+}
+
+/** Who works an event, with their role there and when they must reach. */
+export async function eventTeam(db: Queryable, eventId: string): Promise<TeamMember[]> {
+  const { rows } = await db.query<{ user_id: string; name: string | null; role_note: string | null; call_time: string | null }>(
+    `SELECT t.user_id, u.name, t.role_note, to_char(t.call_time, 'HH24:MI') AS call_time
+       FROM event_team t JOIN users u ON u.id = t.user_id
+      WHERE t.event_id = $1 ORDER BY t.call_time NULLS LAST, u.name`,
+    [eventId],
+  );
+  return rows.map((r) => ({ userId: r.user_id, name: r.name, roleNote: r.role_note, callTime: r.call_time }));
 }

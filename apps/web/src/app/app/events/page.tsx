@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatDate, localISODate } from "@wedding-yantra/core";
+import { can, eventScope, formatDate, localISODate } from "@wedding-yantra/core";
 import { useCalendar, useEvents } from "@wedding-yantra/api-client/react";
 import type { CalendarEntry, EventSummary } from "@wedding-yantra/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Lock, Plus } from "lucide-react";
@@ -23,7 +23,8 @@ function EventsScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const view = (["calendar", "past"].includes(params.get("view") ?? "") ? params.get("view") : "upcoming") as View;
-  const allowed = can(workspace.role, "events.view");
+  // Freelancers see the events they're booked on.
+  const allowed = eventScope(workspace.role) !== "none";
 
   if (!allowed) {
     return (
@@ -110,7 +111,9 @@ function ListView({ past }: { past: boolean }) {
         <EmptyState icon={CalendarDays} title={past ? "No past events yet" : "No upcoming events"}>
           {past
             ? "Events you've finished will be kept here."
-            : "When a client accepts a quote, the event appears here by itself. You can also add one yourself."}
+            : eventScope(workspace.role) === "own"
+              ? "When the owner puts you on an event's team, it shows here with the time to reach."
+              : "When a client accepts a quote, the event appears here by itself. You can also add one yourself."}
         </EmptyState>
       </Card>
     );

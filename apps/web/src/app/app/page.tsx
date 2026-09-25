@@ -1,7 +1,7 @@
 "use client";
 
 import { can, firstName, formatMoney, formatMoneyShort, greeting, leadScope, type Role } from "@wedding-yantra/core";
-import { useHome } from "@wedding-yantra/api-client/react";
+import { useHome, useMyDay } from "@wedding-yantra/api-client/react";
 import { UNIT_LABELS, type HomeSummary } from "@wedding-yantra/types";
 import {
   AlarmClock,
@@ -20,9 +20,10 @@ import {
 import { LeadCard } from "@/components/sales/lead-card";
 import { EventCard } from "@/components/bookings/event-card";
 import { DueRow } from "@/components/money/rows";
+import { MyDayCard, myDayHasContent } from "@/components/tasks/my-day";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import {
   Card,
@@ -74,34 +75,45 @@ export default function HomePage() {
 }
 
 function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon: string }) {
+  const { workspace } = useCurrentWorkspace();
   // Setup steps are the owner's and manager's job; others never see a to-do they can't do.
   const showSetup = can(role, "workspace.update") && home.setupDone < home.setupTotal;
+  const works = can(role, "tasks.work");
+  const myDay = useMyDay(workspace.id, works);
+  const day = myDay.data && myDayHasContent(myDay.data) ? myDay.data : null;
+  // `tasks` can be missing for a minute while a new web version waits on the API's deploy.
+  const teamLate = home.tasks?.teamOverdue ?? 0;
+  // Events already in "Your day" aren't listed twice.
+  const coming = home.upcomingEvents.filter((e) => !day?.events.some((d) => d.id === e.id));
 
   return (
     <div className="space-y-6">
       {showSetup && <SetupCard home={home} />}
 
       {home.money && home.money.pendingExpenses > 0 && (
-        <Link
-          href="/app/money?view=expenses"
-          className="flex items-center gap-3 rounded-2xl border border-sun-300/60 bg-cream px-4 py-3 font-semibold hover:border-sun-300"
-        >
-          <ReceiptText className="size-5 shrink-0 text-brand-strong" />
-          <span className="flex-1">
-            {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
-          </span>
-          <ChevronRight className="size-4 text-ink-subtle" />
-        </Link>
+        <Banner href="/app/money?view=expenses" icon={ReceiptText}>
+          {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
+        </Banner>
       )}
+      {teamLate > 0 && (
+        <Banner href="/app/tasks?view=team" icon={AlarmClock} tone="danger">
+          {teamLate} team task{teamLate === 1 ? " is" : "s are"} late
+        </Banner>
+      )}
+
+      {day && <MyDayCard day={day} />}
 
       {leadScope(role) !== "none" ? (
         <Today home={home} />
       ) : (
-        <Card>
-          <EmptyState icon={Inbox} title="Nothing needs you today">
-            Your events and tasks will show up here, so you know what to do first each morning.
-          </EmptyState>
-        </Card>
+        !day &&
+        !(works && myDay.isPending) && (
+          <Card>
+            <EmptyState icon={Inbox} title="Nothing needs you today">
+              Your events and tasks will show up here, so you know what to do first each morning.
+            </EmptyState>
+          </Card>
+        )
       )}
 
       {home.money && home.money.toCollect > 0 && (
@@ -126,7 +138,7 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
         </section>
       )}
 
-      {home.upcomingEvents.length > 0 && (
+      {coming.length > 0 && (
         <section>
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="font-display text-lg font-extrabold">Coming up in two weeks</h2>
@@ -135,15 +147,33 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
             </Link>
           </div>
           <div className="space-y-3">
-            {home.upcomingEvents.map((e) => (
+            {coming.map((e) => (
               <EventCard key={e.id} event={e} />
             ))}
           </div>
         </section>
       )}
 
-      <StarterPack home={home} icon={icon} />
+      {/* What the business started with: for the people who set it up and change it. */}
+      {can(role, "workspace.update") && <StarterPack home={home} icon={icon} />}
     </div>
+  );
+}
+
+/** One line that needs someone's attention, with a way straight to it. */
+function Banner({ href, icon: Icon, tone, children }: { href: string; icon: LucideIcon; tone?: "danger"; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border px-4 py-3 font-semibold",
+        tone === "danger" ? "border-danger/25 bg-danger-soft text-danger hover:border-danger/50" : "border-sun-300/60 bg-cream hover:border-sun-300",
+      )}
+    >
+      <Icon className={cn("size-5 shrink-0", tone === "danger" ? "text-danger" : "text-brand-strong")} />
+      <span className="flex-1">{children}</span>
+      <ChevronRight className="size-4 text-ink-subtle" />
+    </Link>
   );
 }
 
@@ -151,8 +181,8 @@ function HomeContent({ home, role, icon }: { home: HomeSummary; role: Role; icon
 function Today({ home }: { home: HomeSummary }) {
   const { overdue, dueToday, newLeads, openValue, due } = home.sales;
   const tiles: { label: string; value: string; icon: LucideIcon; tone?: "danger" }[] = [
-    { label: "Overdue", value: String(overdue), icon: AlarmClock, tone: overdue > 0 ? "danger" : undefined },
-    { label: "Due today", value: String(dueToday), icon: BellRing },
+    { label: "Follow-ups late", value: String(overdue), icon: AlarmClock, tone: overdue > 0 ? "danger" : undefined },
+    { label: "Follow-ups today", value: String(dueToday), icon: BellRing },
     { label: "New enquiries", value: String(newLeads), icon: Inbox },
     { label: "In the pipeline", value: formatMoneyShort(openValue), icon: IndianRupee },
   ];

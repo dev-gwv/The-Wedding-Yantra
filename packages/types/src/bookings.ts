@@ -3,6 +3,7 @@ import { personName, phone } from "./auth.js";
 import { SERVICE_UNITS, type ServiceUnit } from "./business-types.js";
 import { optionalText } from "./common.js";
 import { EVENT_TYPES, type EventType } from "./sales.js";
+import type { TeamMember } from "./tasks.js";
 
 // ---------------------------------------------------------------------------
 // Service catalogue (price list)
@@ -237,6 +238,8 @@ export interface WeddingEvent extends EventSummary {
   clientPhone: string | null;
   functions: EventFunction[];
   clashes: EventClash[];
+  /** Who works this event */
+  team: TeamMember[];
   createdAt: string;
 }
 

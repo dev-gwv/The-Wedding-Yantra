@@ -8,7 +8,9 @@ import {
   Building2,
   Check,
   ChevronRight,
+  ClipboardList,
   GitBranch,
+  ListChecks,
   LogOut,
   MessageCircle,
   Package,
@@ -72,11 +74,21 @@ export default function MorePage() {
         </>
       )}
 
+      {can(workspace.role, "tasks.work") && (
+        <>
+          <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Work</h2>
+          <Card className="mb-6 divide-y divide-line overflow-hidden">
+            <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
+            {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
+              <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
+            )}
+            {can(workspace.role, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
+          </Card>
+        </>
+      )}
+
       <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
-        {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
-          <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
-        )}
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         <Row href="/app/team" icon={Users} label="Team" />
         {me.workspaces.length > 1 && (

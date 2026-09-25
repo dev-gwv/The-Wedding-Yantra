@@ -12,6 +12,7 @@ import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
+import { EventTasks, EventTeamCard } from "@/components/tasks/event-work";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/button";
 import { Card, Notice, Pill } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
@@ -161,6 +162,10 @@ function EventView({ event }: { event: WeddingEvent }) {
         )}
       </section>
 
+      <EventTeamCard event={event} />
+
+      <EventTasks event={event} />
+
       <EventMoneyCard event={event} />
 
       <EventExpenses eventId={event.id} />
@@ -171,10 +176,17 @@ function EventView({ event }: { event: WeddingEvent }) {
             {/* Buttons drop below the name on a phone instead of squeezing it */}
             <div className="flex min-w-48 flex-1 items-center gap-3">
               <UserRound className="size-5 shrink-0 text-ink-muted" />
-              <Link href={`/app/clients/${event.clientId}`} className="min-w-0 font-bold hover:text-brand-strong">
-                {event.clientName}
-                {event.clientPhone && <span className="block text-sm font-normal text-ink-muted tabular">{formatPhone(event.clientPhone)}</span>}
-              </Link>
+              {can(workspace.role, "clients.view") ? (
+                <Link href={`/app/clients/${event.clientId}`} className="min-w-0 font-bold hover:text-brand-strong">
+                  {event.clientName}
+                  {event.clientPhone && <span className="block text-sm font-normal text-ink-muted tabular">{formatPhone(event.clientPhone)}</span>}
+                </Link>
+              ) : (
+                <p className="min-w-0 font-bold">
+                  {event.clientName}
+                  {event.clientPhone && <span className="block text-sm font-normal text-ink-muted tabular">{formatPhone(event.clientPhone)}</span>}
+                </p>
+              )}
             </div>
             {event.clientPhone && (
               <div className="flex gap-2">

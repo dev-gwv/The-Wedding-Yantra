@@ -60,7 +60,7 @@ export interface CallResult<T = Json> {
 
 export async function call<T = Json>(
   app: FastifyInstance,
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   options: { token?: string; body?: unknown } = {},
 ): Promise<CallResult<T>> {

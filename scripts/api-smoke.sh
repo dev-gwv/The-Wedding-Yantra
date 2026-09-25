@@ -2,7 +2,8 @@
 # Smoke-tests the BUILT API (apps/api/dist) against a real Postgres at $DATABASE_URL:
 #   1. first start applies every migration; health, business types and the full
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
-#      -> bill -> payment -> bill photo -> expense -> monthly report flow work over real HTTP
+#      -> bill -> payment -> bill photo -> expense -> monthly report -> checklist and tasks
+#      flow work over real HTTP
 #   2. second start applies nothing (migrations are idempotent) and data is intact
 # Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
 set -euo pipefail
@@ -56,7 +57,8 @@ sign_in() {
 echo "== first start (fresh database)"
 start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
-  0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses; do
+  0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
+  0008_tasks_and_team; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -123,6 +125,16 @@ expect "the monthly report adds up the bill and the payment" '.success and .data
   "$(api GET "/api/v1/workspaces/$WS_ID/reports/month?month=$MONTH" "" "$TOKEN")"
 expect "the bills spreadsheet for the CA is ready" '.success and .data.rows == 1 and (.data.content | startswith("\ufeffBill date,Bill number"))' \
   "$(api GET "/api/v1/workspaces/$WS_ID/exports?kind=bills&month=$MONTH" "" "$TOKEN")"
+expect "the trade's checklist is installed" '.success and (.data | length) >= 3' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/checklist" "" "$TOKEN")"
+expect "the checklist becomes tasks on the event" '.success and (.data | length) >= 3 and (.data | all(.fromChecklist))' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/checklist" "" "$TOKEN")"
+TASK="$(api POST "/api/v1/workspaces/$WS_ID/tasks" '{"title":"Smoke task","priority":"high"}' "$TOKEN")"
+expect "a task can be added" '.success and .data.done == false' "$TASK"
+expect "and ticked off" '.success and .data.done == true' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$TASK" | jq -r '.data.id')/done" '{"done":true}' "$TOKEN")"
+expect "My Day answers" '.success and (.data.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/my-day" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

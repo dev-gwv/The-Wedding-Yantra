@@ -276,7 +276,8 @@ describe("events and calendar", () => {
 
     // Staff and accountants can see events; only owners and managers change them.
     expect((await call(t.app, "PATCH", `/workspaces/${ws}/events/${first.body.data.id}`, { token: staff, body: { title: "X Y" } })).status).toBe(403);
-    expect((await call(t.app, "GET", `/workspaces/${ws}/events`, { token: freelancer })).status).toBe(403);
+    // Freelancers see only the events they're booked on: none yet.
+    expect((await call(t.app, "GET", `/workspaces/${ws}/events`, { token: freelancer })).body.data).toEqual([]);
     expect((await call(t.app, "GET", `/workspaces/${ws}/quotes`, { token: staff })).status).toBe(403);
     expect((await call(t.app, "GET", `/workspaces/${ws}/quotes`, { token: accountant })).status).toBe(200);
 

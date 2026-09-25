@@ -1,4 +1,13 @@
 import type {
+  ChecklistItem,
+  MyDay,
+  SaveChecklistInput,
+  SaveEventTeamInput,
+  TaskInput,
+  TaskItem,
+  TaskListQuery,
+  TeamMember,
+  UpdateTaskInput,
   ExportFile,
   ExportKind,
   MonthReport,
@@ -304,6 +313,29 @@ export function createApiClient(options: ApiClientOptions) {
       /** A month's bills, payments or expenses as a spreadsheet (CSV) */
       export: (workspaceId: string, kind: ExportKind, month: string) =>
         request<ExportFile>("GET", `${ws(workspaceId)}/exports${qs({ kind, month })}`),
+    },
+    tasks: {
+      list: (workspaceId: string, query: TaskListQuery = {}) => request<TaskItem[]>("GET", `${ws(workspaceId)}/tasks${qs(query)}`),
+      create: (workspaceId: string, input: TaskInput) => request<TaskItem>("POST", `${ws(workspaceId)}/tasks`, input),
+      update: (workspaceId: string, id: string, input: UpdateTaskInput) =>
+        request<TaskItem>("PATCH", `${ws(workspaceId)}/tasks/${encodeURIComponent(id)}`, input),
+      setDone: (workspaceId: string, id: string, done: boolean) =>
+        request<TaskItem>("POST", `${ws(workspaceId)}/tasks/${encodeURIComponent(id)}/done`, { done }),
+      remove: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/tasks/${encodeURIComponent(id)}`),
+      /** Your tasks for today and the week, and the events you're working */
+      myDay: (workspaceId: string) => request<MyDay>("GET", `${ws(workspaceId)}/my-day`),
+    },
+    checklist: {
+      get: (workspaceId: string) => request<ChecklistItem[]>("GET", `${ws(workspaceId)}/checklist`),
+      save: (workspaceId: string, input: SaveChecklistInput) => request<ChecklistItem[]>("PUT", `${ws(workspaceId)}/checklist`, input),
+      /** Adds the checklist to an event as dated tasks; steps already there are skipped */
+      applyToEvent: (workspaceId: string, eventId: string) =>
+        request<TaskItem[]>("POST", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/checklist`),
+    },
+    eventTeam: {
+      save: (workspaceId: string, eventId: string, input: SaveEventTeamInput) =>
+        request<TeamMember[]>("PUT", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/team`, input),
     },
     invitations: {
       preview: (token: string) => request<InvitationPreview>("GET", `/invitations/${encodeURIComponent(token)}`),

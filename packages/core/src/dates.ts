@@ -87,3 +87,74 @@ export function followUpPresets(now: Date = new Date()): { label: string; at: Da
   if (now.getHours() < 17) presets.unshift({ label: "This evening", at: at(0, 18) });
   return presets;
 }
+
+const utcDay = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return Date.UTC(y!, m! - 1, d!);
+};
+
+/**
+ * Today's date (`YYYY-MM-DD`) in a time zone, such as the business's, moved by `days` if given.
+ * Apps use it so their "today" matches the API's, whatever the device's own clock says.
+ */
+export function todayIn(timeZone: string, now: Date = new Date(), days = 0): string {
+  let today: string;
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+        .formatToParts(now)
+        .map((p) => [p.type, p.value]),
+    );
+    today = `${parts.year}-${parts.month}-${parts.day}`;
+  } catch {
+    // An unknown zone: fall back to the device's own date.
+    return localISODate(now, days);
+  }
+  return days ? new Date(utcDay(today) + days * 86_400_000).toISOString().slice(0, 10) : today;
+}
+
+/** Whole days from one calendar date (`2026-11-14`) to another. Never shifted by time zones. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((utcDay(to) - utcDay(from)) / 86_400_000);
+}
+
+/**
+ * When a task is due, next to today (both `YYYY-MM-DD`):
+ * "Today", "Tomorrow", "Yesterday", "3 days late", "Mon 16 Nov".
+ */
+export function formatDueDay(dueDate: string, today: string): string {
+  const days = daysBetween(today, dueDate);
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days === -1) return "Yesterday";
+  if (days < 0) return `${-days} days late`;
+  const d = new Date(utcDay(dueDate));
+  const label = `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  return dueDate.slice(0, 4) === today.slice(0, 4) ? label : `${label} ${dueDate.slice(0, 4)}`;
+}
+
+/** A 24-hour time as people say it: `18:30` -> `6:30 pm`, `09:00` -> `9 am`. */
+export function formatClock(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h === undefined || m === undefined || Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  return clock(new Date(2000, 0, 1, h, m));
+}
+
+/**
+ * Starting days for a trade's checklist, so its steps don't all fall on one day. Steps
+ * before the event run in order from a week before to the day before; steps after run
+ * from the next day to a week after. Migration 0008 uses the same rule in SQL.
+ */
+export function checklistDays(items: readonly { when: "before" | "on_day" | "after" }[]): number[] {
+  const total = { before: 0, on_day: 0, after: 0 };
+  for (const i of items) total[i.when]++;
+  const seen = { before: 0, on_day: 0, after: 0 };
+  return items.map((i) => {
+    const k = seen[i.when]++;
+    const n = total[i.when];
+    if (i.when === "on_day") return 0;
+    if (n === 1) return i.when === "before" ? 3 : 2;
+    const step = (6 * k) / (n - 1);
+    return Math.round(i.when === "before" ? 7 - step : 1 + step);
+  });
+}

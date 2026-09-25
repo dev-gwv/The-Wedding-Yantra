@@ -11,6 +11,8 @@ export const workspaceSummary = z.object({
   businessTypeName: z.string(),
   /** Icon name for the kind of business, e.g. `camera`. */
   businessTypeIcon: z.string(),
+  /** The time zone the business's days are counted in, e.g. Asia/Kolkata */
+  timezone: z.string(),
   role,
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummary>;
@@ -83,6 +85,8 @@ export const workspace = z.object({
   upiId: z.string().nullable(),
   billPrefix: z.string(),
   billTerms: z.string().nullable(),
+  /** The time zone the business's days are counted in, e.g. Asia/Kolkata */
+  timezone: z.string(),
   createdAt: z.string(),
   /** The signed-in person's role in this business. */
   role,

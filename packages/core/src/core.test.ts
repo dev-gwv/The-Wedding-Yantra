@@ -91,7 +91,20 @@ describe("roles", () => {
   });
 });
 
-import { leadScope, renderTemplate } from "./index.js";
+import { eventScope, leadScope, renderTemplate } from "./index.js";
+
+describe("events and tasks", () => {
+  it("shows freelancers only the events they work on, and lets everyone but the accountant do tasks", () => {
+    expect(eventScope("owner")).toBe("all");
+    expect(eventScope("staff")).toBe("all");
+    expect(eventScope("freelancer")).toBe("own");
+    expect(eventScope("accountant")).toBe("all");
+    expect(can("freelancer", "tasks.work")).toBe(true);
+    expect(can("staff", "tasks.manage")).toBe(false);
+    expect(can("manager", "tasks.manage")).toBe(true);
+    expect(can("accountant", "tasks.work")).toBe(false);
+  });
+});
 
 describe("leads", () => {
   it("shows staff only their own leads and freelancers none", () => {
@@ -129,6 +142,46 @@ describe("follow-up times", () => {
   it("says how long ago things happened", () => {
     expect(timeAgo(new Date(2026, 10, 12, 8, 30).toISOString(), now)).toBe("2 hours ago");
     expect(timeAgo(new Date(2026, 10, 9, 10, 0).toISOString(), now)).toBe("3 days ago");
+  });
+});
+
+import { checklistDays, daysBetween, formatClock, formatDueDay, todayIn } from "./index.js";
+
+describe("due days and times", () => {
+  it("counts calendar days, across months and years", () => {
+    expect(daysBetween("2026-11-12", "2026-11-12")).toBe(0);
+    expect(daysBetween("2026-10-30", "2026-11-02")).toBe(3);
+    expect(daysBetween("2026-12-31", "2027-01-01")).toBe(1);
+    expect(daysBetween("2026-11-12", "2026-11-09")).toBe(-3);
+  });
+  it("says when a task is due, next to today", () => {
+    const today = "2026-11-12";
+    expect(formatDueDay("2026-11-12", today)).toBe("Today");
+    expect(formatDueDay("2026-11-13", today)).toBe("Tomorrow");
+    expect(formatDueDay("2026-11-11", today)).toBe("Yesterday");
+    expect(formatDueDay("2026-11-09", today)).toBe("3 days late");
+    expect(formatDueDay("2026-11-20", today)).toBe("Fri 20 Nov");
+    expect(formatDueDay("2027-01-04", today)).toBe("Mon 4 Jan 2027");
+  });
+  it("knows today in the business's time zone, whatever the device says", () => {
+    const lateNightUtc = new Date("2026-09-25T18:54:00Z"); // already the 26th in India
+    expect(todayIn("Asia/Kolkata", lateNightUtc)).toBe("2026-09-26");
+    expect(todayIn("UTC", lateNightUtc)).toBe("2026-09-25");
+    expect(todayIn("Asia/Kolkata", lateNightUtc, 6)).toBe("2026-10-02");
+    expect(todayIn("Not/AZone", new Date(2026, 0, 5, 12))).toBe("2026-01-05");
+  });
+  it("spreads a trade's checklist over the days around the event", () => {
+    const w = (...whens: ("before" | "on_day" | "after")[]) => checklistDays(whens.map((when) => ({ when })));
+    expect(w("before", "before", "before", "on_day", "on_day", "after", "after")).toEqual([7, 4, 1, 0, 0, 1, 7]);
+    expect(w("before", "on_day", "after", "after", "after", "after")).toEqual([3, 0, 1, 3, 5, 7]);
+    expect(w("after", "before", "before", "before", "before", "before")).toEqual([2, 7, 6, 4, 3, 1]);
+  });
+  it("reads times the way people say them", () => {
+    expect(formatClock("18:30")).toBe("6:30 pm");
+    expect(formatClock("09:00")).toBe("9 am");
+    expect(formatClock("00:15")).toBe("12:15 am");
+    expect(formatClock("12:00")).toBe("12 pm");
+    expect(formatClock("soon")).toBe("soon");
   });
 });
 

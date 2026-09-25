@@ -601,3 +601,47 @@ expenses as a spreadsheet that opens in Excel and Google Sheets.
 
 Phase 3 is complete. Next is Phase 4: team and accountability (tasks, checklists, My Day,
 KRAs, daily WhatsApp summary).
+
+---
+
+## 20. Built in Phase 4, part 1: tasks, event checklists and the team on each event
+
+**Every event gets its checklist.** Each business starts with its trade's steps, such as
+"Trial session done" or "Kit packed and checked".
+- **The dates are worked out.** Steps before the event are spread from a week before down to
+  the day before, and steps after run from the next day to a week after. The owner changes
+  any of it in **More → Event checklist**.
+- **One tap adds them.** "Add 7 steps" on an event makes each step a task, dated from the
+  event's functions. Pressing it again later only adds new steps. A step taken off an event
+  on purpose never comes back.
+
+**The team on each event.** The owner ticks who works it, with their role there
+("Lead artist") and when to reach (2 pm).
+- **Freelancers see only those events.** They don't see the client's number or the booking
+  value.
+- **Staff still see every event**, as before.
+
+**Tasks.**
+- **Giving tasks:** owners and managers give tasks to anyone, or leave an event's task to
+  "anyone on the event". Everyone else adds tasks for themselves.
+- **What a task holds:** a date, a time, an "urgent" flag, notes and an event.
+- **Who ticks it off:** whoever it's for, whoever added it, owners and managers, or anyone
+  on the event when it's for nobody.
+- **More → Tasks:** your tasks, sorted into late, today, tomorrow, this week and later.
+  Owners and managers also get a Team view, filtered by person.
+
+**Home.**
+- **"Your day" for the people doing the work:** the events they're on this week with the
+  time to reach, and what's late or due today, ticked off right there.
+- **Owners see "2 team tasks are late"** at the top.
+- **The sales tiles now say "Follow-ups late"** and "Follow-ups today", so they aren't
+  confused with tasks.
+
+**Days follow the business's time zone.** "Today" and "late" are counted in India time on
+the API and in every app, whatever the phone's clock says.
+
+**Also fixed.** The API image build on the server failed because the nightly photo backup
+made a private folder that Docker tried to read. Phase 3 part 3 went live after the fix.
+
+Next: Phase 4 part 2. KRA scores worked out from this data, an activity log, and a daily
+summary.

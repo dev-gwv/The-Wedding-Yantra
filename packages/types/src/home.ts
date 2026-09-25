@@ -39,5 +39,7 @@ export interface HomeSummary {
     /** Expenses the team sent that wait for approval (for those who approve) */
     pendingExpenses: number;
   } | null;
+  /** Your tasks, and the team's overdue ones for those who manage tasks */
+  tasks: { overdue: number; dueToday: number; teamOverdue: number | null };
   starterPack: StarterPack;
 }
