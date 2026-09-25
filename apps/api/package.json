@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ],
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
@@ -13,7 +14,8 @@
     "start": "node dist/index.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "migration:new": "tsx scripts/new-migration.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

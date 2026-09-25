@@ -54,6 +54,38 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api.weddingyantra.com
 
+  api-smoke:
+    name: API smoke test (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: wy
+          POSTGRES_PASSWORD: wy
+          POSTGRES_DB: wy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wy -d wy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@wedding-yantra/api...
+      - name: Migrations, health, bookings, restart idempotency
+        run: bash scripts/api-smoke.sh
+        env:
+          DATABASE_URL: postgres://wy:wy@127.0.0.1:5432/wy
+
   docker:
     name: API image & compose validation
     runs-on: ubuntu-latest

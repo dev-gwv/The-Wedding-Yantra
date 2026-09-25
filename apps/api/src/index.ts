@@ -8,6 +8,7 @@ import {
   type BookingStatus,
   type SystemHealth,
 } from "@wedding-yantra/types";
+import { runMigrations } from "./db/migrate.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -70,23 +71,8 @@ const toBooking = (row: BookingRow): Booking => ({
   createdAt: row.created_at.toISOString(),
 });
 
-const statusList = BOOKING_STATUSES.map((s) => `'${s}'`).join(", ");
-
-async function initSchema(): Promise<void> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS bookings (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      client_name   TEXT NOT NULL,
-      event_date    DATE NOT NULL,
-      venue         TEXT NOT NULL,
-      guest_count   INTEGER NOT NULL CHECK (guest_count >= 0),
-      status        TEXT NOT NULL DEFAULT 'inquiry' CHECK (status IN (${statusList})),
-      total_amount  NUMERIC(12, 2) NOT NULL DEFAULT 0,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS bookings_event_date_idx ON bookings (event_date);
-  `);
-
+// Schema lives in apps/api/migrations (applied by runMigrations at startup).
+async function seedDemoData(): Promise<void> {
   if (process.env.SEED_DEMO_DATA !== "true") return;
 
   const { rows } = await pool.query<{ count: string }>("SELECT count(*) FROM bookings");
@@ -221,10 +207,11 @@ app.addHook("onClose", async () => {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-async function connectWithRetry(attempts = 10, delayMs = 2_000): Promise<void> {
+// Only connectivity is retried; a failing migration aborts immediately.
+async function waitForDatabase(attempts = 10, delayMs = 2_000): Promise<void> {
   for (let i = 1; i <= attempts; i++) {
     try {
-      await initSchema();
+      await pool.query("SELECT 1");
       return;
     } catch (err) {
       if (i === attempts) throw err;
@@ -248,7 +235,9 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 process.once("SIGINT", () => void shutdown("SIGINT"));
 
 try {
-  await connectWithRetry();
+  await waitForDatabase();
+  await runMigrations(pool, app.log);
+  await seedDemoData();
   await app.listen({ port: PORT, host: HOST });
 } catch (err) {
   app.log.fatal({ err }, "failed to start");

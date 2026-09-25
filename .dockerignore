@@ -12,3 +12,5 @@
 docs
 infra
 apps/web
+backups
+**/backups

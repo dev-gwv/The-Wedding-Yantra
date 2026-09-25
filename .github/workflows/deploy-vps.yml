@@ -24,6 +24,8 @@ on:
       - "apps/api/**"
       - "packages/types/**"
       - "docker-compose.prod.yml"
+      - "infra/backup/**"
+      - "scripts/api-smoke.sh"
       - "pnpm-lock.yaml"
       - "package.json"
       - "pnpm-workspace.yaml"
@@ -50,6 +52,20 @@ jobs:
     name: Verify API builds
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: wy
+          POSTGRES_PASSWORD: wy
+          POSTGRES_DB: wy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wy -d wy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     outputs:
       configured: ${{ steps.secrets.outputs.configured }}
     steps:
@@ -72,6 +88,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run lint typecheck build --filter=@wedding-yantra/api...
+      - name: Smoke test against real Postgres (migrations must apply cleanly)
+        run: bash scripts/api-smoke.sh
+        env:
+          DATABASE_URL: postgres://wy:wy@127.0.0.1:5432/wy
 
   deploy:
     name: Deploy to VPS
@@ -141,32 +161,63 @@ jobs:
             || { echo "::error::Docker network '$PROXY_NETWORK' not found. Create it once: docker network create $PROXY_NETWORK"; exit 1; }
           $COMPOSE config --quiet
 
+          mkdir -p backups
+
+          wait_healthy() {
+            for i in $(seq 1 30); do
+              status="$(docker inspect -f '{{.State.Health.Status}}' wedding-yantra-api 2>/dev/null || echo missing)"
+              echo "health: $status ($i/30)"
+              [ "$status" = "healthy" ] && return 0
+              sleep 4
+            done
+            return 1
+          }
+
+          # Version currently running (image tag = commit SHA), used for rollback.
+          PREV_IMAGE="$(docker inspect -f '{{.Config.Image}}' wedding-yantra-api 2>/dev/null || true)"
+          PREV_VERSION="${PREV_IMAGE##*:}"
+          echo "current version: ${PREV_VERSION:-none}  ->  new version: $APP_VERSION"
+
           # ---- Build first, while the current API keeps serving ---------------
           export APP_VERSION
           $COMPOSE build --pull wedding-yantra-api
 
+          # ---- Backup right before rolling out (new migrations may run) -------
+          if [ "$(docker inspect -f '{{.State.Running}}' wedding-yantra-backup 2>/dev/null || true)" = "true" ]; then
+            $COMPOSE exec -T wedding-yantra-backup /bin/sh /scripts/backup.sh once \
+              || { echo "::error::Pre-deploy backup failed; aborting before touching the running API"; exit 1; }
+          else
+            echo "backup container not running yet (first deploy); skipping pre-deploy backup"
+          fi
+
           # ---- Roll out: recreates only containers whose image/config changed --
           # The DB is left running unless its definition changed.
-          $COMPOSE up -d --build --remove-orphans
+          $COMPOSE up -d --remove-orphans
 
-          # ---- Wait for the new API to report healthy -------------------------
-          for i in $(seq 1 30); do
-            status="$(docker inspect -f '{{.State.Health.Status}}' wedding-yantra-api 2>/dev/null || echo missing)"
-            echo "health: $status ($i/30)"
-            [ "$status" = "healthy" ] && break
-            if [ "$i" = 30 ]; then
-              echo "::error::wedding-yantra-api did not become healthy"
-              $COMPOSE ps
-              $COMPOSE logs --tail=100 wedding-yantra-api
-              exit 1
+          # ---- Health gate with automatic rollback ----------------------------
+          if ! wait_healthy; then
+            echo "::error::New version ${APP_VERSION:0:7} did not become healthy"
+            $COMPOSE logs --tail=100 wedding-yantra-api || true
+            if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$APP_VERSION" ] \
+               && docker image inspect "wedding-yantra-api:$PREV_VERSION" >/dev/null 2>&1; then
+              echo "::warning::Rolling back to ${PREV_VERSION:0:7}"
+              APP_VERSION="$PREV_VERSION" $COMPOSE up -d --no-build wedding-yantra-api
+              if wait_healthy; then
+                echo "::error::Deploy failed, rolled back: the API is running the previous version ${PREV_VERSION:0:7}. Fix the problem and push again."
+              else
+                echo "::error::Rollback to ${PREV_VERSION:0:7} is ALSO unhealthy; the API is down. Check the logs above."
+              fi
+            else
+              echo "::error::No previous image available to roll back to."
             fi
-            sleep 4
-          done
+            exit 1
+          fi
 
           # ---- Housekeeping: only images built by THIS project ----------------
-          docker image prune -af \
-            --filter "label=com.weddingyantra.project=wedding-yantra" \
-            --filter "until=168h" || true
+          # Keep the 3 newest API images (current + rollback targets), drop the rest.
+          docker images wedding-yantra-api --format '{{.Repository}}:{{.Tag}}' \
+            | tail -n +4 | xargs -r docker rmi >/dev/null 2>&1 || true
+          docker image prune -f --filter "label=com.weddingyantra.project=wedding-yantra" >/dev/null || true
 
           $COMPOSE ps
           REMOTE

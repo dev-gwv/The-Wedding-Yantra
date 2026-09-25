@@ -53,6 +53,37 @@ services:
           memory: 1g
     logging: *default-logging
 
+  # Daily pg_dump into ./backups (on the VPS: /opt/wedding-yantra/backups), 7-day retention.
+  # The deploy also runs `backup.sh once` here right before every rollout.
+  wedding-yantra-backup:
+    image: postgres:16-alpine
+    container_name: wedding-yantra-backup
+    restart: unless-stopped
+    init: true
+    depends_on:
+      wedding-yantra-db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/backup.sh"]
+    environment:
+      PGHOST: wedding-yantra-db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-20}
+      BACKUP_MINUTE_UTC: ${BACKUP_MINUTE_UTC:-0}
+    volumes:
+      - ./infra/backup/backup.sh:/scripts/backup.sh:ro
+      - ./backups:/backups
+    networks:
+      - wy-internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging: *default-logging
+
   wedding-yantra-api:
     build:
       context: .

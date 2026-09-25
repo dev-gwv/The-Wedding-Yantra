@@ -30,5 +30,10 @@ pnpm dev                   # web :3000, api :4000
   and waits for the health check to pass.
 - **Frontend**: Vercel Git integration, Root Directory `apps/web`.
 
+Backend deploys take a database backup first and **roll back automatically** if the new version
+is unhealthy. Database changes go in `apps/api/migrations`
+(`pnpm --filter @wedding-yantra/api migration:new <name>`; read
+[apps/api/migrations/README.md](apps/api/migrations/README.md) first). The database is backed up daily.
+
 See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for VPS setup and reverse-proxy options
 (NPM / Traefik / Caddy / host nginx).

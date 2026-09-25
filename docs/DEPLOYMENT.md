@@ -230,11 +230,32 @@ Create a GitHub **Environment** named `production` if you want a manual approval
 
 **About the API's own downtime:** the image is built while the old container keeps serving,
 then `up -d` swaps it. That's typically a 2–5 s gap for the API only. The DB is left alone
-unless its definition changed. If you later need true zero-downtime for the API, run two
-replicas behind the proxy or move to blue/green. The builds also use VPS CPU; if that ever
-bothers the other app, build in Actions, push to GHCR, and have the VPS `pull` instead.
+unless its definition changed. The builds also use VPS CPU; if that ever bothers the other
+apps, build in Actions, push to GHCR, and have the VPS `pull` instead.
 
-## 8. Operations cheat-sheet
+## 8. What every backend deploy does
+
+1. **Verify (GitHub):** lint, typecheck and build, then `scripts/api-smoke.sh` starts the API against
+   a throwaway Postgres. A broken migration fails **here**, before the server is touched.
+2. **Build** the new image on the VPS while the current API keeps serving.
+3. **Backup:** `wedding-yantra-backup` takes a `pg_dump`. If the backup fails, the deploy stops.
+4. **Roll out:** `up -d`. On start, the API applies pending migrations (`apps/api/migrations`).
+5. **Health gate:** wait up to 2 minutes for `healthy`.
+   **If it isn't healthy, the deploy rolls back automatically** to the previous image and fails
+   red, saying it rolled back. Migrations are *not* reversed, which is why they must be
+   backward-compatible (see `apps/api/migrations/README.md`).
+6. **Clean up:** keep the 3 newest API images (rollback targets) and remove older ones.
+
+## 9. Backups
+
+- `wedding-yantra-backup` dumps the DB **daily at 20:00 UTC (01:30 IST)**, when it starts, and
+  before every deploy. Files: `/opt/wedding-yantra/backups/wy-<UTC time>.dump` (`pg_dump` custom format).
+- Retention: the newest 3 are always kept; others are deleted after 7 days (`BACKUP_KEEP_DAYS`).
+- These backups live **on the same server**. They protect against bad migrations and mistakes,
+  not against losing the VPS. Copy one off the server now and then (see below), or add
+  off-site storage later.
+
+## 10. Operations cheat-sheet
 
 ```bash
 cd /opt/wedding-yantra
@@ -242,18 +263,28 @@ C="docker compose -p wedding-yantra -f docker-compose.prod.yml"
 
 $C ps
 $C logs -f --tail=200 wedding-yantra-api
-$C exec wedding-yantra-db psql -U "$(grep ^POSTGRES_USER= .env | cut -d= -f2)" wedding_yantra
+$C logs --tail=50 wedding-yantra-backup
+$C exec wedding-yantra-db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
 
-# Backup (to backups/, which deploys never delete)
-mkdir -p backups
-$C exec -T wedding-yantra-db pg_dump -U wedding_yantra wedding_yantra | gzip > backups/wy-$(date +%F).sql.gz
+# --- Backups ---------------------------------------------------------------
+$C exec wedding-yantra-backup ls -lh /backups              # list
+$C exec -T wedding-yantra-backup /bin/sh /scripts/backup.sh once   # take one now
 
-# Temporary DB access from your laptop via SSH tunnel (loopback 5433 only)
+# Copy a backup to your PC (run in PowerShell on your PC; use a name from the list above):
+#   scp root@<VPS_IP>:/opt/wedding-yantra/backups/wy-YYYYMMDDTHHMMSSZ.dump .
+# (Don't use `ssh ... cat > file` in Windows PowerShell 5.1: it corrupts binary files.)
+
+# Restore a backup (REPLACES current data). Stop the API first so nothing writes meanwhile:
+$C stop wedding-yantra-api
+$C exec -T wedding-yantra-backup sh -c   'pg_restore --clean --if-exists --no-owner -d "$PGDATABASE" /backups/wy-YYYYMMDDTHHMMSSZ.dump'
+$C start wedding-yantra-api
+
+# --- Manual rollback to an older version -----------------------------------
+docker images wedding-yantra-api                    # tags are commit SHAs (newest 3 kept)
+APP_VERSION=<full-sha> $C up -d --no-build wedding-yantra-api
+
+# --- Temporary DB access from your laptop via SSH tunnel (loopback 5433 only)
 docker compose -p wedding-yantra -f docker-compose.prod.yml -f docker-compose.db-access.yml up -d
 ssh -N -L 5433:127.0.0.1:5433 deploy@<VPS_HOST>
 # ...when finished, run the normal `up -d` again to drop the port.
-
-# Rollback to a previous image (tags are commit SHAs, kept for 7 days)
-docker images wedding-yantra-api
-APP_VERSION=<old-sha> $C up -d --no-build wedding-yantra-api
 ```
