@@ -11,6 +11,8 @@ import {
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type {
   NotificationPrefs,
+  RecogniseInput,
+  SavePointSettingsInput,
   TaskRepeatInput,
   SaveCustomFieldsInput,
   BillListQuery,
@@ -167,6 +169,10 @@ export const queryKeys = {
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
   /** Scores, the activity log and the daily summary: read-only views over everything. */
   scores: (id: string, month: string) => ["workspace", id, "review", "scores", month] as const,
+  /** Points live under work: finishing a task changes them. */
+  leaderboard: (id: string, month: string) => ["workspace", id, "work", "points", "board", month] as const,
+  ledger: (id: string, month: string, userId: string) => ["workspace", id, "work", "points", "ledger", month, userId] as const,
+  pointRules: (id: string) => ["workspace", id, "point-rules"] as const,
   activity: (id: string, userId: string) => ["workspace", id, "review", "activity", userId] as const,
   dailySummary: (id: string, date: string) => ["workspace", id, "review", "daily-summary", date] as const,
   billing: (id: string) => ["workspace", id, "billing"] as const,
@@ -1020,6 +1026,47 @@ export function useSaveEventTeam(workspaceId: string, eventId: string) {
 }
 
 // ---- Scores, activity log and the daily summary -----------------------------------
+
+export function useLeaderboard(workspaceId: string, month: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.leaderboard(workspaceId, month), queryFn: () => api.review.leaderboard(workspaceId, month) });
+}
+
+/** Someone's points this month; leave `userId` empty for your own. */
+export function useLedger(workspaceId: string, month: string, userId: string | null, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.ledger(workspaceId, month, userId ?? "me"),
+    queryFn: () => api.review.ledger(workspaceId, month, userId ?? undefined),
+    enabled,
+  });
+}
+
+export function usePointRules(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.pointRules(workspaceId), queryFn: () => api.review.pointRules(workspaceId) });
+}
+
+export function useSavePointRules(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SavePointSettingsInput) => api.review.savePointRules(workspaceId, input),
+    onSuccess: (settings) => {
+      qc.setQueryData(queryKeys.pointRules(workspaceId), settings);
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) });
+    },
+  });
+}
+
+export function useRecognise(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RecogniseInput) => api.review.recognise(workspaceId, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) }),
+  });
+}
 
 export function useScores(workspaceId: string, month: string, enabled = true) {
   const api = useApi();

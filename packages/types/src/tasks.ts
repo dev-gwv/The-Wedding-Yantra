@@ -381,6 +381,8 @@ export interface PeopleBoard {
     toCheck: number;
     doneThisWeek: number;
     offToday: boolean;
+    /** Points earned this month */
+    points: number;
   }[];
   totals: { late: number; dueToday: number; toCheck: number; stuck: number; doneThisWeek: number; unassigned: number };
 }

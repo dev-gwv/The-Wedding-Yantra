@@ -1,5 +1,6 @@
 import { eveningDigestText, morningDigestText, taskAlertText } from "@wedding-yantra/core";
 import type { Queryable } from "../../db.js";
+import { awardStreaks } from "../review/points.js";
 import { makeDueRepeats } from "../tasks/repeats.js";
 import { notify } from "./service.js";
 
@@ -12,6 +13,8 @@ import { notify } from "./service.js";
 
 /** Local times each job runs, and the latest it may still run after a restart. */
 export const SCHEDULE = {
+  /** Streak points for the seven days up to yesterday */
+  streak: { from: "00:10", until: "06:00" },
   morning: { from: "08:00", until: "11:00" },
   overdue: { from: "08:05", until: "12:00" },
   evening: { from: "19:00", until: "22:00" },
@@ -26,10 +29,12 @@ export interface ScheduleResult {
   morning: number;
   overdue: number;
   evening: number;
+  /** Streak points paid */
+  streak: number;
 }
 
 export async function runSchedule(db: Queryable, now: Date = new Date()): Promise<ScheduleResult> {
-  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), morning: 0, overdue: 0, evening: 0 };
+  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), morning: 0, overdue: 0, evening: 0, streak: 0 };
   const { rows } = await db.query<{ id: string; clock: string; today: string }>(
     `SELECT id, to_char($1::timestamptz AT TIME ZONE timezone, 'HH24:MI') AS clock, ($1::timestamptz AT TIME ZONE timezone)::date::text AS today
        FROM workspaces WHERE deleted_at IS NULL`,
@@ -42,6 +47,7 @@ export async function runSchedule(db: Queryable, now: Date = new Date()): Promis
       if (!(await claim(db, job, ws.id, ws.today))) continue;
       if (job === "morning") result.morning += await morning(db, ws.id, ws.today);
       else if (job === "overdue") result.overdue += await overdue(db, ws.id, ws.today);
+      else if (job === "streak") result.streak += await awardStreaks(db, ws.id, ws.today, now);
       else result.evening += await evening(db, ws.id, ws.today);
     }
   }

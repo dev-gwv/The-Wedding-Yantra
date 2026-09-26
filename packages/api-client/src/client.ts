@@ -56,6 +56,11 @@ import type {
   ChecklistItem,
   MyDay,
   NotificationList,
+  Leaderboard,
+  Ledger,
+  PointSettings,
+  RecogniseInput,
+  SavePointSettingsInput,
   NotificationPrefs,
   SaveChecklistInput,
   SaveEventTeamInput,
@@ -574,6 +579,13 @@ export function createApiClient(options: ApiClientOptions) {
     review: {
       /** Everyone's month for owners and managers; your own for everyone else */
       scores: (workspaceId: string, month: string) => request<TeamScores>("GET", `${ws(workspaceId)}/scores${qs({ month })}`),
+      /** The month's points, ranked, with your own place and what to do next */
+      leaderboard: (workspaceId: string, month: string) => request<Leaderboard>("GET", `${ws(workspaceId)}/points/leaderboard${qs({ month })}`),
+      /** How someone's points were earned: your own, or anyone's for owners and managers */
+      ledger: (workspaceId: string, month: string, userId?: string) => request<Ledger>("GET", `${ws(workspaceId)}/points/ledger${qs({ month, userId })}`),
+      pointRules: (workspaceId: string) => request<PointSettings>("GET", `${ws(workspaceId)}/points/rules`),
+      savePointRules: (workspaceId: string, input: SavePointSettingsInput) => request<PointSettings>("PUT", `${ws(workspaceId)}/points/rules`, input),
+      recognise: (workspaceId: string, input: RecogniseInput) => request<{ points: number }>("POST", `${ws(workspaceId)}/points/recognise`, input),
       activity: (workspaceId: string, query: ActivityQuery = {}) =>
         request<ActivityPage>("GET", `${ws(workspaceId)}/activity${qs(query)}`),
       dailySummary: (workspaceId: string, date?: string) => request<DailySummary>("GET", `${ws(workspaceId)}/daily-summary${qs({ date })}`),

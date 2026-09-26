@@ -5,6 +5,7 @@ import { useApi, useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  Award,
   Bell,
   Sun,
   Boxes,
@@ -106,7 +107,8 @@ export default function MorePage() {
             {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
               <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
             )}
-            <Row href="/app/scores" icon={Trophy} label={can(workspace.role, "team.review") ? "Team scores" : "My score"} />
+            <Row href="/app/scores" icon={Trophy} label={can(workspace.role, "team.review") ? "Team scores and points" : "My points and score"} />
+            {can(workspace.role, "workspace.update") && <Row href="/app/settings/points" icon={Award} label="Points rules" />}
             {can(workspace.role, "team.review") && <Row href="/app/summary" icon={MessageSquareText} label="Daily summary" />}
             {can(workspace.role, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
           </Card>

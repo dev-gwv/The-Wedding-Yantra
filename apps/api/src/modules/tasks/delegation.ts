@@ -6,6 +6,7 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { assertWorkspaceFile, toUploaded } from "../files/service.js";
 import { taskAlert } from "./alerts.js";
+import { awardFinished, awardMoved, awardSentBack } from "../review/points.js";
 import { loadTask, manages, taskEvent, toTask, type TaskRow } from "./service.js";
 
 /** Whether a finished task was on time: finished on or before its day, in the business's time zone. */
@@ -81,11 +82,13 @@ export async function moveTask(db: Db, ctx: MemberContext, id: string, input: { 
 
     const base = { workspaceId: ctx.workspaceId, actorUserId: ctx.userId, entityType: "task", entityId: id };
     if (to === "done") {
+      const late = await isLate(tx, id);
       await logActivity(tx, {
         ...base,
         action: from === "review" ? "task.approved" : "task.done",
-        meta: { title: row.title, eventId: row.event_id, dueDate: row.due_date, late: await isLate(tx, id), assigneeId: row.assignee_id },
+        meta: { title: row.title, eventId: row.event_id, dueDate: row.due_date, late, assigneeId: row.assignee_id },
       });
+      await awardFinished(tx, ctx, row, late);
       // Approved: tell whoever did it. Ticked off: tell whoever gave it.
       if (from === "review") await taskAlert(tx, ctx, "task.approved", row, [row.assignee_id]);
       else await taskAlert(tx, ctx, "task.done", row, [row.created_by]);
@@ -150,9 +153,10 @@ export async function reviewTask(db: Db, ctx: MemberContext, id: string, input: 
     if (!r.manages && !r.isGiver) throw forbidden("Only whoever gave this task can check it");
     if (row.status !== "review") throw new AppError(409, "NOT_HANDED_IN", "Nothing handed in to check yet");
     const late = await isLate(tx, id);
-    await tx.query(
+    const decided = await tx.query<{ id: string }>(
       `UPDATE task_submissions SET decision = $2, decided_by = $3, decided_at = now(), reason = $4
-        WHERE id = (SELECT id FROM task_submissions WHERE task_id = $1 AND decision IS NULL ORDER BY created_at DESC LIMIT 1)`,
+        WHERE id = (SELECT id FROM task_submissions WHERE task_id = $1 AND decision IS NULL ORDER BY created_at DESC LIMIT 1)
+        RETURNING id`,
       [id, input.approve ? "approved" : "sent_back", ctx.userId, input.reason ?? null],
     );
     if (input.approve) {
@@ -164,6 +168,8 @@ export async function reviewTask(db: Db, ctx: MemberContext, id: string, input: 
       // Not finished after all: the clock runs until it's handed in again.
       await tx.query(`UPDATE tasks SET status = 'doing', completed_at = NULL, revisions = revisions + 1 WHERE id = $1`, [id]);
     }
+    if (input.approve) await awardFinished(tx, ctx, row, late);
+    else if (decided.rows[0]) await awardSentBack(tx, ctx, row, decided.rows[0].id);
     await taskEvent(tx, id, ctx.userId, input.approve ? "approved" : "sent_back", { reason: input.reason ?? null });
     await logActivity(tx, {
       workspaceId: ctx.workspaceId,
@@ -201,6 +207,7 @@ export async function snoozeTask(db: Db, ctx: MemberContext, id: string, input: 
     ]);
     await taskEvent(tx, id, ctx.userId, "deadline_moved", { from: row.due_date, to: input.to, reason: input.reason ?? null });
     if (row.due_date) {
+      await awardMoved(tx, ctx, row);
       await logActivity(tx, {
         workspaceId: ctx.workspaceId,
         actorUserId: ctx.userId,
@@ -459,6 +466,7 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
     to_check: number;
     done_week: number;
     off_today: boolean;
+    points: number;
     today: string;
   }>(
     `WITH today AS (SELECT (now() AT TIME ZONE timezone)::date AS d FROM workspaces WHERE id = $1)
@@ -470,7 +478,10 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
             count(t.id) FILTER (WHERE t.status = 'review')::int AS to_check,
             count(t.id) FILTER (WHERE t.status = 'done' AND (t.done_at AT TIME ZONE w.timezone)::date > today.d - 7)::int AS done_week,
             EXISTS (SELECT 1 FROM time_off o WHERE o.workspace_id = m.workspace_id AND o.user_id = m.user_id AND o.deleted_at IS NULL
-                     AND today.d BETWEEN o.start_date AND o.end_date) AS off_today
+                     AND today.d BETWEEN o.start_date AND o.end_date) AS off_today,
+            (SELECT coalesce(sum(p.points), 0)::int FROM points_ledger p
+              WHERE p.workspace_id = m.workspace_id AND p.user_id = m.user_id
+                AND (p.at AT TIME ZONE w.timezone)::date >= date_trunc('month', today.d)::date) AS points
        FROM memberships m
        JOIN users u ON u.id = m.user_id
        JOIN workspaces w ON w.id = m.workspace_id
@@ -479,7 +490,7 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
        LEFT JOIN events e ON e.id = t.event_id
       WHERE m.workspace_id = $1 AND m.removed_at IS NULL AND m.role <> 'accountant'
         AND (t.id IS NULL OR t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
-      GROUP BY m.user_id, u.name, m.role, today.d, m.workspace_id
+      GROUP BY m.user_id, u.name, m.role, today.d, m.workspace_id, w.timezone
       ORDER BY count(t.id) FILTER (WHERE t.status NOT IN ('done', 'cancelled') AND t.due_date < today.d) DESC,
                count(t.id) FILTER (WHERE t.status NOT IN ('done', 'cancelled')) DESC, u.name`,
     [ctx.workspaceId],
@@ -500,6 +511,7 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
     toCheck: p.to_check,
     doneThisWeek: p.done_week,
     offToday: p.off_today,
+    points: p.points,
   }));
   const sum = (k: "late" | "dueToday" | "stuck" | "toCheck" | "doneThisWeek") => people.reduce((a, p) => a + p[k], 0);
   return {

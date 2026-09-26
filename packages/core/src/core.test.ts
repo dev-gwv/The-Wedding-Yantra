@@ -678,3 +678,48 @@ describe("alerts", () => {
     );
   });
 });
+
+import { awardsFor, bandFor, coachingLine, rankPeople, resolveRules } from "./points.js";
+
+describe("points", () => {
+  const rules = resolveRules(null);
+  it("pays by priority, on time and first time", () => {
+    expect(awardsFor({ kind: "finished", priority: "urgent", late: false, checked: true, revisions: 0 }, rules, false)).toEqual([
+      { rule: "done_urgent", points: 12 },
+      { rule: "on_time", points: 2 },
+      { rule: "first_time", points: 3 },
+    ]);
+    expect(awardsFor({ kind: "finished", priority: "normal", late: true, checked: true, revisions: 2 }, rules, false)).toEqual([{ rule: "done_normal", points: 5 }]);
+  });
+  it("counts penalties only when switched on", () => {
+    expect(awardsFor({ kind: "sent_back" }, rules, false)).toEqual([]);
+    expect(awardsFor({ kind: "sent_back" }, rules, true)).toEqual([{ rule: "sent_back", points: -2 }]);
+    expect(awardsFor({ kind: "finished", priority: "low", late: true, checked: false, revisions: 0 }, rules, true)).toEqual([
+      { rule: "done_low", points: 3 },
+      { rule: "late", points: -3 },
+    ]);
+  });
+  it("follows the owner's changes", () => {
+    const own = resolveRules({ done_normal: { points: 7 }, on_time: { enabled: false } });
+    expect(awardsFor({ kind: "finished", priority: "normal", late: false, checked: false, revisions: 0 }, own, false)).toEqual([{ rule: "done_normal", points: 7 }]);
+  });
+  it("bands and the gap to the next", () => {
+    expect(bandFor(55)).toMatchObject({ band: { name: "Good" }, next: { name: "Excellent" }, gap: 25 });
+    expect(bandFor(90)).toMatchObject({ band: { name: "Excellent" }, next: null, gap: 0 });
+    expect(bandFor(0).band.name).toBe("Just starting");
+  });
+  it("ranks with ties, and leaves out people who finished nothing", () => {
+    const r = rankPeople([
+      { id: "a", points: 20, tasksDone: 3, onTime: 100 },
+      { id: "b", points: 30, tasksDone: 4, onTime: 75 },
+      { id: "c", points: 20, tasksDone: 3, onTime: 100 },
+      { id: "d", points: 0, tasksDone: 0, onTime: null },
+    ]);
+    expect(r.map((p) => [p.id, p.rank])).toEqual([["b", 1], ["a", 2], ["c", 2], ["d", null]]);
+    expect(r[3]!.notRanked).toBe("No tasks finished this month");
+  });
+  it("coaches in one line", () => {
+    expect(coachingLine({ lateNow: 2, onTime: 92, gap: 0, nextBand: null, rank: 2, ranked: 3, onTimeTaskPoints: 7 })).toBe("2 late tasks: finish them today to keep your on-time at 92%.");
+    expect(coachingLine({ lateNow: 0, onTime: 100, gap: 8, nextBand: "Excellent", rank: 2, ranked: 3, onTimeTaskPoints: 7 })).toBe("8 points to Excellent: about 2 tasks finished on time.");
+  });
+});

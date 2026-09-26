@@ -233,6 +233,7 @@ export function PeopleView({
                   </span>
                 )}
                 <span className="text-ink-muted">{p.doneThisWeek} done this week</span>
+                {p.points !== 0 && <span className="font-bold text-ink-muted tabular">· {p.points} pts</span>}
               </div>
             }
           >

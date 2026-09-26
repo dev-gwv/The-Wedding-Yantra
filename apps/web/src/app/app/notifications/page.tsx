@@ -6,6 +6,7 @@ import type { NotificationItem, NotificationPrefs } from "@wedding-yantra/types"
 import {
   AlarmClock,
   AtSign,
+  Award,
   Bell,
   BellOff,
   BellRing,
@@ -29,6 +30,7 @@ import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
@@ -47,6 +49,7 @@ const KIND_ICON: Record<NotificationKind, { icon: LucideIcon; tone: string }> = 
   "task.mentioned": { icon: AtSign, tone: "bg-sun-50 text-brand-strong" },
   "digest.morning": { icon: Sun, tone: "bg-sun-50 text-brand-strong" },
   "digest.evening": { icon: Moon, tone: "bg-cream text-ink" },
+  "points.recognised": { icon: Award, tone: "bg-success-soft text-success" },
   test: { icon: Bell, tone: "bg-cream text-ink-muted" },
 };
 
@@ -204,22 +207,6 @@ function AlertList() {
         </Card>
       )}
     </>
-  );
-}
-
-function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn("relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50", checked ? "bg-brand" : "bg-line-strong")}
-    >
-      <span className={cn("absolute top-1 size-5 rounded-full bg-white shadow transition-all", checked ? "left-6" : "left-1")} />
-    </button>
   );
 }
 

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { PointsView } from "@/components/scores/points-view";
 import { Avatar, Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
@@ -21,43 +22,77 @@ const shift = (m: string, by: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-/** Each person's month in a few numbers, worked out from the work itself. */
+/** Points and the month's board first; the four measures, worked out from the work itself, second. */
 export default function ScoresPage() {
   const { workspace } = useCurrentWorkspace();
   const everyone = can(workspace.role, "team.review");
   const thisMonth = useBusinessDay()().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
-  const scores = useScores(workspace.id, month);
+  const [tab, setTab] = useState<"points" | "measures">("points");
 
   return (
     <>
       <BackLink href="/app/more" label="More" />
       <PageHeader
         title={everyone ? "Team scores" : "My score"}
-        subtitle="Worked out from the work itself: tasks, follow-ups, bookings and expenses. Nobody fills anything in."
+        subtitle={
+          tab === "points"
+            ? "Points for every task finished, more for on time and first time. Ranked each month."
+            : "Worked out from the work itself: tasks, follow-ups, bookings and expenses. Nobody fills anything in."
+        }
       />
-      <div className="mb-5 flex items-center justify-between gap-1 sm:justify-start">
-        <button type="button" onClick={() => setMonth((m) => shift(m, -1))} className="rounded-xl p-2 hover:bg-cream" aria-label="Previous month">
-          <ChevronLeft className="size-5" />
-        </button>
-        <h2 className="whitespace-nowrap px-2 font-display text-xl font-extrabold">{monthLabel(month)}</h2>
-        <button
-          type="button"
-          onClick={() => setMonth((m) => shift(m, 1))}
-          disabled={month >= thisMonth}
-          className="rounded-xl p-2 hover:bg-cream disabled:opacity-30 disabled:hover:bg-transparent"
-          aria-label="Next month"
-        >
-          <ChevronRight className="size-5" />
-        </button>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-2xl border border-line bg-cream p-1" role="tablist" aria-label="Scores">
+          {(
+            [
+              ["points", "Points"],
+              ["measures", "Measures"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={cn("h-10 rounded-xl px-5 text-sm font-bold transition sm:px-7", tab === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setMonth((m) => shift(m, -1))} className="rounded-xl p-2 hover:bg-cream" aria-label="Previous month">
+            <ChevronLeft className="size-5" />
+          </button>
+          <h2 className="whitespace-nowrap px-2 font-display text-lg font-extrabold">{monthLabel(month)}</h2>
+          <button
+            type="button"
+            onClick={() => setMonth((m) => shift(m, 1))}
+            disabled={month >= thisMonth}
+            className="rounded-xl p-2 hover:bg-cream disabled:opacity-30 disabled:hover:bg-transparent"
+            aria-label="Next month"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        </div>
       </div>
+      {tab === "points" ? <PointsView month={month} current={month === thisMonth} /> : <Measures month={month} current={month === thisMonth} />}
+    </>
+  );
+}
+
+function Measures({ month, current }: { month: string; current: boolean }) {
+  const { workspace } = useCurrentWorkspace();
+  const scores = useScores(workspace.id, month);
+  return (
+    <>
       {scores.isPending && (
         <div className="flex justify-center py-16 text-brand">
           <Spinner />
         </div>
       )}
       {scores.isError && <Notice tone="danger">{errorMessage(scores.error)}</Notice>}
-      {scores.data && <Scores data={scores.data} current={month === thisMonth} />}
+      {scores.data && <Scores data={scores.data} current={current} />}
     </>
   );
 }

@@ -1110,5 +1110,26 @@ After studying IPC Studios' control center (task manager, accountability board, 
 - **My day** (`/app/my-day`): events, Late, Today, Waiting on you (sent back with the reason, work
   to check), This week, No date, Handed in. One-tap Start, Done, Hand in, Tomorrow, Stuck.
   **Done for the day**: done, still open, tomorrow, and the same as a WhatsApp message.
-- Next (part 3): points and the monthly leaderboard.
+- Part 3 followed: points and the monthly leaderboard (section 40).
+
+## 40. Built: delegation, part 3: points and the leaderboard
+
+- **Earning:** finishing a task someone else gave you pays by priority (urgent 12, high 8,
+  normal 5, low 3), +2 when finished by its day, +3 when checked work is approved first time.
+  A task finished on each of seven days in a row pays +10 (the scheduler checks just after
+  midnight, at most once a week per person). Owners and managers can **recognise** someone's
+  work (+5, with a note and an alert). Nobody earns from tasks they gave themselves.
+- **Paid once:** a ledger with a unique key per thing and rule; reopening and finishing again
+  earns nothing more. Points are paid in the same save as the task change.
+- **Penalties** (late −3, sent back −2, moving your own task's date later −5) exist but count only
+  when the owner switches them on. A date moved by a manager never costs the assignee.
+- **The owner's rules:** every rule's points and on/off, penalties, and bands (Excellent 80,
+  Good 50, Needs attention 20, Just starting 0 by default) in More, Points rules. Changes count
+  from then on.
+- **Scores page:** Points (default) and Measures tabs. Your card: points, rank of how many, band
+  and progress to the next, one coaching line, and your ledger. A podium for the top three and the
+  ranked list; "Not ranked: no tasks finished this month" instead of a zero. Tap a name for their
+  ledger (owners and managers), and Recognise. Others' on-time % stays with owners and managers.
+- The team People board shows each person's points this month.
+- Next (part 4): task sets with default owners, workload warnings, and a task report.
 

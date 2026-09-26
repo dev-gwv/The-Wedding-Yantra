@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -148,6 +148,10 @@ expect "the push key is made and kept" '.success and (.data.publicKey | length) 
   "$(api GET "/api/v1/push/key" "" "$TOKEN")"
 expect "alert settings can be saved" '.success and .data.off == ["digests"] and .data.quietFrom == "22:30"' \
   "$(api PUT "/api/v1/workspaces/$WS_ID/notifications/prefs" '{"off":["digests"],"push":true,"quietFrom":"22:30","quietTo":"07:00"}' "$TOKEN")"
+expect "the points board answers" '.success and (.data.rows | length) >= 1 and .data.penaltiesOn == false' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/points/leaderboard?month=$(date -u +%Y-%m)" "" "$TOKEN")"
+expect "the points rules can be read" '.success and (.data.rules | length) == 11' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/points/rules" "" "$TOKEN")"
 expect "My Day lists what was done today" '.success and (.data.doneToday | length) >= 1 and (.data.sentBack | type) == "array"' \
   "$(api GET "/api/v1/workspaces/$WS_ID/my-day" "" "$TOKEN")"
 expect "a task can repeat every day" '.success and .data.label == "Every day"' \

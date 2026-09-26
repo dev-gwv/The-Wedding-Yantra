@@ -18,6 +18,7 @@ export const NOTIFICATION_KINDS = [
   "task.mentioned",
   "digest.morning",
   "digest.evening",
+  "points.recognised",
   "test",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -29,6 +30,7 @@ export const NOTIFICATION_GROUPS = [
   { key: "checks", label: "Hand-ins and checks", about: "Work handed in to you, and your work approved or sent back", kinds: ["task.submitted", "task.approved", "task.sent_back"] },
   { key: "updates", label: "Finished and stuck", about: "When a task you gave is done, or someone is stuck on it", kinds: ["task.done", "task.stuck"] },
   { key: "talk", label: "Comments and mentions", about: "Comments on your tasks, and when someone @mentions you", kinds: ["task.commented", "task.mentioned"] },
+  { key: "praise", label: "Recognition", about: "When the owner or a manager recognises your work", kinds: ["points.recognised"] },
   { key: "digests", label: "Morning plan and evening round-up", about: "Your day at 8 am; for owners and managers, the team's day at 7 pm", kinds: ["digest.morning", "digest.evening"] },
 ] as const satisfies readonly { key: string; label: string; about: string; kinds: readonly NotificationKind[] }[];
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number]["key"];

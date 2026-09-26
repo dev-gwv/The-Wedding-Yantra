@@ -19,6 +19,7 @@ export * from "./inventory.js";
 export * from "./invoicing.js";
 export * from "./money.js";
 export * from "./notifications.js";
+export * from "./points.js";
 export * from "./reports.js";
 export * from "./review.js";
 export * from "./sales.js";
