@@ -230,6 +230,30 @@ jobs:
             echo "::warning::The API can't write to /app/uploads, so bill photos won't save. Fix the owner of the wedding-yantra-uploads volume (it should belong to uid 1000, the node user)."
           fi
 
+          # ---- Sign-in codes: what's set up, never the key itself ---------------
+          # Asks 2Factor for the SMS balance, which proves the key works without sending a text.
+          docker exec wedding-yantra-api node -e '
+          const env = process.env;
+          const echo = env.AUTH_OTP_DEV_ECHO === "true";
+          console.log(`sign-in codes: provider ${env.OTP_PROVIDER || "none"}, test mode ${echo ? "ON" : "off"}`);
+          if (echo) console.log("::warning::AUTH_OTP_DEV_ECHO is true: anyone can sign in as any number. Set it to false for real customers.");
+          if (!env.OTP_PROVIDER && !echo) console.log("::warning::No OTP_PROVIDER is set, so nobody can get a sign-in code.");
+          const key = env.TWOFACTOR_API_KEY;
+          if (!key) { console.log("2factor: no API key set"); process.exit(0); }
+          const ask = (path) => fetch(`https://2factor.in/API/V1/${encodeURIComponent(key)}/${path}`, { signal: AbortSignal.timeout(10000) }).then((r) => r.json());
+          (async () => {
+            let last = "";
+            for (const path of ["BAL/SMS", "ADDON_SERVICES/BAL/SMS"]) {
+              try {
+                const j = await ask(path);
+                if (j.Status === "Success") return console.log(`2factor: key accepted, SMS balance ${j.Details}`);
+                last = String(j.Details ?? j.Status ?? "").replace(key, "***").slice(0, 80);
+              } catch (e) { last = e.message; }
+            }
+            console.log(`::warning::2factor: could not confirm the key (${last})`);
+          })();
+          ' || echo "::warning::Couldn't check the sign-in code settings"
+
           # ---- Housekeeping: only images built by THIS project ----------------
           # Keep the 3 newest API images (current + rollback targets), drop the rest.
           docker images wedding-yantra-api --format '{{.Repository}}:{{.Tag}}' \
