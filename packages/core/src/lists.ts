@@ -5,12 +5,13 @@
  * hidden option still shows its name on the records that use it.
  */
 
-export const OPTION_LISTS = ["payment_method", "expense_category"] as const;
+export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag"] as const;
 export type OptionList = (typeof OPTION_LISTS)[number];
 
 export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; about: string }> = {
   payment_method: { title: "Payment modes", one: "payment mode", about: "How clients pay you and how you pay others." },
   expense_category: { title: "Expense categories", one: "category", about: "What your money goes on. Reports group expenses by these." },
+  task_tag: { title: "Task tags", one: "tag", about: "Group tasks by kind of work, and filter the task board by them." },
 };
 
 export interface OptionSeed {
@@ -37,6 +38,14 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
     { key: "rent", label: "Rent & bills" },
     { key: "marketing", label: "Ads & marketing" },
     { key: "other", label: "Other" },
+  ],
+  task_tag: [
+    { key: "client", label: "Client" },
+    { key: "event", label: "Event prep" },
+    { key: "delivery", label: "Delivery" },
+    { key: "vendors", label: "Vendors" },
+    { key: "marketing", label: "Marketing" },
+    { key: "admin", label: "Admin" },
   ],
 };
 

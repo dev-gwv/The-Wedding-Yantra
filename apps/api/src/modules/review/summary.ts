@@ -43,7 +43,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
       `SELECT u.name, count(*) AS count
          FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id LEFT JOIN events e ON e.id = t.event_id
         WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.due_date <= $2::date
-          AND (t.status = 'open' OR (t.done_at AT TIME ZONE $3)::date > $2::date)
+          AND (t.status NOT IN ('done', 'cancelled') OR (t.done_at AT TIME ZONE $3)::date > $2::date)
           AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
         GROUP BY t.assignee_id, u.name
         ORDER BY count(*) DESC, u.name NULLS LAST`,
@@ -67,7 +67,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
     ),
     db.query<{ count: number }>(
       `SELECT count(*) AS count FROM tasks t LEFT JOIN events e ON e.id = t.event_id
-        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status = 'open' AND t.due_date = $2::date
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status NOT IN ('done', 'cancelled') AND t.due_date = $2::date
           AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))`,
       [ws, tomorrow],
     ),

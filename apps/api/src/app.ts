@@ -112,7 +112,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       moneyRoutes(v1, { db, files });
       fileRoutes(v1, { db, files });
       reportRoutes(v1, { db });
-      taskRoutes(v1, { db });
+      taskRoutes(v1, { db, files });
       reviewRoutes(v1, { db });
       growRoutes(v1, { db });
       deliverableRoutes(v1, { db });

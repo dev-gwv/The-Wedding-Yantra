@@ -1,4 +1,4 @@
-import { can, formatDateRange, ROLE_INFO, type Role } from "@wedding-yantra/core";
+import { can, formatDate, formatDateRange, ROLE_INFO, type Role } from "@wedding-yantra/core";
 import type { ActivityItem, ActivityPage } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { AppError, forbidden } from "../../lib/http.js";
@@ -241,7 +241,9 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.other = (str(m.assigneeId) && users.get(str(m.assigneeId)!)?.name) ?? null;
         item.detail = r.action === "task.done" ? (t?.event_title ?? null) : null;
         item.late = m.late === true;
-        item.link = t?.event_id ? { kind: "event", id: t.event_id } : { kind: "tasks", id: null };
+        if (r.action === "task.deadline_moved" && str(m.to)) item.detail = `to ${formatDate(str(m.to)!, { year: false })}`;
+        if (r.action === "task.stuck" || r.action === "task.sent_back") item.detail = str(m.reason) ?? null;
+        item.link = t?.event_id ? { kind: "event", id: t.event_id } : { kind: "tasks", id: id ?? null };
         break;
       }
       case "time_off": {

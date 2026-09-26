@@ -210,7 +210,8 @@ export function EventTasks({ event }: { event: WeddingEvent }) {
 
   const today = day();
   // Keep the order steady while ticking: by due date, undated last.
-  const list = [...(tasks.data ?? [])].sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+  // Cancelled steps leave the checklist.
+  const list = [...(tasks.data ?? [])].filter((t) => t.status !== "cancelled").sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
   const done = list.filter((t) => t.done).length;
   const steps = checklist.data?.length ?? 0;
   const offerChecklist = manage && event.status !== "cancelled" && steps > 0 && !list.some((t) => t.fromChecklist);

@@ -41,9 +41,9 @@ export async function teamScores(db: Queryable, ctx: MemberContext, month: strin
   const tasks = await counts(
     db,
     `SELECT t.assignee_id AS user_id, count(*) AS total,
-            count(*) FILTER (WHERE t.status = 'done' AND (t.done_at AT TIME ZONE $5)::date <= t.due_date) AS done
+            count(*) FILTER (WHERE t.status = 'done' AND (coalesce(t.completed_at, t.done_at) AT TIME ZONE $5)::date <= t.due_date) AS done
        FROM tasks t LEFT JOIN events e ON e.id = t.event_id
-      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.assignee_id IS NOT NULL
+      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.assignee_id IS NOT NULL AND t.status <> 'cancelled'
         AND t.due_date >= $2::date AND t.due_date < $3::date AND t.due_date < $4::date AND ${ACTIVE_EVENT}
       GROUP BY t.assignee_id`,
     [ctx.workspaceId, start, end, today, tz],
@@ -100,7 +100,7 @@ export async function teamScores(db: Queryable, ctx: MemberContext, month: strin
   const late = await db.query<{ user_id: string; late: number }>(
     `SELECT t.assignee_id AS user_id, count(*) AS late
        FROM tasks t LEFT JOIN events e ON e.id = t.event_id
-      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status = 'open' AND t.assignee_id IS NOT NULL
+      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status NOT IN ('done', 'cancelled') AND t.assignee_id IS NOT NULL
         AND t.due_date < $2::date AND ${ACTIVE_EVENT}
       GROUP BY t.assignee_id`,
     [ctx.workspaceId, today],
@@ -154,8 +154,8 @@ async function businessScores(
      steps AS (
        SELECT count(*) FILTER (WHERE late = 0) AS done, count(*) AS total
          FROM (SELECT ev.id,
-                      count(*) FILTER (WHERE NOT (t.status = 'done' AND (t.done_at AT TIME ZONE $5)::date <= t.due_date)) AS late
-                 FROM ev JOIN tasks t ON t.event_id = ev.id AND t.deleted_at IS NULL AND t.due_date < $4::date
+                      count(*) FILTER (WHERE NOT (t.status = 'done' AND (coalesce(t.completed_at, t.done_at) AT TIME ZONE $5)::date <= t.due_date)) AS late
+                 FROM ev JOIN tasks t ON t.event_id = ev.id AND t.deleted_at IS NULL AND t.status <> 'cancelled' AND t.due_date < $4::date
                 GROUP BY ev.id) y
      )
      SELECT money.due, money.collected, steps.done, steps.total FROM money, steps`,

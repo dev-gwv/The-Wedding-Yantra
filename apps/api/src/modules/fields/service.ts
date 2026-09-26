@@ -19,7 +19,7 @@ export async function listFields(db: Queryable, workspaceId: string, entity?: Cu
   const { rows } = await db.query<FieldRow>(
     `SELECT id, entity, label, kind, options FROM custom_fields
       WHERE workspace_id = $1 AND deleted_at IS NULL ${entity ? "AND entity = $2" : ""}
-      ORDER BY array_position(ARRAY['lead', 'client', 'event'], entity::text), position, created_at`,
+      ORDER BY array_position(ARRAY['lead', 'client', 'event', 'task'], entity::text), position, created_at`,
     entity ? [workspaceId, entity] : [workspaceId],
   );
   return rows.map(toField);
@@ -54,7 +54,7 @@ export async function saveFields(
   });
 }
 
-const TABLES: Record<CustomFieldEntity, string> = { lead: "leads", client: "clients", event: "events" };
+const TABLES: Record<CustomFieldEntity, string> = { lead: "leads", client: "clients", event: "events", task: "tasks" };
 
 /**
  * Checks the sent values against the business's fields and merges them into the row's

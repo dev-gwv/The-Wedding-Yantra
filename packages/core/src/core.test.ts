@@ -599,3 +599,43 @@ describe("payment plans", () => {
     expect(text).toBe('Hi Neha, a gentle reminder from Riya Studio: the "Before the event" payment of ₹40,000 for the wedding is due by 10 Nov. Thank you!');
   });
 });
+
+import { canMove, dueState, linksIn, taskWhatsappText } from "./index.js";
+
+describe("delegation rules", () => {
+  const base = { needsCheck: false, manages: false, isAssignee: true, isGiver: false };
+  it("lets whoever it's for work it, but not skip a check or cancel", () => {
+    expect(canMove({ ...base, from: "open", to: "doing" }).ok).toBe(true);
+    expect(canMove({ ...base, from: "doing", to: "waiting" }).ok).toBe(true);
+    expect(canMove({ ...base, from: "doing", to: "done" }).ok).toBe(true);
+    expect(canMove({ ...base, needsCheck: true, from: "doing", to: "done" })).toEqual({ ok: false, reason: "Hand it in for a check instead" });
+    expect(canMove({ ...base, needsCheck: true, from: "doing", to: "review" }).ok).toBe(true);
+    expect(canMove({ ...base, needsCheck: true, from: "review", to: "done" }).ok).toBe(false);
+    expect(canMove({ ...base, from: "open", to: "cancelled" }).ok).toBe(false);
+    expect(canMove({ ...base, isAssignee: false, from: "open", to: "doing" })).toEqual({ ok: false, reason: "This task is for someone else" });
+  });
+  it("lets whoever gave it approve, send back and cancel", () => {
+    const giver = { ...base, isAssignee: false, isGiver: true, needsCheck: true };
+    expect(canMove({ ...giver, from: "review", to: "done" }).ok).toBe(true);
+    expect(canMove({ ...giver, from: "review", to: "doing" }).ok).toBe(true);
+    expect(canMove({ ...giver, from: "open", to: "cancelled" }).ok).toBe(true);
+  });
+  it("knows how close a task is to its day", () => {
+    const t = { status: "open" as const, dueDate: "2026-10-10" };
+    expect(dueState(t, "2026-10-11")).toBe("overdue");
+    expect(dueState(t, "2026-10-10")).toBe("today");
+    expect(dueState({ ...t, dueTime: "09:00" }, "2026-10-10", "10:30")).toBe("overdue");
+    expect(dueState(t, "2026-10-08")).toBe("soon");
+    expect(dueState(t, "2026-10-01")).toBe("later");
+    expect(dueState({ ...t, status: "done" }, "2026-10-11")).toBe("none");
+  });
+  it("finds links and writes the task for WhatsApp", () => {
+    expect(linksIn("See https://drive.google.com/x, and https://www.example.com/a.")).toEqual([
+      { url: "https://drive.google.com/x", host: "drive.google.com" },
+      { url: "https://www.example.com/a", host: "example.com" },
+    ]);
+    expect(taskWhatsappText({ title: "Album layout", assigneeName: "Rohit", priority: "urgent", dueDate: "2026-10-10", steps: [{ title: "Pick photos", done: true }] })).toBe(
+      "*Album layout*\nFor: Rohit\nBy: 10 Oct 2026\nPriority: Urgent\n\n✓ Pick photos",
+    );
+  });
+});

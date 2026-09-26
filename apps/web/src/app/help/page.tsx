@@ -78,6 +78,10 @@ const GUIDES: Guide[] = [
     id: "events",
     title: "Events, your team and checklists",
     steps: [
+      "Give a task from Tasks: who, by when and how urgent (low, normal, high, urgent). Under More options add a tag, steps, the hours it takes, your own task fields, or tick \"I'll check it before it's done\".",
+      "Each task moves To do, Doing, Stuck (with what it's waiting on), and Done. A task you check is handed in with a note, link or photo; you approve it or send it back with what to change, and it counts how many times it went back.",
+      "Tasks, Team shows everyone's load: late, due today, waiting for your check and stuck. See it by People (drag a card onto someone to give it to them), as a Board (drag to move it along) or as a List, with filters and search.",
+      "Open a task for its steps, photos and files, comments (@Name tells someone), what happened when, and a Send on WhatsApp button.",
       "An event holds its functions (haldi, mehendi, wedding) with dates, times and venues. The calendar warns you when two events fall on the same day.",
       "Choose who works each event, their role there and when to reach. They see it in their day. Freelancers see only the events they're on.",
       "Add the checklist to an event in one tap: every step gets its date from the functions. Give steps to people, or leave them to anyone on the event.",

@@ -1,19 +1,20 @@
 "use client";
 
-import { can, describeRepeat, eventScope, formatDate, timeAgo, WEEKDAY_NAMES, weekdayOf, type RepeatFrequency } from "@wedding-yantra/core";
+import { can, describeRepeat, eventScope, formatDate, WEEKDAY_NAMES, weekdayOf, type RepeatFrequency } from "@wedding-yantra/core";
 import {
   useCreateTask,
   useCreateTaskRepeat,
   useDeleteTask,
   useEvents,
-  useSetTaskDone,
   useStopTaskRepeat,
   useTeam,
   useUpdateTask,
 } from "@wedding-yantra/api-client/react";
-import { taskInput, taskRepeatInput, updateTaskInput, type TaskItem } from "@wedding-yantra/types";
-import { Flag, Repeat } from "lucide-react";
+import { taskInput, taskRepeatInput, updateTaskInput, type TaskItem, type TaskPriority } from "@wedding-yantra/types";
+import { ChevronDown, Repeat, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
+import { OptionPills } from "@/components/app/option-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
 import { Button } from "@/components/ui/button";
@@ -24,29 +25,58 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { useBusinessDay } from "@/lib/today";
-import { canEditTask, canTick } from "./task-row";
+import { canEditTask } from "./task-row";
+import { PriorityPicker } from "./task-bits";
+import { TaskView } from "./task-view";
 
-/** Add a task, or open one to change it or tick it off. */
+/** Add a task, or open one: see it in full, move it along, or change it. */
 export function TaskSheet({
   open,
   onClose,
   task,
+  taskId,
   eventId,
+  assigneeId,
 }: {
   open: boolean;
   onClose: () => void;
   task?: TaskItem;
+  /** Open a task by id (from a link or a notification) */
+  taskId?: string;
   /** Opened from an event: the task is for it */
   eventId?: string;
+  /** Start a new task for this person (from the People board) */
+  assigneeId?: string;
 }) {
+  const id = task?.id ?? taskId;
+  const [editing, setEditing] = useState<TaskItem | null>(null);
+  const close = () => {
+    setEditing(null);
+    onClose();
+  };
   return (
-    <Sheet open={open} onClose={onClose} title={task ? "Task" : "New task"}>
-      {open && <TaskForm task={task} eventId={eventId} onDone={onClose} />}
+    <Sheet open={open} onClose={close} title={id ? (editing ? "Change task" : "Task") : "New task"}>
+      {open && id && !editing && <TaskView taskId={id} initial={task} onEdit={setEditing} onClose={close} />}
+      {open && (!id || editing) && (
+        <TaskForm task={editing ?? undefined} eventId={eventId} assigneeId={assigneeId} onDone={editing ? () => setEditing(null) : close} onRemoved={close} />
+      )}
     </Sheet>
   );
 }
 
-function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string; onDone: () => void }) {
+function TaskForm({
+  task,
+  eventId,
+  assigneeId: startAssignee,
+  onDone,
+  onRemoved,
+}: {
+  task?: TaskItem;
+  eventId?: string;
+  assigneeId?: string;
+  onDone: () => void;
+  onRemoved: () => void;
+}) {
   const { workspace, me } = useCurrentWorkspace();
   const manage = can(workspace.role, "tasks.manage");
   const editable = !task || canEditTask(task, workspace.role, me.user.id);
@@ -55,7 +85,6 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
   const create = useCreateTask(workspace.id);
   const update = useUpdateTask(workspace.id);
   const remove = useDeleteTask(workspace.id);
-  const setDone = useSetTaskDone(workspace.id);
   const team = useTeam(manage && editable ? workspace.id : null);
   // Coming events to hang the task on (freelancers get only theirs).
   const events = useEvents(workspace.id, { from: today, status: "confirmed" }, editable && !eventId && eventScope(workspace.role) !== "none");
@@ -64,9 +93,17 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
   const [title, setTitle] = useState(task?.title ?? "");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [dueTime, setDueTime] = useState(task?.dueTime ?? "");
-  const [assigneeId, setAssigneeId] = useState(task ? (task.assignee?.id ?? "") : me.user.id);
+  const [assigneeId, setAssigneeId] = useState(task ? (task.assignee?.id ?? "") : (startAssignee ?? me.user.id));
   const [forEvent, setForEvent] = useState(task?.eventId ?? eventId ?? "");
-  const [urgent, setUrgent] = useState(task?.priority === "high");
+  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "normal");
+  const [tag, setTag] = useState<string | null>(task?.tag ?? null);
+  const [needsCheck, setNeedsCheck] = useState(task?.needsCheck ?? false);
+  const [startDate, setStartDate] = useState(task?.startDate ?? "");
+  const [estimate, setEstimate] = useState(task?.estimateHours ? String(task.estimateHours) : "");
+  const [stepsText, setStepsText] = useState("");
+  const customFields = useEntityFields("task");
+  const [custom, setCustom] = useState(() => toDraft(task?.custom));
+  const [more, setMore] = useState(() => !!task && !!(task.tag || task.needsCheck || task.startDate || task.estimateHours || Object.keys(task.custom ?? {}).length));
   const [notes, setNotes] = useState(task?.notes ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -88,7 +125,7 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
       title,
       notes,
       dueTime,
-      priority: urgent ? ("high" as const) : ("normal" as const),
+      priority,
       frequency: repeat as RepeatFrequency,
       weekdays,
       monthDay: repeat === "monthly" ? monthDay : null,
@@ -111,26 +148,34 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (repeat !== "none") return submitRepeat();
-    const fields = {
+    const forSomeoneElse = manage && !!assigneeId && assigneeId !== me.user.id;
+    const payload = {
       title,
       notes,
       dueDate,
       dueTime,
-      priority: urgent ? ("high" as const) : ("normal" as const),
+      priority,
       eventId: forEvent || null,
+      tag,
+      startDate,
+      estimateHours: estimate || null,
+      custom: customPayload(customFields, custom),
+      // A check only when someone else does it.
+      needsCheck: needsCheck && forSomeoneElse,
+      ...(task ? {} : { steps: stepsText.split("\n").map((x) => x.trim()).filter(Boolean) }),
       // Only owners and managers choose who does it; everyone else adds for themselves.
       ...(manage ? { assigneeId: assigneeId || null } : {}),
     };
-    const check = task ? validate(updateTaskInput, fields) : validate(taskInput, fields);
-    if (check.errors) return setErrors(check.errors);
+    const check = task ? validate(updateTaskInput, payload) : validate(taskInput, payload);
+    const customErrors = checkDraft(customFields, custom);
+    if (check.errors || Object.keys(customErrors).length) return setErrors({ ...check.errors, ...customErrors });
     setErrors({});
     try {
       if (task) {
-        await update.mutateAsync({ ...fields, id: task.id });
+        await update.mutateAsync({ ...payload, id: task.id });
         toast("Task saved");
       } else {
-        await create.mutateAsync(fields);
-        const forSomeoneElse = manage && assigneeId !== me.user.id;
+        await create.mutateAsync(payload);
         toast(forSomeoneElse ? "Task given" : "Task added");
       }
       onDone();
@@ -140,23 +185,12 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
     }
   }
 
-  async function tick(done: boolean) {
-    if (!task) return;
-    try {
-      await setDone.mutateAsync({ id: task.id, done });
-      toast(done ? "Done" : "Opened again");
-      onDone();
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    }
-  }
-
   async function deleteIt() {
     if (!task) return;
     try {
       await remove.mutateAsync(task.id);
       toast("Task removed");
-      onDone();
+      onRemoved();
     } catch (err) {
       toast(errorMessage(err), "error");
     }
@@ -171,23 +205,6 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      {task && (
-        <p className="text-sm text-ink-muted">
-          {task.done && task.doneAt
-            ? `Done${task.doneBy?.name ? ` by ${task.doneBy.name}` : ""} ${timeAgo(task.doneAt)}.`
-            : task.createdBy && task.createdBy.id !== me.user.id
-              ? `Added by ${task.createdBy.name ?? "the team"}${task.fromChecklist ? " from the event checklist" : ""}.`
-              : task.fromChecklist
-                ? "From the event checklist."
-                : null}
-        </p>
-      )}
-      {task && canTick(task, workspace.role, me.user.id) && (
-        <Button variant="secondary" size="lg" onClick={() => tick(!task.done)} loading={setDone.isPending} className={cn(!task.done && "text-success")}>
-          {task.done ? "Open it again" : "Mark done"}
-        </Button>
-      )}
-
       <fieldset disabled={!editable} className="space-y-4">
         <TextField
           label="What needs doing"
@@ -343,14 +360,65 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
         )}
         {!editable && task?.eventTitle && !eventId && <p className="text-sm text-ink-muted">For {task.eventTitle}.</p>}
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line px-4 py-3 has-[:checked]:border-sun-300 has-[:checked]:bg-cream">
-          <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="size-5 accent-brand" />
-          <Flag className="size-4 text-brand-strong" />
-          <span className="font-semibold">Urgent</span>
-          <span className="text-sm text-ink-muted">Shows first on the day</span>
-        </label>
+        <div>
+          <p className="mb-2 text-sm font-semibold text-ink">Priority</p>
+          <PriorityPicker value={priority} onChange={setPriority} />
+        </div>
 
-        <TextAreaField label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} error={errors.notes} maxLength={1000} />
+        <TextAreaField
+          label="Details (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          error={errors.notes}
+          maxLength={4000}
+          placeholder="What exactly, where to find things, links"
+        />
+
+        <button
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          aria-expanded={more}
+          className="flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-left text-sm font-semibold"
+        >
+          More options: tag, check, steps{customFields.length ? ", your fields" : ""}
+          <ChevronDown className={cn("size-4 text-ink-muted transition", more && "rotate-180")} />
+        </button>
+        {more && (
+          <div className="space-y-4 rounded-2xl border border-line p-4">
+            <OptionPills list="task_tag" label="Tag" value={tag} onChange={setTag} error={errors.tag} allowNone />
+            {manage && assigneeId && assigneeId !== me.user.id && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line px-4 py-3 has-[:checked]:border-sun-300 has-[:checked]:bg-cream">
+                <input type="checkbox" checked={needsCheck} onChange={(e) => setNeedsCheck(e.target.checked)} className="mt-0.5 size-5 accent-brand" />
+                <span>
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <ShieldCheck className="size-4 text-brand-strong" /> I&apos;ll check it before it&apos;s done
+                  </span>
+                  <span className="block text-sm text-ink-muted">They hand in the work with a note, link or photo. You approve it or send it back.</span>
+                </span>
+              </label>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Start from (optional)" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} error={errors.startDate} />
+              <TextField
+                label="Hours it takes (optional)"
+                inputMode="decimal"
+                value={estimate}
+                onChange={(e) => setEstimate(e.target.value.replace(/[^\d.]/g, ""))}
+                error={errors.estimateHours}
+              />
+            </div>
+            {!task && (
+              <TextAreaField
+                label="Steps (optional, one per line)"
+                rows={3}
+                value={stepsText}
+                onChange={(e) => setStepsText(e.target.value)}
+                placeholder={"Pick 60 photos\nLay out 40 pages\nSend to the couple"}
+              />
+            )}
+            <CustomFieldInputs fields={customFields} draft={custom} onChange={setCustom} errors={errors} />
+          </div>
+        )}
       </fieldset>
 
       {task?.repeat && (

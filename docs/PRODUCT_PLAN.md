@@ -1068,3 +1068,23 @@ An invoice lists what it pays for beyond the price lines: "500 edited photos by 
 - Without an event (a walk-in customer), items stay on the invoice only.
 - Next: reminders for dues, and draft invoices.
 
+## 38. Built: delegation, part 1: tasks in depth and the team board
+
+After studying IPC Studios' control center (task manager, accountability board, KPI proof flow):
+- **Where a task stands:** To do, Doing, Stuck (with the reason), Waiting for a check, Done,
+  Cancelled. Rules in core `canMove`: whoever it's for works it and finishes it; whoever gave it
+  (or an owner or manager) approves, sends back and cancels. When it was finished is kept apart
+  from later edits, so editing never makes a finished task late.
+- **Priority** in four levels (earlier "urgent" tasks stay urgent). **Tags** are the business's own
+  list. **Start date**, **hours it takes**, **client**, and the business's **own task fields**.
+- **Checked work:** "I'll check it before it's done". The person hands in a note, link or photo;
+  the giver approves or sends it back with what to change; send-backs are counted.
+- **Steps** inside a task, **photos and files**, **comments** with @mentions, **history** of every
+  change, **move date** (counted), and **Send on WhatsApp**.
+- **Tasks page:** Mine, Given by me (to follow up), and Team: totals that filter (late, due today,
+  waiting for your check, stuck, done this week) and three views: People (each person's load and
+  days off; drag to reassign), Board (drag to move along), List. Filters and search live in the
+  link. The activity log says each step in words and opens the task.
+- Freelancers can now attach photos to their tasks.
+- Next (part 2): alerts in the app and on the phone, a morning "your day" and evening owner digest.
+

@@ -81,6 +81,13 @@ import type {
   UpdateMeInput,
   UpdateMemberInput,
   UpdateWorkspaceInput,
+  CommentInput,
+  MoveTaskInput,
+  ReviewTaskInput,
+  SnoozeTaskInput,
+  SubmitTaskInput,
+  UpdateStepInput,
+  TaskDetail,
 } from "@wedding-yantra/types";
 import type { ApiClient } from "./client.js";
 
@@ -143,6 +150,8 @@ export const queryKeys = {
   work: (id: string) => ["workspace", id, "work"] as const,
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
+  task: (id: string, taskId: string) => ["workspace", id, "work", "task", taskId] as const,
+  taskBoard: (id: string) => ["workspace", id, "work", "board"] as const,
   timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
   broadcasts: (id: string) => ["workspace", id, "broadcasts"] as const,
   broadcast: (id: string, broadcastId: string) => ["workspace", id, "broadcasts", broadcastId] as const,
@@ -812,6 +821,77 @@ export function useSetTaskDone(workspaceId: string) {
 export function useDeleteTask(workspaceId: string) {
   const api = useApi();
   return useTaskMutation(workspaceId, (id: string) => api.tasks.remove(workspaceId, id));
+}
+
+/** One task in full: steps, comments, files, hand-ins and history. */
+export function useTask(workspaceId: string, taskId: string | null) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.task(workspaceId, taskId ?? ""), queryFn: () => api.tasks.get(workspaceId, taskId!), enabled: !!taskId });
+}
+
+export function usePeopleBoard(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.taskBoard(workspaceId), queryFn: () => api.tasks.board(workspaceId), enabled });
+}
+
+/** Changes to one task: the answer is the whole task, put straight into its cache. */
+function useTaskDetailMutation<TInput>(workspaceId: string, taskId: string, fn: (input: TInput) => Promise<TaskDetail>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (detail) => {
+      qc.setQueryData(queryKeys.task(workspaceId, taskId), detail);
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId), predicate: (q) => q.queryKey[3] !== "task" || q.queryKey[4] !== taskId });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+/** Moves any task by id: for dragging cards between columns. */
+export function useMoveAnyTask(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, ({ id, ...input }: MoveTaskInput & { id: string }) => api.tasks.move(workspaceId, id, input));
+}
+
+export function useMoveTask(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return useTaskDetailMutation(workspaceId, taskId, (input: MoveTaskInput) => api.tasks.move(workspaceId, taskId, input));
+}
+export function useSubmitTask(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return useTaskDetailMutation(workspaceId, taskId, (input: SubmitTaskInput) => api.tasks.submit(workspaceId, taskId, input));
+}
+export function useReviewTask(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return useTaskDetailMutation(workspaceId, taskId, (input: ReviewTaskInput) => api.tasks.review(workspaceId, taskId, input));
+}
+export function useSnoozeTask(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return useTaskDetailMutation(workspaceId, taskId, (input: SnoozeTaskInput) => api.tasks.snooze(workspaceId, taskId, input));
+}
+export function useTaskSteps(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return {
+    add: useTaskDetailMutation(workspaceId, taskId, (title: string) => api.tasks.addStep(workspaceId, taskId, title)),
+    update: useTaskDetailMutation(workspaceId, taskId, ({ stepId, ...input }: UpdateStepInput & { stepId: string }) =>
+      api.tasks.updateStep(workspaceId, taskId, stepId, input),
+    ),
+    remove: useTaskDetailMutation(workspaceId, taskId, (stepId: string) => api.tasks.removeStep(workspaceId, taskId, stepId)),
+  };
+}
+export function useTaskComments(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return {
+    add: useTaskDetailMutation(workspaceId, taskId, (input: CommentInput) => api.tasks.comment(workspaceId, taskId, input)),
+    remove: useTaskDetailMutation(workspaceId, taskId, (commentId: string) => api.tasks.removeComment(workspaceId, taskId, commentId)),
+  };
+}
+export function useTaskFiles(workspaceId: string, taskId: string) {
+  const api = useApi();
+  return {
+    attach: useTaskDetailMutation(workspaceId, taskId, (fileId: string) => api.tasks.attach(workspaceId, taskId, fileId)),
+    detach: useTaskDetailMutation(workspaceId, taskId, (fileId: string) => api.tasks.detach(workspaceId, taskId, fileId)),
+  };
 }
 
 export function useTimeOff(workspaceId: string, query: TimeOffQuery = {}, enabled = true) {

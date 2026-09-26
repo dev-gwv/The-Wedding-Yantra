@@ -30,6 +30,7 @@ const toOption = (r: OptionRow): CustomOption => ({
 const ADD_RIGHT: Record<OptionList, Permission[]> = {
   payment_method: ["payments.record", "bills.manage"],
   expense_category: ["expenses.submit"],
+  task_tag: ["tasks.manage"],
 };
 
 /** A new business starts with the built-in options, plus the categories its trade usually needs. */

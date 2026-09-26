@@ -25,6 +25,7 @@ const SECTIONS: Record<CustomFieldEntity, { title: string; about: string; save: 
   lead: { title: "Enquiries", about: "Asked when someone enquires, like skin type or guest count.", save: "Save enquiry fields" },
   client: { title: "Clients", about: "Kept on the client, like allergies or a family contact.", save: "Save client fields" },
   event: { title: "Events", about: "Filled for each booking, like power needed or plates confirmed.", save: "Save event fields" },
+  task: { title: "Tasks", about: "Asked on every task, like the album page count or the reel length.", save: "Save task fields" },
 };
 
 interface Row {

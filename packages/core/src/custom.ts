@@ -5,9 +5,9 @@
  */
 import { formatDate } from "./dates.js";
 
-export const CUSTOM_FIELD_ENTITIES = ["lead", "client", "event"] as const;
+export const CUSTOM_FIELD_ENTITIES = ["lead", "client", "event", "task"] as const;
 export type CustomFieldEntity = (typeof CUSTOM_FIELD_ENTITIES)[number];
-export const CUSTOM_FIELD_ENTITY_LABELS: Record<CustomFieldEntity, string> = { lead: "Enquiries", client: "Clients", event: "Events" };
+export const CUSTOM_FIELD_ENTITY_LABELS: Record<CustomFieldEntity, string> = { lead: "Enquiries", client: "Clients", event: "Events", task: "Tasks" };
 
 export const CUSTOM_FIELD_KINDS = ["text", "number", "date", "choice", "yes_no"] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];

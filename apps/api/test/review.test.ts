@@ -65,8 +65,8 @@ describe("scores", () => {
     const lateOne = await task("Order flowers", "2026-08-12");
     await task("Call the band", "2026-08-20");
     for (const id of [onTime, lateOne]) await call(t.app, "POST", `/workspaces/${ws}/tasks/${id}/done`, { token: staff, body: { done: true } });
-    await sql(`UPDATE tasks SET done_at = '2026-08-10T10:00:00+05:30' WHERE id = $1`, [onTime]);
-    await sql(`UPDATE tasks SET done_at = '2026-08-14T10:00:00+05:30' WHERE id = $1`, [lateOne]);
+    await sql(`UPDATE tasks SET done_at = '2026-08-10T10:00:00+05:30', completed_at = '2026-08-10T10:00:00+05:30' WHERE id = $1`, [onTime]);
+    await sql(`UPDATE tasks SET done_at = '2026-08-14T10:00:00+05:30', completed_at = '2026-08-14T10:00:00+05:30' WHERE id = $1`, [lateOne]);
 
     // Follow-ups: A kept (called on the day), B missed, C moved before it came due.
     const lead = async (name: string) =>
@@ -124,7 +124,7 @@ describe("scores", () => {
       body: { title: "Site visit", eventId: ev.body.data.id, dueDate: "2026-08-14" },
     });
     await call(t.app, "POST", `/workspaces/${ws}/tasks/${step.body.data.id}/done`, { token: owner, body: { done: true } });
-    await sql(`UPDATE tasks SET done_at = '2026-08-13T18:00:00+05:30' WHERE id = $1`, [step.body.data.id]);
+    await sql(`UPDATE tasks SET done_at = '2026-08-13T18:00:00+05:30', completed_at = '2026-08-13T18:00:00+05:30' WHERE id = $1`, [step.body.data.id]);
 
     const res = await call<Scores>(t.app, "GET", `/workspaces/${ws}/scores?month=2026-08`, { token: owner });
     expect(res.status).toBe(200);

@@ -3,17 +3,23 @@
 import { can, daysBetween, formatClock, formatDueDay, type Role } from "@wedding-yantra/core";
 import { useSetTaskDone } from "@wedding-yantra/api-client/react";
 import type { TaskItem } from "@wedding-yantra/types";
-import { Check, Flag, Repeat } from "lucide-react";
+import { Check, ListChecks, MessageSquare, Paperclip, Repeat, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Card } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
+import { PriorityMark, StatusPill } from "./task-bits";
 
 /** Whoever it's for or made it, owners and managers, or anyone on its event when it's for nobody. Same rule as the API. */
 export function canTick(task: TaskItem, role: Role, userId: string) {
   return can(role, "tasks.manage") || task.assignee?.id === userId || task.createdBy?.id === userId || task.assignee === null;
+}
+
+/** Whoever gave it, or an owner or manager: they approve, send back and cancel. */
+export function isBoss(task: TaskItem, role: Role, userId: string) {
+  return can(role, "tasks.manage") || task.createdBy?.id === userId;
 }
 
 /** Owners and managers change any task; everyone else the ones they added. */
@@ -43,9 +49,12 @@ export function TaskRow({
   // The tick shows at once; it stops overriding as soon as the refreshed task arrives.
   const [pending, setPending] = useState<{ done: boolean; was: boolean } | null>(null);
   const done = pending && pending.was === task.done ? pending.done : task.done;
-  const tickable = canTick(task, workspace.role, me.user.id);
+  const tickable = canTick(task, workspace.role, me.user.id) && task.status !== "cancelled";
+  // A task that needs a check is handed in, not ticked: the tick opens it.
+  const handIn = task.needsCheck && !isBoss(task, workspace.role, me.user.id) && task.status !== "done";
 
   async function toggle() {
+    if (handIn || task.status === "review") return onOpen?.(task);
     const next = !done;
     setPending({ done: next, was: task.done });
     try {
@@ -56,7 +65,7 @@ export function TaskRow({
     }
   }
 
-  const late = !done && task.dueDate !== null && task.dueDate < today;
+  const late = !done && task.status !== "cancelled" && task.dueDate !== null && task.dueDate < today;
   const who = task.assignee ? (task.assignee.id === me.user.id ? "You" : (task.assignee.name ?? "Team member")) : "Anyone on the event";
 
   return (
@@ -67,18 +76,23 @@ export function TaskRow({
         aria-checked={done}
         aria-label={task.title}
         disabled={!tickable}
-        title={tickable ? undefined : "This task is for someone else"}
         onClick={toggle}
+        title={handIn ? "Hand it in for a check" : task.status === "review" ? "Waiting for a check" : tickable ? undefined : "This task is for someone else"}
         className="group grid size-11 shrink-0 place-items-center rounded-full disabled:cursor-not-allowed"
       >
         <span
           className={cn(
             "grid size-6 place-items-center rounded-full border-2 transition",
-            done ? "border-success bg-success text-on-brand" : "border-line-strong bg-surface group-hover:border-sun-300",
+            done
+              ? "border-success bg-success text-on-brand"
+              : task.status === "review"
+                ? "border-[#6366F1] bg-[#EEF2FF] text-[#4338CA]"
+                : "border-line-strong bg-surface group-hover:border-sun-300",
             !tickable && !done && "border-dashed opacity-50",
           )}
         >
           {done && <Check className="size-3.5" strokeWidth={3} />}
+          {!done && task.status === "review" && <ShieldCheck className="size-3.5" />}
         </span>
       </button>
       <button
@@ -89,11 +103,8 @@ export function TaskRow({
       >
         <span className={cn("block font-semibold leading-snug", done && "text-ink-muted line-through")}>{task.title}</span>
         <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-ink-muted">
-          {task.priority === "high" && !done && (
-            <span className="inline-flex items-center gap-1 font-semibold text-brand-strong">
-              <Flag className="size-3.5" /> Urgent
-            </span>
-          )}
+          {(task.status === "doing" || task.status === "waiting" || task.status === "review" || task.status === "cancelled") && <StatusPill status={task.status} />}
+          {!done && <PriorityMark priority={task.priority} />}
           {task.dueDate && (
             <span className={cn(late && "font-semibold text-danger")}>
               {formatDueDay(task.dueDate, today)}
@@ -105,7 +116,29 @@ export function TaskRow({
               <Repeat className="size-3.5" /> <span className="sr-only">{task.repeat.label}</span>
             </span>
           )}
+          {task.steps.total > 0 && (
+            <span className="inline-flex items-center gap-1 tabular" title="Steps done">
+              <ListChecks className="size-3.5" /> {task.steps.done}/{task.steps.total}
+            </span>
+          )}
+          {task.comments > 0 && (
+            <span className="inline-flex items-center gap-1 tabular" title="Comments">
+              <MessageSquare className="size-3.5" /> {task.comments}
+            </span>
+          )}
+          {task.files > 0 && (
+            <span className="inline-flex items-center gap-1 tabular" title="Files">
+              <Paperclip className="size-3.5" /> {task.files}
+            </span>
+          )}
+          {task.needsCheck && !done && task.status !== "review" && (
+            <span className="inline-flex items-center gap-1" title="Whoever gave it checks the work">
+              <ShieldCheck className="size-3.5" /> Check
+            </span>
+          )}
+          {task.tagLabel && <span className="rounded-md bg-cream px-1.5 text-xs font-semibold leading-5 text-ink-muted">{task.tagLabel}</span>}
           {show.event && task.eventTitle && <span className="min-w-0 truncate">{task.eventTitle}</span>}
+          {!show.event && task.clientName && <span className="min-w-0 truncate">{task.clientName}</span>}
           {show.assignee && <span>{who}</span>}
         </span>
         {note && <span className="mt-0.5 block text-xs text-ink-subtle">{note}</span>}

@@ -136,6 +136,20 @@ export function activityText(a: ActivityFacts): string {
       return `gave ${a.other ?? "someone"} a task: ${q(a.subject)}`;
     case "task.done":
       return `ticked off ${q(a.subject)}${a.detail ? ` for ${a.detail}` : ""}${a.late ? ", late" : ""}`;
+    case "task.submitted":
+      return `handed in ${q(a.subject)} for a check`;
+    case "task.approved":
+      return `approved ${q(a.subject)}${a.other ? ` by ${a.other}` : ""}${a.late ? ", late" : ""}`;
+    case "task.sent_back":
+      return `sent back ${q(a.subject)}${a.other ? ` to ${a.other}` : ""}${a.detail ? `: ${a.detail}` : ""}`;
+    case "task.stuck":
+      return `is stuck on ${q(a.subject)}${a.detail ? `: ${a.detail}` : ""}`;
+    case "task.cancelled":
+      return `cancelled ${q(a.subject)}`;
+    case "task.deadline_moved":
+      return `moved ${q(a.subject)}${a.detail ? ` ${a.detail}` : " later"}`;
+    case "task.commented":
+      return `commented on ${q(a.subject)}`;
     case "time_off.added":
       return a.other ? `marked ${a.other} as off${a.detail ? ` ${a.detail}` : ""}` : `will be off${a.detail ? ` ${a.detail}` : ""}`;
     case "lead.created":

@@ -142,6 +142,14 @@ import type {
   UpdateWorkspaceInput,
   User,
   Workspace,
+  CommentInput,
+  MoveTaskInput,
+  PeopleBoard,
+  ReviewTaskInput,
+  SnoozeTaskInput,
+  SubmitTaskInput,
+  TaskDetail,
+  UpdateStepInput,
 } from "@wedding-yantra/types";
 
 /** Thrown for every failed call. `fields` holds per-field messages for forms. */
@@ -208,6 +216,7 @@ export function createApiClient(options: ApiClientOptions) {
   }
 
   const ws = (id: string) => `/workspaces/${encodeURIComponent(id)}`;
+  const task = (workspaceId: string, id: string) => `${ws(workspaceId)}/tasks/${encodeURIComponent(id)}`;
   const qs = (params: Record<string, string | undefined>) => {
     const entries = Object.entries(params).filter((e): e is [string, string] => !!e[1]);
     return entries.length ? `?${new URLSearchParams(entries).toString()}` : "";
@@ -391,6 +400,25 @@ export function createApiClient(options: ApiClientOptions) {
         request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/tasks/${encodeURIComponent(id)}`),
       /** Your tasks for today and the week, and the events you're working */
       myDay: (workspaceId: string) => request<MyDay>("GET", `${ws(workspaceId)}/my-day`),
+      /** One task with its steps, comments, files, hand-ins and history */
+      get: (workspaceId: string, id: string) => request<TaskDetail>("GET", `${task(workspaceId, id)}`),
+      /** Each person's load and the business's totals (owners and managers) */
+      board: (workspaceId: string) => request<PeopleBoard>("GET", `${ws(workspaceId)}/tasks/board`),
+      move: (workspaceId: string, id: string, input: MoveTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/move`, input),
+      submit: (workspaceId: string, id: string, input: SubmitTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/submit`, input),
+      review: (workspaceId: string, id: string, input: ReviewTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/review`, input),
+      snooze: (workspaceId: string, id: string, input: SnoozeTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/snooze`, input),
+      addStep: (workspaceId: string, id: string, title: string) => request<TaskDetail>("POST", `${task(workspaceId, id)}/steps`, { title }),
+      updateStep: (workspaceId: string, id: string, stepId: string, input: UpdateStepInput) =>
+        request<TaskDetail>("PATCH", `${task(workspaceId, id)}/steps/${encodeURIComponent(stepId)}`, input),
+      removeStep: (workspaceId: string, id: string, stepId: string) =>
+        request<TaskDetail>("DELETE", `${task(workspaceId, id)}/steps/${encodeURIComponent(stepId)}`),
+      comment: (workspaceId: string, id: string, input: CommentInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/comments`, input),
+      removeComment: (workspaceId: string, id: string, commentId: string) =>
+        request<TaskDetail>("DELETE", `${task(workspaceId, id)}/comments/${encodeURIComponent(commentId)}`),
+      attach: (workspaceId: string, id: string, fileId: string) => request<TaskDetail>("POST", `${task(workspaceId, id)}/files`, { fileId }),
+      detach: (workspaceId: string, id: string, fileId: string) =>
+        request<TaskDetail>("DELETE", `${task(workspaceId, id)}/files/${encodeURIComponent(fileId)}`),
     },
     checklist: {
       get: (workspaceId: string) => request<ChecklistItem[]>("GET", `${ws(workspaceId)}/checklist`),

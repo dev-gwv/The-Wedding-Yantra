@@ -1,13 +1,16 @@
-import { can, checklistDays, describeRepeat, eventScope, type RepeatFrequency } from "@wedding-yantra/core";
-import type { ChecklistItem, ChecklistWhen, MyDay, StarterPack, TaskItem, TaskPriority, TeamMember } from "@wedding-yantra/types";
+import { can, checklistDays, describeRepeat, eventScope, type CustomValues, type RepeatFrequency, type TaskStatus } from "@wedding-yantra/core";
+import type { ChecklistItem, ChecklistWhen, MyDay, StarterPack, TaskDueFilter, TaskItem, TaskPriority, TeamMember } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { eventTeam, listEvents } from "../bookings/events.js";
 import { makeDueRepeats } from "./repeats.js";
+import { moveTask } from "./delegation.js";
+import { writeCustom } from "../fields/service.js";
+import { assertOption, optionJoin } from "../options/service.js";
 
-const manages = (ctx: MemberContext) => can(ctx.role, "tasks.manage");
+export const manages = (ctx: MemberContext) => can(ctx.role, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
   if (!can(ctx.role, "tasks.work")) throw forbidden("Your role doesn't include tasks");
 };
@@ -19,7 +22,7 @@ const requireManage = (ctx: MemberContext) => {
 // Reading tasks
 // ---------------------------------------------------------------------------
 
-interface TaskRow {
+export interface TaskRow {
   id: string;
   title: string;
   notes: string | null;
@@ -30,7 +33,7 @@ interface TaskRow {
   due_date: string | null;
   due_time: string | null;
   priority: TaskPriority;
-  status: "open" | "done";
+  status: TaskStatus;
   done_at: Date | null;
   done_by: string | null;
   done_by_name: string | null;
@@ -44,27 +47,60 @@ interface TaskRow {
   repeat_weekdays: number[] | null;
   repeat_month_day: number | null;
   repeat_stopped: boolean | null;
+  tag: string | null;
+  tag_label: string | null;
+  client_id: string | null;
+  client_name: string | null;
+  start_date: string | null;
+  estimate_hours: string | null;
+  needs_check: boolean;
+  waiting_reason: string | null;
+  completed_at: Date | null;
+  accepted_at: Date | null;
+  revisions: number;
+  moved_count: number;
+  custom: CustomValues;
+  steps_done: number;
+  steps_total: number;
+  comment_count: number;
+  file_count: number;
+  last_sub_at: Date | null;
+  last_sub_link: string | null;
+  last_sub_decision: "approved" | "sent_back" | null;
 }
 
-const TASK_SELECT = `
+export const TASK_SELECT = `
   SELECT t.id, t.title, t.notes, t.event_id, e.title AS event_title, t.assignee_id, a.name AS assignee_name,
          t.due_date::text AS due_date, to_char(t.due_time, 'HH24:MI') AS due_time, t.priority, t.status,
          t.done_at, t.done_by, d.name AS done_by_name, t.template_id, t.created_by, c.name AS created_by_name,
          t.created_at, (now() AT TIME ZONE w.timezone)::date::text AS today,
          t.repeat_id, rp.frequency AS repeat_frequency, rp.weekdays AS repeat_weekdays, rp.month_day AS repeat_month_day,
-         (rp.stopped_at IS NOT NULL) AS repeat_stopped
+         (rp.stopped_at IS NOT NULL) AS repeat_stopped,
+         t.tag, tg.label AS tag_label, t.client_id, cl.name AS client_name, t.start_date::text AS start_date, t.estimate_hours,
+         t.needs_check, t.waiting_reason, t.completed_at, t.accepted_at, t.revisions, t.moved_count, t.custom,
+         (SELECT count(*)::int FROM task_steps s WHERE s.task_id = t.id AND s.done_at IS NOT NULL) AS steps_done,
+         (SELECT count(*)::int FROM task_steps s WHERE s.task_id = t.id) AS steps_total,
+         (SELECT count(*)::int FROM task_comments k WHERE k.task_id = t.id AND k.deleted_at IS NULL) AS comment_count,
+         (SELECT count(*)::int FROM task_files f WHERE f.task_id = t.id) AS file_count,
+         ls.created_at AS last_sub_at, ls.link AS last_sub_link, ls.decision AS last_sub_decision
     FROM tasks t
     LEFT JOIN task_repeats rp ON rp.id = t.repeat_id
+    LEFT JOIN clients cl ON cl.id = t.client_id
+    ${optionJoin("tg", "task_tag", "t.workspace_id", "t.tag")}
+    LEFT JOIN LATERAL (SELECT created_at, link, decision FROM task_submissions WHERE task_id = t.id ORDER BY created_at DESC LIMIT 1) ls ON true
     JOIN workspaces w ON w.id = t.workspace_id
     LEFT JOIN events e ON e.id = t.event_id
     LEFT JOIN users a ON a.id = t.assignee_id
     LEFT JOIN users d ON d.id = t.done_by
     LEFT JOIN users c ON c.id = t.created_by`;
 
+/** Urgent first, then high, normal, low. */
+export const PRIORITY_RANK = "CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END";
+
 /** Tasks that aren't for an event, or whose event is still on. */
 const ACTIVE_EVENT = "(t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))";
 
-const toTask = (r: TaskRow): TaskItem => ({
+export const toTask = (r: TaskRow): TaskItem => ({
   id: r.id,
   title: r.title,
   notes: r.notes,
@@ -74,10 +110,28 @@ const toTask = (r: TaskRow): TaskItem => ({
   dueDate: r.due_date,
   dueTime: r.due_time,
   priority: r.priority,
+  status: r.status,
   done: r.status === "done",
   doneAt: r.done_at?.toISOString() ?? null,
   doneBy: r.done_by ? { id: r.done_by, name: r.done_by_name } : null,
-  overdue: r.status === "open" && r.due_date !== null && r.due_date < r.today,
+  overdue: r.status !== "done" && r.status !== "cancelled" && r.due_date !== null && r.due_date < r.today,
+  tag: r.tag,
+  tagLabel: r.tag ? (r.tag_label ?? r.tag) : null,
+  clientId: r.client_id,
+  clientName: r.client_name,
+  startDate: r.start_date,
+  estimateHours: r.estimate_hours === null ? null : Number(r.estimate_hours),
+  needsCheck: r.needs_check,
+  waitingReason: r.waiting_reason,
+  completedAt: r.completed_at?.toISOString() ?? null,
+  acceptedAt: r.accepted_at?.toISOString() ?? null,
+  revisions: r.revisions,
+  movedCount: r.moved_count,
+  steps: { done: r.steps_done, total: r.steps_total },
+  comments: r.comment_count,
+  files: r.file_count,
+  lastSubmission: r.last_sub_at ? { at: r.last_sub_at.toISOString(), link: r.last_sub_link, decision: r.last_sub_decision } : null,
+  custom: r.custom ?? {},
   fromChecklist: r.template_id !== null,
   repeat:
     r.repeat_id && r.repeat_frequency
@@ -92,7 +146,7 @@ const toTask = (r: TaskRow): TaskItem => ({
 });
 
 /** Whether this person may look at the event (freelancers: only events they're on). */
-async function seesEvent(db: Queryable, ctx: MemberContext, eventId: string): Promise<boolean> {
+export async function seesEvent(db: Queryable, ctx: MemberContext, eventId: string): Promise<boolean> {
   const { rows } = await db.query<{ on_team: boolean }>(
     `SELECT EXISTS (SELECT 1 FROM event_team WHERE event_id = e.id AND user_id = $3) AS on_team
        FROM events e WHERE e.id = $1 AND e.workspace_id = $2 AND e.deleted_at IS NULL`,
@@ -103,7 +157,7 @@ async function seesEvent(db: Queryable, ctx: MemberContext, eventId: string): Pr
 }
 
 /** A task is visible to managers, to whoever it's for or who made it, and to anyone who can see its event. */
-async function loadTask(db: Queryable, ctx: MemberContext, id: string, lock = false): Promise<TaskRow> {
+export async function loadTask(db: Queryable, ctx: MemberContext, id: string, lock = false): Promise<TaskRow> {
   const { rows } = await db.query<TaskRow>(
     `${TASK_SELECT} WHERE t.id = $1 AND t.workspace_id = $2 AND t.deleted_at IS NULL${lock ? " FOR UPDATE OF t" : ""}`,
     [id, ctx.workspaceId],
@@ -122,7 +176,18 @@ async function loadTask(db: Queryable, ctx: MemberContext, id: string, lock = fa
 export async function listTasks(
   db: Queryable,
   ctx: MemberContext,
-  filters: { scope?: "mine" | "team"; status?: "open" | "done"; eventId?: string; assigneeId?: string } = {},
+  filters: {
+    scope?: "mine" | "team" | "given";
+    status?: "open" | "done";
+    state?: TaskStatus;
+    eventId?: string;
+    clientId?: string;
+    assigneeId?: string;
+    priority?: TaskPriority;
+    tag?: string;
+    due?: TaskDueFilter;
+    q?: string;
+  } = {},
 ): Promise<TaskItem[]> {
   requireWork(ctx);
   const params: unknown[] = [ctx.workspaceId];
@@ -136,9 +201,17 @@ export async function listTasks(
     if (!(await seesEvent(db, ctx, filters.eventId))) throw notFound("This event");
     where.push(`t.event_id = ${add(filters.eventId)}`);
   } else {
-    if (filters.scope === "team") {
+    if (filters.clientId) {
+      // A client's tasks: managers see all of them, everyone else their own.
+      where.push(`t.client_id = ${add(filters.clientId)}`);
+      if (!manages(ctx)) where.push(`(t.assignee_id = ${add(ctx.userId)} OR t.created_by = $${params.length})`);
+    } else if (filters.scope === "team") {
       requireManage(ctx);
-      if (filters.assigneeId) where.push(`t.assignee_id = ${add(filters.assigneeId)}`);
+      if (filters.assigneeId === "none") where.push("t.assignee_id IS NULL");
+      else if (filters.assigneeId) where.push(`t.assignee_id = ${add(filters.assigneeId)}`);
+    } else if (filters.scope === "given") {
+      // Tasks I gave others: to follow up on.
+      where.push(`t.created_by = ${add(ctx.userId)}`, `t.assignee_id IS DISTINCT FROM $${params.length}`);
     } else {
       where.push(`t.assignee_id = ${add(ctx.userId)}`);
     }
@@ -147,12 +220,25 @@ export async function listTasks(
     // Today's copies of repeating tasks appear the first time anyone looks.
     await makeDueRepeats(db, ctx.workspaceId);
   }
-  if (filters.status) where.push(`t.status = ${add(filters.status)}`);
+  if (filters.state) where.push(`t.status = ${add(filters.state)}`);
+  else if (filters.status === "open") where.push("t.status NOT IN ('done', 'cancelled')");
+  else if (filters.status === "done") where.push("t.status = 'done'");
+  if (filters.priority) where.push(`t.priority = ${add(filters.priority)}`);
+  if (filters.tag) where.push(`t.tag = ${add(filters.tag)}`);
+  if (filters.q) {
+    const like = add(`%${filters.q.replace(/[%_]/g, "")}%`);
+    where.push(`(t.title ILIKE ${like} OR t.notes ILIKE ${like} OR e.title ILIKE ${like} OR cl.name ILIKE ${like})`);
+  }
+  const today = "(now() AT TIME ZONE w.timezone)::date";
+  if (filters.due === "overdue") where.push(`t.due_date < ${today}`);
+  else if (filters.due === "today") where.push(`t.due_date = ${today}`);
+  else if (filters.due === "week") where.push(`t.due_date BETWEEN ${today} AND ${today} + 7`);
+  else if (filters.due === "none") where.push("t.due_date IS NULL");
   // Finished tasks: the latest first. Otherwise by day, urgent ones first within a day.
   const order =
-    filters.status === "done"
-      ? "t.done_at DESC NULLS LAST, t.created_at DESC LIMIT 100"
-      : "(t.status = 'done'), t.due_date NULLS LAST, (t.priority = 'high') DESC, t.due_time NULLS LAST, t.position, t.created_at LIMIT 500";
+    filters.status === "done" || filters.state === "done" || filters.state === "cancelled"
+      ? "coalesce(t.done_at, t.updated_at) DESC NULLS LAST, t.created_at DESC LIMIT 100"
+      : `(t.status IN ('done', 'cancelled')), t.due_date NULLS LAST, ${PRIORITY_RANK}, t.due_time NULLS LAST, t.position, t.created_at LIMIT 500`;
   const { rows } = await db.query<TaskRow>(`${TASK_SELECT} WHERE ${where.join(" AND ")} ORDER BY ${order}`, params);
   return rows.map(toTask);
 }
@@ -161,7 +247,7 @@ export async function listTasks(
 // Writing tasks
 // ---------------------------------------------------------------------------
 
-interface TaskFields {
+export interface TaskFields {
   title: string;
   notes?: string | null;
   eventId?: string | null;
@@ -169,6 +255,13 @@ interface TaskFields {
   dueDate?: string | null;
   dueTime?: string | null;
   priority?: TaskPriority;
+  tag?: string | null;
+  clientId?: string | null;
+  startDate?: string | null;
+  estimateHours?: number | null;
+  needsCheck?: boolean;
+  custom?: Record<string, unknown>;
+  steps?: string[];
 }
 
 async function assertMember(db: Queryable, workspaceId: string, userId: string) {
@@ -177,6 +270,16 @@ async function assertMember(db: Queryable, workspaceId: string, userId: string) 
     [workspaceId, userId],
   );
   if (!rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose someone from your team", { assigneeId: "Choose someone from your team" });
+}
+
+async function assertClient(db: Queryable, workspaceId: string, clientId: string) {
+  const { rowCount } = await db.query(`SELECT 1 FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [clientId, workspaceId]);
+  if (!rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose a client from your list", { clientId: "Choose a client" });
+}
+
+/** One line in a task's history. */
+export async function taskEvent(db: Queryable, taskId: string, actorId: string | null, action: string, meta: Record<string, unknown> = {}) {
+  await db.query(`INSERT INTO task_events (task_id, actor_id, action, meta) VALUES ($1, $2, $3, $4)`, [taskId, actorId, action, JSON.stringify(meta)]);
 }
 
 /**
@@ -196,34 +299,53 @@ export async function createTask(db: Db, ctx: MemberContext, input: TaskFields):
   if (input.eventId && !(await seesEvent(db, ctx, input.eventId))) {
     throw new AppError(400, "VALIDATION_ERROR", "Choose an event from your list", { eventId: "Choose an event" });
   }
-  const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO tasks (workspace_id, title, notes, event_id, assignee_id, due_date, due_time, priority, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-    [
-      ctx.workspaceId,
-      input.title,
-      input.notes ?? null,
-      input.eventId ?? null,
-      assignee,
-      input.dueDate ?? null,
-      input.dueTime ?? null,
-      input.priority ?? "normal",
-      ctx.userId,
-    ],
-  );
-  if (assignee !== ctx.userId) {
-    await logActivity(db, {
-      workspaceId: ctx.workspaceId,
-      actorUserId: ctx.userId,
-      action: "task.assigned",
-      entityType: "task",
-      entityId: rows[0]!.id,
-      meta: { title: input.title, assigneeId: assignee },
-    });
-  }
-  return toTask(await loadTask(db, ctx, rows[0]!.id));
+  return withTransaction(db, async (tx) => {
+    if (input.clientId) await assertClient(tx, ctx.workspaceId, input.clientId);
+    if (input.tag) await assertOption(tx, ctx.workspaceId, "task_tag", input.tag, "tag");
+    // A check only makes sense when someone else does the work.
+    const needsCheck = !!input.needsCheck && assignee !== ctx.userId;
+    const { rows } = await tx.query<{ id: string }>(
+      `INSERT INTO tasks (workspace_id, title, notes, event_id, assignee_id, due_date, due_time, priority, created_by,
+                          tag, client_id, start_date, estimate_hours, needs_check)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      [
+        ctx.workspaceId,
+        input.title,
+        input.notes ?? null,
+        input.eventId ?? null,
+        assignee,
+        input.dueDate ?? null,
+        input.dueTime ?? null,
+        input.priority ?? "normal",
+        ctx.userId,
+        input.tag ?? null,
+        input.clientId ?? null,
+        input.startDate ?? null,
+        input.estimateHours ?? null,
+        needsCheck,
+      ],
+    );
+    const id = rows[0]!.id;
+    for (const [position, title] of (input.steps ?? []).entries()) {
+      await tx.query(`INSERT INTO task_steps (task_id, title, position) VALUES ($1, $2, $3)`, [id, title, position]);
+    }
+    await writeCustom(tx, ctx.workspaceId, "task", id, input.custom);
+    await taskEvent(tx, id, ctx.userId, "created", { assigneeId: assignee, dueDate: input.dueDate ?? null });
+    if (assignee !== ctx.userId) {
+      await logActivity(tx, {
+        workspaceId: ctx.workspaceId,
+        actorUserId: ctx.userId,
+        action: "task.assigned",
+        entityType: "task",
+        entityId: id,
+        meta: { title: input.title, assigneeId: assignee },
+      });
+    }
+    return toTask(await loadTask(tx, ctx, id));
+  });
 }
 
+/** Owners, managers and whoever added it change a task. A later date is counted as moved. */
 export async function updateTask(db: Db, ctx: MemberContext, id: string, input: Partial<TaskFields>): Promise<TaskItem> {
   requireWork(ctx);
   return withTransaction(db, async (tx) => {
@@ -237,6 +359,8 @@ export async function updateTask(db: Db, ctx: MemberContext, id: string, input: 
     if (input.eventId && !(await seesEvent(tx, ctx, input.eventId))) {
       throw new AppError(400, "VALIDATION_ERROR", "Choose an event from your list", { eventId: "Choose an event" });
     }
+    if (input.clientId) await assertClient(tx, ctx.workspaceId, input.clientId);
+    if (input.tag) await assertOption(tx, ctx.workspaceId, "task_tag", input.tag, "tag", row.tag ?? undefined);
     const map: [keyof TaskFields, string][] = [
       ["title", "title"],
       ["notes", "notes"],
@@ -245,51 +369,63 @@ export async function updateTask(db: Db, ctx: MemberContext, id: string, input: 
       ["dueDate", "due_date"],
       ["dueTime", "due_time"],
       ["priority", "priority"],
+      ["tag", "tag"],
+      ["clientId", "client_id"],
+      ["startDate", "start_date"],
+      ["estimateHours", "estimate_hours"],
+      ["needsCheck", "needs_check"],
     ];
     const sets: string[] = [];
     const values: unknown[] = [id];
+    const changed: string[] = [];
     for (const [key, column] of map) {
       if (input[key] === undefined) continue;
       values.push(input[key]);
       sets.push(`${column} = $${values.length}`);
+      changed.push(key);
     }
+    // Pushing an open task's date later is counted: it's the moved-deadline measure.
+    const later = input.dueDate !== undefined && row.due_date !== null && (input.dueDate === null || input.dueDate > row.due_date);
+    const active = row.status !== "done" && row.status !== "cancelled";
+    if (later && active) sets.push("moved_count = moved_count + 1");
     if (sets.length) await tx.query(`UPDATE tasks SET ${sets.join(", ")} WHERE id = $1`, values);
-    if (input.assigneeId && input.assigneeId !== row.assignee_id && input.assigneeId !== ctx.userId) {
-      await logActivity(tx, {
-        workspaceId: ctx.workspaceId,
-        actorUserId: ctx.userId,
-        action: "task.assigned",
-        entityType: "task",
-        entityId: id,
-        meta: { title: input.title ?? row.title, assigneeId: input.assigneeId },
-      });
+    await writeCustom(tx, ctx.workspaceId, "task", id, input.custom);
+
+    if (input.assigneeId !== undefined && input.assigneeId !== row.assignee_id) {
+      await taskEvent(tx, id, ctx.userId, "reassigned", { from: row.assignee_id, to: input.assigneeId });
+      if (input.assigneeId && input.assigneeId !== ctx.userId) {
+        await logActivity(tx, {
+          workspaceId: ctx.workspaceId,
+          actorUserId: ctx.userId,
+          action: "task.assigned",
+          entityType: "task",
+          entityId: id,
+          meta: { title: input.title ?? row.title, assigneeId: input.assigneeId },
+        });
+      }
     }
+    if (input.dueDate !== undefined && input.dueDate !== row.due_date) {
+      await taskEvent(tx, id, ctx.userId, later ? "deadline_moved" : "due_changed", { from: row.due_date, to: input.dueDate });
+      if (later && active) {
+        await logActivity(tx, {
+          workspaceId: ctx.workspaceId,
+          actorUserId: ctx.userId,
+          action: "task.deadline_moved",
+          entityType: "task",
+          entityId: id,
+          meta: { title: row.title, from: row.due_date, to: input.dueDate, assigneeId: row.assignee_id },
+        });
+      }
+    }
+    const other = changed.filter((k) => k !== "assigneeId" && k !== "dueDate");
+    if (other.length || input.custom) await taskEvent(tx, id, ctx.userId, "edited", { fields: other });
     return toTask(await loadTask(tx, ctx, id));
   });
 }
 
-/** Tick a task off (or back on). The person it's for, managers, or anyone on its event if it's for nobody. */
+/** Tick a task off (or back on). Same as moving it to done, or back to to-do. */
 export async function setTaskDone(db: Db, ctx: MemberContext, id: string, done: boolean): Promise<TaskItem> {
-  requireWork(ctx);
-  const row = await loadTask(db, ctx, id);
-  const allowed = manages(ctx) || row.assignee_id === ctx.userId || row.created_by === ctx.userId || row.assignee_id === null;
-  if (!allowed) throw forbidden("This task is for someone else");
-  await db.query(
-    `UPDATE tasks SET status = $2, done_at = CASE WHEN $2 = 'done' THEN now() END, done_by = CASE WHEN $2 = 'done' THEN $3::uuid END
-      WHERE id = $1`,
-    [id, done ? "done" : "open", ctx.userId],
-  );
-  if (done && row.status !== "done") {
-    await logActivity(db, {
-      workspaceId: ctx.workspaceId,
-      actorUserId: ctx.userId,
-      action: "task.done",
-      entityType: "task",
-      entityId: id,
-      meta: { title: row.title, eventId: row.event_id, dueDate: row.due_date, late: row.due_date !== null && row.due_date < row.today },
-    });
-  }
-  return toTask(await loadTask(db, ctx, id));
+  return moveTask(db, ctx, id, { status: done ? "done" : "open" });
 }
 
 export async function deleteTask(db: Db, ctx: MemberContext, id: string): Promise<void> {
@@ -477,7 +613,7 @@ export async function homeTasks(db: Queryable, ctx: MemberContext): Promise<{ ov
             count(*) FILTER (WHERE t.due_date < today.d) AS team_overdue
        FROM tasks t CROSS JOIN today
        LEFT JOIN events e ON e.id = t.event_id
-      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status = 'open' AND ${ACTIVE_EVENT}`,
+      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status NOT IN ('done', 'cancelled') AND ${ACTIVE_EVENT}`,
     [ctx.workspaceId, ctx.userId],
   );
   const r = rows[0]!;

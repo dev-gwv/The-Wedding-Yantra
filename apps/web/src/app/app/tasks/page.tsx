@@ -1,11 +1,14 @@
 "use client";
 
 import { can, formatDueDay, timeAgo } from "@wedding-yantra/core";
-import { useStopTaskRepeat, useTaskRepeats, useTasks } from "@wedding-yantra/api-client/react";
-import type { TaskItem } from "@wedding-yantra/types";
-import { ListChecks, Lock, Plus, Repeat } from "lucide-react";
+import { usePeopleBoard, useStopTaskRepeat, useTaskRepeats, useTasks } from "@wedding-yantra/api-client/react";
+import type { TaskItem, TaskListQuery } from "@wedding-yantra/types";
+import { AlarmClock, CalendarDays, CircleCheck, CirclePause, Columns3, ListChecks, Lock, Plus, Repeat, ShieldCheck, Users } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
+import { useOptionList } from "@/components/app/option-picker";
+import { Chips, MoneyTile, SearchBox } from "@/components/money/list-kit";
+import { PeopleView, StatusBoard } from "@/components/tasks/boards";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { TaskGroups, TaskRow } from "@/components/tasks/task-row";
@@ -18,7 +21,11 @@ import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { useBusinessDay } from "@/lib/today";
 
-type View = "mine" | "team";
+type Tab = "mine" | "given" | "team";
+type TeamView = "people" | "board" | "list";
+type StateFilter = "all" | "doing" | "waiting" | "review";
+
+const VIEW_KEY = "wy.tasks.view";
 
 function TasksScreen() {
   const { workspace } = useCurrentWorkspace();
@@ -26,8 +33,10 @@ function TasksScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const manage = can(workspace.role, "tasks.manage");
-  const view: View = manage && params.get("view") === "team" ? "team" : "mine";
-  const [sheet, setSheet] = useState<{ task?: TaskItem } | null>(null);
+  const asked = params.get("view");
+  const tab: Tab = manage && (asked === "team" || asked === "given") ? asked : "mine";
+  const openId = params.get("open");
+  const [sheet, setSheet] = useState<{ task?: TaskItem; assigneeId?: string } | null>(null);
 
   if (!can(workspace.role, "tasks.work")) {
     return (
@@ -43,7 +52,21 @@ function TasksScreen() {
     );
   }
 
-  const setView = (v: View) => router.replace(v === "mine" ? pathname : `${pathname}?view=${v}`, { scroll: false });
+  /** Changes some search params, keeping the rest. */
+  const setParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null || v === "") next.delete(k);
+      else next.set(k, v);
+    }
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+  const open = (task: TaskItem) => setSheet({ task });
+  const closeSheet = () => {
+    setSheet(null);
+    if (openId) setParams({ open: null });
+  };
 
   return (
     <>
@@ -51,7 +74,7 @@ function TasksScreen() {
         title="Tasks"
         action={
           <Button onClick={() => setSheet({})}>
-            <Plus className="size-4" strokeWidth={2.5} /> {manage ? "New task" : "Add task"}
+            <Plus className="size-4" strokeWidth={2.5} /> {manage ? "Give a task" : "Add task"}
           </Button>
         }
       />
@@ -60,17 +83,18 @@ function TasksScreen() {
           {(
             [
               ["mine", "Mine"],
+              ["given", "Given by me"],
               ["team", "Team"],
             ] as const
           ).map(([key, label]) => (
             <button
               key={key}
               role="tab"
-              aria-selected={view === key}
-              onClick={() => setView(key)}
+              aria-selected={tab === key}
+              onClick={() => setParams({ view: key === "mine" ? null : key, state: null, who: null, due: null })}
               className={cn(
-                "h-10 rounded-xl px-6 text-sm font-bold transition",
-                view === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink",
+                "h-10 rounded-xl px-4 text-sm font-bold transition sm:px-6",
+                tab === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink",
               )}
             >
               {label}
@@ -78,77 +102,74 @@ function TasksScreen() {
           ))}
         </div>
       )}
-      <TaskList key={view} scope={view} onOpen={(task) => setSheet({ task })} />
-      <TaskSheet open={sheet !== null} onClose={() => setSheet(null)} task={sheet?.task} />
+      {tab === "team" ? (
+        <TeamTasks params={params} setParams={setParams} onOpen={open} onAddFor={(assigneeId) => setSheet({ assigneeId })} />
+      ) : (
+        <TaskList key={tab} scope={tab} params={params} setParams={setParams} onOpen={open} />
+      )}
+      <TaskSheet
+        open={sheet !== null || !!openId}
+        onClose={closeSheet}
+        task={sheet?.task}
+        taskId={sheet?.task ? undefined : (openId ?? undefined)}
+        assigneeId={sheet?.assigneeId}
+      />
     </>
   );
 }
 
-function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => void }) {
-  const { workspace, me } = useCurrentWorkspace();
-  const open = useTasks(workspace.id, { scope, status: "open" });
+type Params = ReturnType<typeof useSearchParams>;
+type SetParams = (patch: Record<string, string | null>) => void;
+
+const STATE_CHIPS: [StateFilter, string][] = [
+  ["all", "All open"],
+  ["doing", "Doing"],
+  ["waiting", "Stuck"],
+  ["review", "To check"],
+];
+
+/** Mine, or the ones I gave others: grouped by day, with status chips and search. */
+function TaskList({ scope, params, setParams, onOpen }: { scope: "mine" | "given"; params: Params; setParams: SetParams; onOpen: (task: TaskItem) => void }) {
+  const { me } = useCurrentWorkspace();
+  const { workspace } = useCurrentWorkspace();
+  const state = (params.get("state") as StateFilter | null) ?? "all";
+  const q = params.get("q") ?? "";
+  const onSearch = useCallback((v: string) => setParams({ q: v || null }), [setParams]);
+  const query: TaskListQuery = { scope, status: "open", ...(state !== "all" ? { state } : {}), ...(q ? { q } : {}) };
+  const open = useTasks(workspace.id, query);
   const [showDone, setShowDone] = useState(false);
   const done = useTasks(workspace.id, { scope, status: "done" }, showDone);
-  const [person, setPerson] = useState("all");
   const today = useBusinessDay()();
-
-  if (open.isPending)
-    return (
-      <div className="flex justify-center py-16 text-brand">
-        <Spinner />
-      </div>
-    );
-  if (open.isError) return <Notice tone="danger">{errorMessage(open.error)}</Notice>;
-
-  // The team view filters by person: only people who have open tasks are offered.
-  const people = new Map<string, string>();
-  for (const t of open.data) people.set(t.assignee?.id ?? "none", t.assignee ? (t.assignee.id === me.user.id ? "You" : (t.assignee.name ?? "Team member")) : "Anyone on the event");
-  const chosen = person !== "all" && people.has(person) ? person : "all";
-  const list = chosen === "all" ? open.data : open.data.filter((t) => (t.assignee?.id ?? "none") === chosen);
-  const late = open.data.filter((t) => t.overdue).length;
 
   return (
     <div className="space-y-6">
-      {scope === "team" && people.size > 1 && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="tablist" aria-label="Whose tasks">
-          {[["all", `Everyone${late ? ` · ${late} late` : ""}`] as const, ...[...people.entries()]].map(([key, label]) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={chosen === key}
-              onClick={() => setPerson(key)}
-              className={cn(
-                "h-10 shrink-0 rounded-full px-4 text-sm font-bold transition",
-                chosen === key ? "bg-gradient-primary text-on-brand shadow-soft" : "bg-cream text-ink hover:bg-sun-100",
-              )}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="space-y-3">
+        <Chips options={STATE_CHIPS} value={state} onChange={(v) => setParams({ state: v === "all" ? null : v })} label="Where it stands" quiet />
+        <SearchBox value={q} onChange={onSearch} placeholder="Search tasks" />
+      </div>
+      {open.isPending && (
+        <div className="flex justify-center py-16 text-brand">
+          <Spinner />
         </div>
       )}
-
-      {list.length === 0 ? (
+      {open.isError && <Notice tone="danger">{errorMessage(open.error)}</Notice>}
+      {open.data && open.data.length === 0 && (
         <Card>
-          <EmptyState icon={ListChecks} title={scope === "team" ? "No open tasks in the team" : "Nothing on your list"}>
-            {scope === "team"
-              ? "Tasks you give the team, and each event's checklist, show up here until they're done."
-              : "Tasks given to you, and ones you add for yourself, show up here. Tick them off as you go."}
+          <EmptyState icon={ListChecks} title={q || state !== "all" ? "Nothing matches" : scope === "given" ? "Nothing waiting on others" : "Nothing on your list"}>
+            {q || state !== "all"
+              ? "Try another filter or search."
+              : scope === "given"
+                ? "Tasks you give the team show here until they're done, so you can follow up."
+                : "Tasks given to you, and ones you add for yourself, show up here. Tick them off as you go."}
           </EmptyState>
         </Card>
-      ) : (
-        <TaskGroups tasks={list} today={today} show={{ event: true, assignee: scope === "team" }} onOpen={onOpen} />
       )}
+      {open.data && open.data.length > 0 && <TaskGroups tasks={open.data} today={today} show={{ event: true, assignee: scope === "given" }} onOpen={onOpen} />}
 
-      <Repeats scope={scope} today={today} />
+      {scope === "mine" && <Repeats scope="mine" today={today} />}
 
       <section>
-        <button
-          type="button"
-          onClick={() => setShowDone((s) => !s)}
-          aria-expanded={showDone}
-          className="text-sm font-bold text-brand-strong hover:text-brand-deep"
-        >
+        <button type="button" onClick={() => setShowDone((s) => !s)} aria-expanded={showDone} className="text-sm font-bold text-brand-strong hover:text-brand-deep">
           {showDone ? "Hide done tasks" : "Show done tasks"}
         </button>
         {showDone && (
@@ -158,7 +179,6 @@ function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => 
                 <Spinner />
               </div>
             )}
-            {done.isError && <Notice tone="danger">{errorMessage(done.error)}</Notice>}
             {done.data && done.data.length === 0 && <p className="text-sm text-ink-muted">Nothing ticked off yet.</p>}
             {done.data && done.data.length > 0 && (
               <Card className="overflow-hidden">
@@ -168,7 +188,7 @@ function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => 
                       key={t.id}
                       task={t}
                       today={today}
-                      show={{ event: true, assignee: scope === "team" }}
+                      show={{ event: true, assignee: scope === "given" }}
                       onOpen={onOpen}
                       note={t.doneAt && `Done ${t.doneBy?.name && t.doneBy.id !== me.user.id ? `by ${t.doneBy.name} ` : ""}${timeAgo(t.doneAt)}`}
                     />
@@ -183,8 +203,168 @@ function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => 
   );
 }
 
+/** The owner's view of everyone's work: totals, then people, a status board, or a list. */
+function TeamTasks({ params, setParams, onOpen, onAddFor }: { params: Params; setParams: SetParams; onOpen: (t: TaskItem) => void; onAddFor: (userId: string) => void }) {
+  const { workspace } = useCurrentWorkspace();
+  const today = useBusinessDay()();
+  const board = usePeopleBoard(workspace.id);
+  const [view, setViewState] = useState<TeamView>(() => {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      return saved === "board" || saved === "list" ? saved : "people";
+    } catch {
+      return "people";
+    }
+  });
+  const setView = (v: TeamView) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* private window */
+    }
+  };
+  const state = params.get("state") as TaskListQuery["state"] | null;
+  const due = params.get("due") as TaskListQuery["due"] | null;
+  const who = params.get("who");
+  const priority = params.get("priority") as TaskListQuery["priority"] | null;
+  const tag = params.get("tag");
+  const q = params.get("q") ?? "";
+  const onSearch = useCallback((v: string) => setParams({ q: v || null }), [setParams]);
+  const { active: tags } = useOptionList("task_tag");
+
+  const query: TaskListQuery = {
+    scope: "team",
+    status: "open",
+    ...(state ? { state } : {}),
+    ...(due ? { due } : {}),
+    ...(who ? { assigneeId: who } : {}),
+    ...(priority ? { priority } : {}),
+    ...(tag ? { tag } : {}),
+    ...(q ? { q } : {}),
+  };
+  const tasks = useTasks(workspace.id, query);
+  const done = useTasks(workspace.id, { scope: "team", state: "done", ...(who ? { assigneeId: who } : {}) }, view === "board");
+  const weekAgo = useBusinessDay()(-7);
+  const doneThisWeek = (done.data ?? []).filter((t) => t.doneAt && t.doneAt.slice(0, 10) >= weekAgo);
+  const totals = board.data?.totals;
+  const filtered = !!(state || due || who || priority || tag || q);
+  const toggle = (key: string, value: string, current: string | null) => setParams({ [key]: current === value ? null : value });
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <MoneyTile label="Late" value={totals ? String(totals.late) : "…"} icon={AlarmClock} tone={totals?.late ? "danger" : undefined} active={due === "overdue"} onClick={() => toggle("due", "overdue", due ?? null)} />
+        <MoneyTile label="Due today" value={totals ? String(totals.dueToday) : "…"} icon={CalendarDays} active={due === "today"} onClick={() => toggle("due", "today", due ?? null)} />
+        <MoneyTile
+          label="Waiting for your check"
+          value={totals ? String(totals.toCheck) : "…"}
+          icon={ShieldCheck}
+          tone={totals?.toCheck ? "brand" : undefined}
+          active={state === "review"}
+          onClick={() => toggle("state", "review", state ?? null)}
+        />
+        <MoneyTile label="Stuck" value={totals ? String(totals.stuck) : "…"} icon={CirclePause} active={state === "waiting"} onClick={() => toggle("state", "waiting", state ?? null)} />
+        <MoneyTile label="Done this week" value={totals ? String(totals.doneThisWeek) : "…"} icon={CircleCheck} tone="success" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-xl bg-cream p-1" role="tablist" aria-label="Show as">
+          {(
+            [
+              ["people", "People", Users],
+              ["board", "Board", Columns3],
+              ["list", "List", ListChecks],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={view === key}
+              onClick={() => setView(key)}
+              className={cn("inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-bold", view === key ? "bg-surface shadow-soft" : "text-ink-muted")}
+            >
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
+        {board.data && (
+          <select
+            value={who ?? ""}
+            onChange={(e) => setParams({ who: e.target.value || null })}
+            aria-label="Whose tasks"
+            className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-semibold"
+          >
+            <option value="">Everyone</option>
+            {board.data.people.map((p) => (
+              <option key={p.user.id} value={p.user.id}>
+                {p.user.name ?? "Team member"}
+              </option>
+            ))}
+          </select>
+        )}
+        <select
+          value={priority ?? ""}
+          onChange={(e) => setParams({ priority: e.target.value || null })}
+          aria-label="Priority"
+          className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-semibold"
+        >
+          <option value="">Any priority</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+          <option value="low">Low</option>
+        </select>
+        {tags.length > 0 && (
+          <select value={tag ?? ""} onChange={(e) => setParams({ tag: e.target.value || null })} aria-label="Tag" className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-semibold">
+            <option value="">Any tag</option>
+            {tags.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {filtered && (
+          <button type="button" onClick={() => setParams({ state: null, due: null, who: null, priority: null, tag: null, q: null })} className="text-sm font-semibold text-brand-strong">
+            Clear filters
+          </button>
+        )}
+      </div>
+      <SearchBox value={q} onChange={onSearch} placeholder="Search by task, event or client" />
+
+      {(tasks.isPending || board.isPending) && (
+        <div className="flex justify-center py-16 text-brand">
+          <Spinner />
+        </div>
+      )}
+      {tasks.isError && <Notice tone="danger">{errorMessage(tasks.error)}</Notice>}
+      {tasks.data && board.data && (
+        <>
+          {view === "people" && (
+            <PeopleView board={who ? { ...board.data, people: board.data.people.filter((p) => p.user.id === who) } : board.data} tasks={tasks.data} today={today} onOpen={onOpen} onAddFor={onAddFor} />
+          )}
+          {view === "board" && <StatusBoard tasks={tasks.data} done={doneThisWeek} today={today} onOpen={onOpen} />}
+          {view === "list" &&
+            (tasks.data.length === 0 ? (
+              <Card>
+                <EmptyState icon={ListChecks} title={filtered ? "Nothing matches" : "No open tasks in the team"}>
+                  {filtered ? "Try another filter or search." : "Tasks you give the team, and each event's checklist, show up here until they're done."}
+                </EmptyState>
+              </Card>
+            ) : (
+              <TaskGroups tasks={tasks.data} today={today} show={{ event: true, assignee: true }} onOpen={onOpen} />
+            ))}
+          {view !== "list" && <p className="text-xs text-ink-muted">Drag a card to another column to {view === "people" ? "give it to someone else" : "move it along"}. Tap a card to open it.</p>}
+        </>
+      )}
+      <Repeats scope="team" today={today} />
+    </div>
+  );
+}
+
 /** Rules that make a task on each of their days. */
-function Repeats({ scope, today }: { scope: View; today: string }) {
+function Repeats({ scope, today }: { scope: "mine" | "team"; today: string }) {
   const { workspace, me } = useCurrentWorkspace();
   const manage = can(workspace.role, "tasks.manage");
   const rules = useTaskRepeats(workspace.id, scope);

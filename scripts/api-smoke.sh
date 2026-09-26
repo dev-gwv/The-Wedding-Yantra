@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -136,6 +136,12 @@ TASK="$(api POST "/api/v1/workspaces/$WS_ID/tasks" '{"title":"Smoke task","prior
 expect "a task can be added" '.success and .data.done == false' "$TASK"
 expect "and ticked off" '.success and .data.done == true' \
   "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$TASK" | jq -r '.data.id')/done" '{"done":true}' "$TOKEN")"
+DTASK="$(api POST "/api/v1/workspaces/$WS_ID/tasks" '{"title":"Smoke delegation","priority":"urgent","tag":"client","steps":["One","Two"]}' "$TOKEN")"
+expect "a task carries priority, tag and steps" '.success and .data.priority == "urgent" and .data.tagLabel == "Client" and .data.steps.total == 2' "$DTASK"
+expect "it can be started and opened in full" '.success and .data.status == "doing" and (.data.stepList | length) == 2 and (.data.history | length) >= 2' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$DTASK" | jq -r '.data.id')/move" '{"status":"doing"}' "$TOKEN")"
+expect "the team board answers" '.success and (.data.people | length) >= 1' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/tasks/board" "" "$TOKEN")"
 expect "a task can repeat every day" '.success and .data.label == "Every day"' \
   "$(api POST "/api/v1/workspaces/$WS_ID/task-repeats" '{"title":"Smoke daily follow-up","frequency":"daily"}' "$TOKEN")"
 expect "and today's copy is on the list" '.success and (.data | map(.repeat.label) | index("Every day")) != null' \

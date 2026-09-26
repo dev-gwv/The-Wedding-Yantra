@@ -1,5 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import {
+  attachFileInput,
+  commentInput,
+  moveTaskInput,
+  reviewTaskInput,
+  snoozeTaskInput,
+  stepInput,
+  submitTaskInput,
+  updateStepInput,
   saveChecklistInput,
   saveEventTeamInput,
   setTaskDoneInput,
@@ -11,6 +19,8 @@ import {
   updateTaskInput,
 } from "@wedding-yantra/types";
 import type { Db } from "../../db.js";
+import type { Files } from "../files/service.js";
+import * as delegation from "./delegation.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as repeats from "./repeats.js";
@@ -20,8 +30,10 @@ import * as timeOff from "./time-off.js";
 type Ws = { Params: { workspaceId: string } };
 type WsId = { Params: { workspaceId: string; id: string } };
 
-export function taskRoutes(app: FastifyInstance, deps: { db: Db }) {
-  const { db } = deps;
+type WsTask = { Params: { workspaceId: string; id: string; itemId: string } };
+
+export function taskRoutes(app: FastifyInstance, deps: { db: Db; files: Files }) {
+  const { db, files } = deps;
   const member = (request: Parameters<typeof requireMember>[1], workspaceId: string) => requireMember(db, request, workspaceId);
 
   // ---- Repeating tasks ------------------------------------------------------------
@@ -62,6 +74,83 @@ export function taskRoutes(app: FastifyInstance, deps: { db: Db }) {
     await tasks.deleteTask(db, ctx, assertId(request.params.id, "This task"));
     return ok({ deleted: true as const });
   });
+  // ---- Delegation: one task in full, moving, handing in, checking ----------------------
+  app.get<Ws>("/workspaces/:workspaceId/tasks/board", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await delegation.peopleBoard(db, ctx));
+  });
+  app.get<WsId>("/workspaces/:workspaceId/tasks/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await delegation.getTaskDetail(db, files.secret, ctx, assertId(request.params.id, "This task")));
+  });
+  const detail = async (ctx: Awaited<ReturnType<typeof member>>, id: string) => delegation.getTaskDetail(db, files.secret, ctx, id);
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/move", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.moveTask(db, ctx, id, parse(moveTaskInput, request.body));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/submit", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.submitTask(db, ctx, id, parse(submitTaskInput, request.body));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/review", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.reviewTask(db, ctx, id, parse(reviewTaskInput, request.body));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/snooze", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.snoozeTask(db, ctx, id, parse(snoozeTaskInput, request.body));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/steps", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.addStep(db, ctx, id, parse(stepInput, request.body).title);
+    return reply.status(201).send(ok(await detail(ctx, id)));
+  });
+  app.patch<WsTask>("/workspaces/:workspaceId/tasks/:id/steps/:itemId", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.updateStep(db, ctx, id, assertId(request.params.itemId, "This step"), parse(updateStepInput, request.body));
+    return ok(await detail(ctx, id));
+  });
+  app.delete<WsTask>("/workspaces/:workspaceId/tasks/:id/steps/:itemId", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.deleteStep(db, ctx, id, assertId(request.params.itemId, "This step"));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/comments", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.addComment(db, ctx, id, parse(commentInput, request.body));
+    return reply.status(201).send(ok(await detail(ctx, id)));
+  });
+  app.delete<WsTask>("/workspaces/:workspaceId/tasks/:id/comments/:itemId", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.deleteComment(db, ctx, id, assertId(request.params.itemId, "This comment"));
+    return ok(await detail(ctx, id));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/tasks/:id/files", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.attachFile(db, ctx, id, parse(attachFileInput, request.body).fileId);
+    return reply.status(201).send(ok(await detail(ctx, id)));
+  });
+  app.delete<WsTask>("/workspaces/:workspaceId/tasks/:id/files/:itemId", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This task");
+    await delegation.detachFile(db, ctx, id, assertId(request.params.itemId, "This file"));
+    return ok(await detail(ctx, id));
+  });
+
   app.get<Ws>("/workspaces/:workspaceId/my-day", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     return ok(await tasks.myDay(db, ctx));
