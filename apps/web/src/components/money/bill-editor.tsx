@@ -55,6 +55,7 @@ import {
   toEditablePlan,
   type EditablePlan,
 } from "./plan-editor";
+import { deliverablesPayload, DeliverablesEditor, toEditableDeliverables, type EditableDeliverable } from "./deliverables-editor";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 const localPhone = (phone: string | null) =>
@@ -161,6 +162,8 @@ export function BillEditor({
     start.bankAccountId,
   );
   const [plan, setPlan] = useState<EditablePlan>(() => toEditablePlan(bill));
+  const [deliverables, setDeliverables] = useState<EditableDeliverable[]>(() => toEditableDeliverables(bill ? bill.deliverables : draft!.deliverables));
+  const [trackDeliverables, setTrackDeliverables] = useState(true);
 
   // Money received with it (new invoices only)
   const canRecord = !bill && can(workspace.role, "payments.record");
@@ -237,6 +240,8 @@ export function BillEditor({
       terms: termsText,
       bankAccountId,
       instalments: planPayload(plan),
+      deliverables: deliverablesPayload(deliverables),
+      trackDeliverables,
     };
     const payment = paid
       ? {
@@ -582,6 +587,18 @@ export function BillEditor({
             </p>
           )}
         </dl>
+      </Card>
+
+      <Card className="p-5">
+        <DeliverablesEditor
+          list={deliverables}
+          onChange={setDeliverables}
+          eventDate={eventDate}
+          forEvent={!!(bill ? bill.eventId : draft!.eventId)}
+          track={trackDeliverables}
+          onTrack={setTrackDeliverables}
+          error={errors.deliverables}
+        />
       </Card>
 
       <Card className="p-5">

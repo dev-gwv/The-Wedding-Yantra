@@ -1,5 +1,6 @@
 import { formatDate, formatMoney, formatPhone, INSTALMENT_STATE_LABELS, rupeesInWords, stateName, type InstalmentStatus } from "@wedding-yantra/core";
-import { UNIT_LABELS, type BankDetails, type Bill, type InvoiceDesign, type Payment } from "@wedding-yantra/types";
+import { UNIT_LABELS, type BankDetails, type Bill, type BillDeliverable, type InvoiceDesign, type Payment } from "@wedding-yantra/types";
+import { CircleCheck } from "lucide-react";
 import type { CSSProperties } from "react";
 import { BusinessMark } from "@/components/app/business-mark";
 import { cn } from "@/lib/cn";
@@ -286,6 +287,8 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
         )}
       </div>
 
+      {bill.deliverables.length > 0 && !cancelled && <WhatYouGet items={bill.deliverables} className={look.line} />}
+
       {bill.plan.length > 0 && !cancelled && <PlanTable plan={bill.plan} className={look.line} />}
 
       {bill.bank && !cancelled && bill.due > 0 && <PayTo bank={bill.bank} className={look.line} />}
@@ -403,6 +406,31 @@ function PlanTable({ plan, className }: { plan: InstalmentStatus[]; className?: 
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+/** What the client gets for this invoice, with dates, and a tick once it's delivered. */
+function WhatYouGet({ items, className }: { items: BillDeliverable[]; className?: string }) {
+  return (
+    <div className={cn("break-inside-avoid border-t p-6 text-sm @lg:p-8", className)}>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">What you&apos;ll get</p>
+      <ul className="grid gap-x-8 @lg:grid-cols-2">
+        {items.map((d, i) => {
+          const done = d.status === "delivered";
+          return (
+            <li key={i} className="flex items-baseline justify-between gap-4 border-b border-line py-2 last:border-0 @lg:[&:nth-last-child(2):nth-child(odd)]:border-0">
+              <span className="flex min-w-0 items-baseline gap-2 font-semibold">
+                {done && <CircleCheck className="size-4 shrink-0 self-center text-success" aria-label="Delivered" />}
+                {d.title}
+              </span>
+              <span className={cn("shrink-0 tabular", done ? "font-semibold text-success" : "text-ink-muted")}>
+                {done && d.deliveredAt ? `Delivered ${formatDate(d.deliveredAt.slice(0, 10), { year: false })}` : d.dueDate ? `By ${formatDate(d.dueDate, { year: false })}` : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import {
   billNumber,
+  can,
   computeBillTotals,
   financialYear,
   formatMoney,
@@ -15,6 +16,8 @@ import {
 } from "@wedding-yantra/core";
 import type {
   BankDetails,
+  BillDeliverable,
+  DeliverableStatus,
   InvoiceDesign,
   Bill,
   BillDraft,
@@ -200,6 +203,68 @@ async function loadPlan(db: Queryable, billId: string): Promise<{ label: string;
   return rows.map((p) => ({ label: p.label, percent: p.percent === null ? null : Number(p.percent), amount: Number(p.amount), dueDate: p.due_date }));
 }
 
+/** What the client gets. Tracked ones take the event deliverable's live date and status. */
+async function loadDeliverables(db: Queryable, billId: string): Promise<BillDeliverable[]> {
+  const { rows } = await db.query<{ title: string; due_date: string | null; deliverable_id: string | null; status: DeliverableStatus | null; delivered_at: Date | null }>(
+    `SELECT bd.title, coalesce(d.due_date, bd.due_date)::text AS due_date, d.id AS deliverable_id, d.status, d.delivered_at
+       FROM bill_deliverables bd
+       LEFT JOIN deliverables d ON d.id = bd.deliverable_id AND d.deleted_at IS NULL
+      WHERE bd.bill_id = $1 ORDER BY bd.position`,
+    [billId],
+  );
+  return rows.map((r) => ({
+    title: r.title,
+    dueDate: r.due_date,
+    deliverableId: r.deliverable_id,
+    status: r.status,
+    deliveredAt: r.delivered_at?.toISOString() ?? null,
+  }));
+}
+
+/**
+ * Replaces an invoice's list of what the client gets. On an event's invoice, new lines can
+ * also be tracked as the event's deliverables (owners and managers); lines already tracked
+ * must belong to the same event. Taking a line off the invoice leaves the event's deliverable.
+ */
+async function saveDeliverables(
+  tx: Queryable,
+  ctx: MemberContext,
+  billId: string,
+  eventId: string | null,
+  list: { title: string; dueDate?: string | null; deliverableId?: string | null }[] | undefined,
+  track: boolean,
+) {
+  if (list === undefined) return;
+  await tx.query(`DELETE FROM bill_deliverables WHERE bill_id = $1`, [billId]);
+  const canTrack = track && !!eventId && can(ctx.role, "events.manage");
+  for (const [i, item] of list.entries()) {
+    let deliverableId = item.deliverableId ?? null;
+    if (deliverableId) {
+      const ok = await tx.query(`SELECT 1 FROM deliverables WHERE id = $1 AND workspace_id = $2 AND event_id IS NOT DISTINCT FROM $3 AND deleted_at IS NULL`, [
+        deliverableId,
+        ctx.workspaceId,
+        eventId,
+      ]);
+      if (!ok.rowCount) {
+        const message = "That deliverable isn't on this invoice's event";
+        throw new AppError(400, "VALIDATION_ERROR", message, { deliverables: message });
+      }
+    } else if (canTrack) {
+      const made = await tx.query<{ id: string }>(
+        `INSERT INTO deliverables (workspace_id, event_id, title, due_date, position, created_by)
+         VALUES ($1, $2, $3, $4, (SELECT coalesce(max(position), -1) + 1 FROM deliverables WHERE event_id = $2), $5)
+         RETURNING id`,
+        [ctx.workspaceId, eventId, item.title, item.dueDate || null, ctx.userId],
+      );
+      deliverableId = made.rows[0]!.id;
+    }
+    await tx.query(
+      `INSERT INTO bill_deliverables (bill_id, workspace_id, position, title, due_date, deliverable_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [billId, ctx.workspaceId, i, item.title, item.dueDate || null, deliverableId],
+    );
+  }
+}
+
 async function toBill(db: Queryable, ctx: MemberContext | null, r: BillRow): Promise<Bill> {
   const items = await loadItems(db, r.id);
   const summary = toBillSummary(r);
@@ -207,6 +272,7 @@ async function toBill(db: Queryable, ctx: MemberContext | null, r: BillRow): Pro
   return {
     ...summary,
     plan: planStatus(await loadPlan(db, r.id), cancelled ? 0 : summary.received, r.today),
+    deliverables: await loadDeliverables(db, r.id),
     dueNow: cancelled ? 0 : Math.min(summary.due, Math.max(0, round2(Number(r.plan_due_by_today) - summary.received))),
     billTo: { name: r.bill_to_name, phone: r.bill_to_phone, address: r.bill_to_address, gstin: r.bill_to_gstin },
     subject: r.subject,
@@ -445,6 +511,14 @@ export async function billDraft(
     notes: await defaultText(db, ctx.workspaceId, "note"),
     terms: (await defaultText(db, ctx.workspaceId, "terms")) ?? ws.bill_terms,
     bankAccountId: await defaultAccountId(db, ctx.workspaceId),
+    deliverables: eventId
+      ? (
+          await db.query<{ id: string; title: string; due_date: string | null }>(
+            `SELECT id, title, due_date::text AS due_date FROM deliverables WHERE event_id = $1 AND deleted_at IS NULL ORDER BY position, created_at`,
+            [eventId],
+          )
+        ).rows.map((d) => ({ title: d.title, dueDate: d.due_date, deliverableId: d.id }))
+      : [],
     chargesGst,
     homeState: stateFromGstin(ws.gstin),
     advance,
@@ -481,6 +555,8 @@ interface BillFields {
   terms?: string | null;
   bankAccountId?: string | null;
   instalments?: PlanPartInput[];
+  deliverables?: { title: string; dueDate?: string | null; deliverableId?: string | null }[];
+  trackDeliverables?: boolean;
 }
 
 /**
@@ -684,6 +760,7 @@ export async function createBill(
     const id = rows[0]!.id;
     const totals = await writeLines(tx, ctx.workspaceId, id, input.items, input.discount, { chargesGst, interState, pricesIncludeGst, discountPercent });
     await savePlan(tx, ctx.workspaceId, id, input.instalments, totals.total);
+    await saveDeliverables(tx, ctx, id, eventId, input.deliverables, input.trackDeliverables ?? true);
     await attachAdvances(tx, { id, eventId, clientId, total: totals.total });
     // Money received with the invoice: full, an advance or a token amount, in the same save.
     if (input.payment) {
@@ -791,6 +868,7 @@ export async function updateBill(db: Db, ctx: MemberContext, billId: string, inp
       discountPercent,
     });
     await savePlan(tx, ctx.workspaceId, billId, input.instalments, totals.total);
+    await saveDeliverables(tx, ctx, billId, current.event_id, input.deliverables, input.trackDeliverables ?? true);
     await logActivity(tx, {
       workspaceId: ctx.workspaceId,
       actorUserId: ctx.userId,

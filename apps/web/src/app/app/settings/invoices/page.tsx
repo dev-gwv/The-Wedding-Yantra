@@ -290,6 +290,10 @@ function sampleBill(workspace: Workspace, bank: BankAccount | null, terms: strin
       today,
     ),
     dueNow: 0,
+    deliverables: [
+      { title: "Edited photos", dueDate: null, deliverableId: null, status: null, deliveredAt: null },
+      { title: "Teaser reel", dueDate: null, deliverableId: null, status: null, deliveredAt: null },
+    ],
     bankAccountId: bank?.id ?? null,
     bank,
     cancelledAt: null,

@@ -1051,5 +1051,20 @@ An invoice can be paid in parts, the way wedding bookings are: "30% to book, 40%
   its amount.
 - A plan in percentages follows a new total when the invoice is edited; one in rupees must be
   fixed first. Clearing it makes the invoice one payment again.
-- Next: deliverables on invoices; then reminders and drafts.
+- Next: deliverables on invoices (section 37); then reminders and drafts.
+
+## 37. Built: what the client gets, on the invoice
+
+An invoice lists what it pays for beyond the price lines: "500 edited photos by 30 Dec",
+"a 40-page album", "the teaser reel", "gift hampers".
+- **In the editor:** "What they'll get" with the trade's usual deliverables a tap away (dated
+  from the event's day), or anything else, each with an optional date. On a new invoice for an
+  event, the event's deliverables are already listed.
+- **Tracked with the event:** on an event's invoice, new items join the event's deliverables
+  (owners and managers; can be switched off). Tracked items take the deliverable's live date,
+  and the invoice shows a tick and the date once each is delivered, on the client's link too.
+  Taking an item off the invoice leaves the event's deliverable as it is; a deliverable from
+  another event can't be listed.
+- Without an event (a walk-in customer), items stay on the invoice only.
+- Next: reminders for dues, and draft invoices.
 

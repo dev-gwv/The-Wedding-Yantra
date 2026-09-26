@@ -9,6 +9,7 @@ import { GSTIN_PATTERN } from "./workspaces.js";
 import type { BankDetails } from "./invoicing.js";
 import type { InvoiceDesign } from "./invoice-look.js";
 import type { InstalmentStatus } from "@wedding-yantra/core";
+import type { DeliverableStatus } from "./deliverables.js";
 import { optionKey } from "./lists.js";
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,8 @@ export interface Bill extends BillSummary {
   plan: InstalmentStatus[];
   /** What should have come in by today under the plan and hasn't */
   dueNow: number;
+  /** What the client gets for this invoice, and when */
+  deliverables: BillDeliverable[];
   /** The account the client pays into, as it was when the invoice was saved */
   bankAccountId: string | null;
   bank: BankDetails | null;
@@ -166,6 +169,24 @@ export const billToInput = z.object({
   gstin,
 });
 
+/** Something the client gets for an invoice. Tracked ones follow the event's deliverable. */
+export interface BillDeliverable {
+  title: string;
+  dueDate: string | null;
+  /** The event's deliverable it's tracked as, if any */
+  deliverableId: string | null;
+  /** From the tracked deliverable; null when it isn't tracked */
+  status: DeliverableStatus | null;
+  deliveredAt: string | null;
+}
+
+export const billDeliverableInput = z.object({
+  title: z.string().trim().min(2, "Say what they'll get").max(120),
+  dueDate: optionalDateInput,
+  deliverableId: z.uuid().nullable().optional(),
+});
+export type BillDeliverableInput = z.input<typeof billDeliverableInput>;
+
 /** One part of a payment plan: a percentage of the total or an amount, and when it's due. */
 export const instalmentInput = z
   .object({
@@ -206,6 +227,10 @@ const billFields = {
     .max(12, "Up to 12 parts")
     .refine((l) => l.length !== 1, "A plan needs at least two parts")
     .optional(),
+  /** What the client gets; the whole list is replaced when sent */
+  deliverables: z.array(billDeliverableInput).max(30, "Up to 30 things").optional(),
+  /** On an event's invoice: also track new ones as the event's deliverables */
+  trackDeliverables: z.boolean().optional(),
   /** One of the business's bank accounts; null prints none. Left out on a new invoice, the default is used. */
   bankAccountId: z.uuid().nullable().optional(),
 };
@@ -391,6 +416,8 @@ export interface BillDraft {
   terms: string | null;
   /** The default bank account, if there is one */
   bankAccountId: string | null;
+  /** The event's deliverables, ready to list on the invoice */
+  deliverables: { title: string; dueDate: string | null; deliverableId: string | null }[];
   /** The business has a GST number, so GST can be charged */
   chargesGst: boolean;
   /** The business's own GST state */
