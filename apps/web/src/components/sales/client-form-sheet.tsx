@@ -40,6 +40,7 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
     city: client?.city ?? "",
     notes: client?.notes ?? "",
   });
+  const [noMessages, setNoMessages] = useState(client?.noMessages ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fields = useEntityFields("client");
   const [custom, setCustom] = useState(() => toDraft(client?.custom));
@@ -47,7 +48,7 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const payload = { ...values, custom: customPayload(fields, custom) };
+    const payload = { ...values, custom: customPayload(fields, custom), ...(client ? { noMessages } : {}) };
     const check = validate(clientInput, payload);
     const customErrors = checkDraft(fields, custom);
     if (check.errors || Object.keys(customErrors).length) return setErrors({ ...check.errors, ...customErrors });
@@ -70,6 +71,13 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
       </div>
       <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />
       <TextAreaField label="Notes" value={values.notes} onChange={set("notes")} error={errors.notes} placeholder="Family contacts, preferences, anything to remember" />
+      {client && (
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line px-4 py-3 has-[:checked]:border-sun-300 has-[:checked]:bg-cream">
+          <input type="checkbox" checked={noMessages} onChange={(e) => setNoMessages(e.target.checked)} className="size-5 accent-brand" />
+          <span className="font-semibold">No wishes or offers</span>
+          <span className="text-sm text-ink-muted">Left out of messages to clients</span>
+        </label>
+      )}
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
         {client ? "Save" : "Add client"}

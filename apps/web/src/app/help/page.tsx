@@ -105,6 +105,16 @@ const GUIDES: Guide[] = [
     ],
   },
   {
+    id: "messages",
+    title: "Wishes and offers",
+    steps: [
+      "From More, Wishes and offers, pick an occasion: Diwali, Holi, Eid, an anniversary, a wedding season offer, and more. The words are ready and you can change them.",
+      "Choose who gets it: clients you've worked with, all clients, enquiries that didn't book, or couples whose anniversary is coming up.",
+      "Send them one by one: WhatsApp opens with the message ready and their first name in it. Tap send, come back, and the next one is ready.",
+      "Skip anyone you like. If a client asks not to get these, tap the bell and they're left out from then on; you can change it on their page.",
+    ],
+  },
+  {
     id: "fields",
     title: "Your own fields",
     steps: [

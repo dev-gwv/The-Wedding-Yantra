@@ -15,6 +15,7 @@ interface ClientRow {
   notes: string | null;
   portal_token: string | null;
   custom: Record<string, string | number | boolean | null>;
+  no_messages: boolean;
   lead_count: string;
   created_at: Date;
 }
@@ -30,7 +31,7 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
 });
 
 const SELECT = `
-  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.portal_token, c.custom, c.created_at,
+  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.portal_token, c.custom, c.no_messages, c.created_at,
          (SELECT count(*) FROM leads l WHERE l.client_id = c.id AND l.deleted_at IS NULL) AS lead_count
     FROM clients c`;
 
@@ -94,6 +95,7 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     leads,
     referredLeads,
     custom: row.custom,
+    noMessages: row.no_messages,
     // The page link lets anyone see the client's bills, so only those who share it see it.
     portalToken: can(ctx.role, "clients.manage") ? row.portal_token : null,
   };
@@ -106,15 +108,16 @@ export interface ClientFields {
   city?: string | null;
   notes?: string | null;
   custom?: Record<string, unknown>;
+  noMessages?: boolean;
 }
 
 export async function createClient(db: Db, ctx: MemberContext, input: Required<Pick<ClientFields, "name">> & ClientFields) {
   if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can add clients");
   const { rows } = await db
     .query<{ id: string }>(
-      `INSERT INTO clients (workspace_id, name, phone, email, city, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [ctx.workspaceId, input.name, input.phone ?? null, input.email ?? null, input.city ?? null, input.notes ?? null, ctx.userId],
+      `INSERT INTO clients (workspace_id, name, phone, email, city, notes, no_messages, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [ctx.workspaceId, input.name, input.phone ?? null, input.email ?? null, input.city ?? null, input.notes ?? null, input.noMessages ?? false, ctx.userId],
     )
     .catch(duplicatePhone);
   await writeCustom(db, ctx.workspaceId, "client", rows[0]!.id, input.custom);
@@ -129,6 +132,7 @@ export async function updateClient(db: Db, ctx: MemberContext, clientId: string,
     ["email", "email"],
     ["city", "city"],
     ["notes", "notes"],
+    ["noMessages", "no_messages"],
   ];
   const sets: string[] = [];
   const values: unknown[] = [];

@@ -27,6 +27,7 @@ import {
   QrCode,
   ReceiptText,
   ListPlus,
+  Megaphone,
   Users,
   UsersRound,
   type LucideIcon,
@@ -75,6 +76,7 @@ export default function MorePage() {
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             {can(workspace.role, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
             {can(workspace.role, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
+            {can(workspace.role, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}

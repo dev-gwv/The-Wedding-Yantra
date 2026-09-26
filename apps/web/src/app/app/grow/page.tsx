@@ -3,7 +3,7 @@
 import { can, formatDate, reviewMessage, whatsappLink } from "@wedding-yantra/core";
 import { useGrow, useRequestReview } from "@wedding-yantra/api-client/react";
 import type { GrowSummary, ReviewAsk } from "@wedding-yantra/types";
-import { ChevronRight, Heart, Lock, MessageCircle, Star } from "lucide-react";
+import { ChevronRight, Heart, Lock, Megaphone, MessageCircle, Star } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -46,6 +46,15 @@ function Grow({ data }: { data: GrowSummary }) {
   const { referrals } = data;
   return (
     <div className="space-y-8">
+      <Link href="/app/messages" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
+        <IconSquare icon={Megaphone} />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold">Wishes and offers</p>
+          <p className="text-sm text-ink-muted">Wish past clients on Diwali or their anniversary, or share a season offer.</p>
+        </div>
+        <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
+      </Link>
+
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-display text-xl font-extrabold">Ask for a review</h2>

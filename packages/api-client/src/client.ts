@@ -1,4 +1,10 @@
 import type {
+  Broadcast,
+  BroadcastAudiencePreview,
+  BroadcastDetail,
+  BroadcastInput,
+  BroadcastRecipient,
+  BroadcastRecipientInput,
   CustomField,
   SaveCustomFieldsInput,
   TaskRepeat,
@@ -414,6 +420,17 @@ export function createApiClient(options: ApiClientOptions) {
         request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/pay`, input),
       unpay: (workspaceId: string, id: string) => request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/unpay`),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`),
+    },
+    broadcasts: {
+      list: (workspaceId: string) => request<Broadcast[]>("GET", `${ws(workspaceId)}/broadcasts`),
+      /** How many people a list has right now, and a few of their names */
+      audience: (workspaceId: string, audience: BroadcastInput["audience"]) =>
+        request<BroadcastAudiencePreview>("GET", `${ws(workspaceId)}/broadcasts/audience${qs({ audience })}`),
+      get: (workspaceId: string, id: string) => request<BroadcastDetail>("GET", `${ws(workspaceId)}/broadcasts/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: BroadcastInput) => request<BroadcastDetail>("POST", `${ws(workspaceId)}/broadcasts`, input),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/broadcasts/${encodeURIComponent(id)}`),
+      mark: (workspaceId: string, id: string, recipientId: string, input: BroadcastRecipientInput) =>
+        request<BroadcastRecipient>("PATCH", `${ws(workspaceId)}/broadcasts/${encodeURIComponent(id)}/recipients/${encodeURIComponent(recipientId)}`, input),
     },
     customFields: {
       /** The business's own fields on enquiries, clients and events */

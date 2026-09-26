@@ -280,6 +280,8 @@ export interface Client extends ClientSummary {
   /** Their own page is shared at /c/<token>. Only owners and managers see it; null when not shared. */
   portalToken: string | null;
   custom: CustomValues;
+  /** Left out of festival wishes and offers */
+  noMessages: boolean;
 }
 
 export const clientInput = z.object({
@@ -289,6 +291,7 @@ export const clientInput = z.object({
   city: optionalText(60),
   notes: optionalText(2000),
   custom: customValuesInput,
+  noMessages: z.boolean().optional(),
 });
 export type ClientInput = z.input<typeof clientInput>;
 export const updateClientInput = clientInput.partial();

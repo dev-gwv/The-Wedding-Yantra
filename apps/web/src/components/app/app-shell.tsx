@@ -20,7 +20,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }

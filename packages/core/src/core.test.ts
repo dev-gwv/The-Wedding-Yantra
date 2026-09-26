@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   assignableRoles,
+  BROADCAST_AUDIENCES,
+  BROADCAST_PRESETS,
+  broadcastProgress,
   can,
   canManageMember,
   formatDate,
@@ -545,3 +548,23 @@ describe("custom fields", () => {
     expect(formatCustomValue(f("text"), null)).toBeNull();
   });
 });
+
+describe("messages to clients", () => {
+  it("has presets for every audience that fill in cleanly", () => {
+    for (const a of BROADCAST_AUDIENCES) expect(BROADCAST_PRESETS.some((p) => p.audience === a)).toBe(true);
+    for (const p of BROADCAST_PRESETS) {
+      const text = renderTemplate(p.message, { name: "Neha Kapoor", business: "Riya Makeup Studio" });
+      expect(text).toContain("Neha");
+      expect(text).toContain("Riya Makeup Studio");
+      expect(text).not.toMatch(/\{\w+\}/);
+      expect(text.length).toBeLessThan(400);
+    }
+    expect(new Set(BROADCAST_PRESETS.map((p) => p.id)).size).toBe(BROADCAST_PRESETS.length);
+  });
+
+  it("counts skipped people as done", () => {
+    expect(broadcastProgress({ total: 40, sent: 10, skipped: 2 })).toEqual({ done: 12, left: 28, percent: 30 });
+    expect(broadcastProgress({ total: 0, sent: 0, skipped: 0 })).toEqual({ done: 0, left: 0, percent: 0 });
+  });
+});
+

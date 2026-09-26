@@ -950,3 +950,20 @@ sound and light, plates confirmed for a caterer.
   filled in stays saved but hidden. Values are kept per enquiry, client and event as JSON,
   so adding a field never needs a database change.
 
+## 32. Built: wishes and offers to past clients
+
+Happy clients book again and send their friends; a Diwali wish keeps the business in mind.
+- **More, Wishes and offers** (owners and managers): pick an occasion (Diwali, Holi, Eid,
+  Navratri, Christmas, New Year, a wedding season offer, "still planning?", an anniversary
+  wish). The words are ready, with the person's first name and the business name filled in.
+- **Who gets it:** clients whose event is done, all clients, enquiries marked lost in the
+  last year (and not clients since), or couples whose wedding day falls in the next two
+  weeks. The count shows before making the list; the list is then fixed.
+- **Sent from the business's own WhatsApp,** one by one: the app opens WhatsApp with the
+  message ready and ticks the person off, then shows the next. No WhatsApp API or approved
+  templates are needed, and replies come to the business's phone as usual. Skips and
+  mistakes can be undone.
+- **Respecting no:** a client who asks not to get these is left out of every future list,
+  from the send screen or their edit form.
+- Later, with the WhatsApp Business API connected, the same lists can be sent in one go.
+

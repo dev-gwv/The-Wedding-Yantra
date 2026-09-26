@@ -12,6 +12,9 @@ import { createContext, useContext, type ReactNode } from "react";
 import type {
   TaskRepeatInput,
   SaveCustomFieldsInput,
+  BroadcastInput,
+  BroadcastRecipientInput,
+  BroadcastDetail,
   InventoryBookingInput,
   InventoryBookingListQuery,
   InventoryItemInput,
@@ -126,6 +129,9 @@ export const queryKeys = {
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
+  broadcasts: (id: string) => ["workspace", id, "broadcasts"] as const,
+  broadcast: (id: string, broadcastId: string) => ["workspace", id, "broadcasts", broadcastId] as const,
+  broadcastAudience: (id: string, audience: string) => ["workspace", id, "broadcasts", "audience", audience] as const,
   customFields: (id: string) => ["workspace", id, "custom-fields"] as const,
   taskRepeats: (id: string, scope: string) => ["workspace", id, "work", "repeats", scope] as const,
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
@@ -1071,3 +1077,66 @@ export function useSaveCustomFields(workspaceId: string) {
     onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.customFields(workspaceId) }),
   });
 }
+
+export function useBroadcasts(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.broadcasts(workspaceId), queryFn: () => api.broadcasts.list(workspaceId) });
+}
+
+export function useBroadcastAudience(workspaceId: string, audience: BroadcastInput["audience"] | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.broadcastAudience(workspaceId, audience ?? ""),
+    queryFn: () => api.broadcasts.audience(workspaceId, audience!),
+    enabled: !!audience,
+  });
+}
+
+export function useBroadcast(workspaceId: string, id: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.broadcast(workspaceId, id), queryFn: () => api.broadcasts.get(workspaceId, id) });
+}
+
+export function useCreateBroadcast(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BroadcastInput) => api.broadcasts.create(workspaceId, input),
+    onSuccess: (made) => {
+      qc.setQueryData(queryKeys.broadcast(workspaceId, made.id), made);
+      void qc.invalidateQueries({ queryKey: queryKeys.broadcasts(workspaceId), exact: true });
+    },
+  });
+}
+
+export function useDeleteBroadcast(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.broadcasts.remove(workspaceId, id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.broadcasts(workspaceId) }),
+  });
+}
+
+/** Ticks a person off; the list updates straight away so sending the next one is quick. */
+export function useMarkBroadcastRecipient(workspaceId: string, broadcastId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipientId, ...input }: BroadcastRecipientInput & { recipientId: string }) => api.broadcasts.mark(workspaceId, broadcastId, recipientId, input),
+    onSuccess: (r) => {
+      qc.setQueryData<BroadcastDetail>(queryKeys.broadcast(workspaceId, broadcastId), (old) => {
+        if (!old) return old;
+        const recipients = old.recipients.map((x) => (x.id === r.id ? r : x));
+        return {
+          ...old,
+          recipients,
+          counts: { total: recipients.length, sent: recipients.filter((x) => x.sentAt).length, skipped: recipients.filter((x) => x.skippedAt).length },
+        };
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.broadcasts(workspaceId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "broadcasts", "audience"] });
+    },
+  });
+}
+

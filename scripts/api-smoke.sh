@@ -60,7 +60,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
-  0017_custom_fields; do
+  0017_custom_fields 0018_broadcasts; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -143,6 +143,10 @@ FIELD_ID="$(api PUT "/api/v1/workspaces/$WS_ID/custom-fields" '{"entity":"event"
 [ -n "$FIELD_ID" ] && [ "$FIELD_ID" != "null" ] || die "a custom field could not be added"
 expect "an event keeps the business's own details" ".success and .data.custom[\"$FIELD_ID\"] == 12" \
   "$(api PATCH "/api/v1/workspaces/$WS_ID/events/$EVENT_ID" "{\"custom\":{\"$FIELD_ID\":\"12\"}}" "$TOKEN")"
+expect "a message to clients can be lined up" '.success and .data.count >= 0' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/broadcasts/audience?audience=all_clients" "" "$TOKEN")"
+expect "and the list of messages answers" '.success and (.data | type) == "array"' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/broadcasts" "" "$TOKEN")"
 expect "My Day answers" '.success and (.data.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
   "$(api GET "/api/v1/workspaces/$WS_ID/my-day" "" "$TOKEN")"
 expect "the month's scores are worked out" ".success and (.data.people | length) >= 1 and .data.business != null" \
