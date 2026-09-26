@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { CustomFieldList } from "@/components/app/custom-fields";
 import { EventCard } from "@/components/bookings/event-card";
 import { QuoteRow } from "@/components/bookings/quote-row";
 import { PortalCard } from "@/components/grow/portal-card";
@@ -79,6 +80,7 @@ export default function ClientPage() {
                 </Button>
               )}
             </div>
+            <CustomFieldList entity="client" values={c.custom} className="mt-5" />
             {c.notes && <p className="mt-5 whitespace-pre-line rounded-2xl bg-cream p-4">{c.notes}</p>}
           </Card>
 

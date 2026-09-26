@@ -105,6 +105,16 @@ const GUIDES: Guide[] = [
     ],
   },
   {
+    id: "fields",
+    title: "Your own fields",
+    steps: [
+      "Add the details your business always asks for from More, Your own fields: skin type, guest count, power needed, plates confirmed.",
+      "Pick what each one holds: text, a number, a date, yes or no, or one from your own list of choices. Tap a suggestion to add the usual ones for your trade.",
+      "They show on the enquiry, client and event forms for the whole team, and on each page once filled in.",
+      "Removing a field hides it everywhere. What was filled in is kept, just not shown.",
+    ],
+  },
+  {
     id: "data",
     title: "Your data",
     steps: [

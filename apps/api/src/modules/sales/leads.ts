@@ -12,6 +12,7 @@ import type {
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { writeCustom } from "../fields/service.js";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -160,6 +161,7 @@ interface LeadRow extends SummaryRow {
   referred_by: string | null;
   referred_by_client_id: string | null;
   referred_by_client_name: string | null;
+  custom: Record<string, string | number | boolean | null>;
   requirements: string | null;
   lost_reason: LostReason | null;
   created_by: string | null;
@@ -173,7 +175,7 @@ async function loadVisible(db: Queryable, ctx: MemberContext, leadId: string): P
   const scope = scopeCondition(ctx, params);
   const { rows } = await db.query<LeadRow>(
     `SELECT ${SUMMARY_COLUMNS}, l.email, l.venue, l.guest_count, l.referred_by, l.requirements,
-            l.referred_by_client_id, rc.name AS referred_by_client_name,
+            l.referred_by_client_id, rc.name AS referred_by_client_name, l.custom,
             l.lost_reason, l.created_by, cu.name AS created_by_name,
             (SELECT e.id FROM events e WHERE e.lead_id = l.id AND e.deleted_at IS NULL LIMIT 1) AS event_id
        ${FROM}
@@ -213,6 +215,7 @@ export async function getLead(db: Queryable, ctx: MemberContext, leadId: string)
     guestCount: r.guest_count,
     referredBy: r.referred_by,
     referredByClient: r.referred_by_client_id ? { id: r.referred_by_client_id, name: r.referred_by_client_name } : null,
+    custom: r.custom,
     requirements: r.requirements,
     lostReason: r.lost_reason,
     createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
@@ -294,6 +297,7 @@ export interface LeadFields {
   referredBy?: string | null;
   referredByClientId?: string | null;
   requirements?: string | null;
+  custom?: Record<string, unknown>;
   stageId?: string;
   assignedToUserId?: string | null;
   nextFollowUpAt?: string | null;
@@ -359,6 +363,7 @@ export async function createLead(db: Db, ctx: MemberContext, input: LeadFields):
       values,
     );
     const id = rows[0]!.id;
+    await writeCustom(tx, ctx.workspaceId, "lead", id, input.custom);
     await addActivityRow(tx, ctx, id, "created", null, { source: input.source ?? "other" });
     // The first follow-up counts like any other (for "follow-ups kept").
     if (input.nextFollowUpAt) await addActivityRow(tx, ctx, id, "follow_up_set", null, { at: input.nextFollowUpAt });
@@ -393,6 +398,7 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
   return withTransaction(db, async (tx) => {
     const current = await loadVisible(tx, ctx, leadId);
     if (input.referredByClientId !== current.referred_by_client_id) await assertReferrer(tx, ctx, input.referredByClientId);
+    await writeCustom(tx, ctx.workspaceId, "lead", leadId, input.custom);
     const sets: string[] = [];
     const values: unknown[] = [];
     const set = (column: string, value: unknown) => {

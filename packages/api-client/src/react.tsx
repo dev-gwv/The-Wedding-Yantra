@@ -11,6 +11,7 @@ import {
 import { createContext, useContext, type ReactNode } from "react";
 import type {
   TaskRepeatInput,
+  SaveCustomFieldsInput,
   InventoryBookingInput,
   InventoryBookingListQuery,
   InventoryItemInput,
@@ -125,6 +126,7 @@ export const queryKeys = {
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
+  customFields: (id: string) => ["workspace", id, "custom-fields"] as const,
   taskRepeats: (id: string, scope: string) => ["workspace", id, "work", "repeats", scope] as const,
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
   /** Scores, the activity log and the daily summary: read-only views over everything. */
@@ -1054,4 +1056,18 @@ export function useCreateTaskRepeat(workspaceId: string) {
 export function useStopTaskRepeat(workspaceId: string) {
   const api = useApi();
   return useWorkMutation(workspaceId, (id: string) => api.taskRepeats.stop(workspaceId, id));
+}
+
+export function useCustomFields(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.customFields(workspaceId), queryFn: () => api.customFields.list(workspaceId), staleTime: 5 * 60_000 });
+}
+
+export function useSaveCustomFields(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveCustomFieldsInput) => api.customFields.save(workspaceId, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.customFields(workspaceId) }),
+  });
 }

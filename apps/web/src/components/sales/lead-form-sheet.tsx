@@ -18,6 +18,7 @@ import { useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
+import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { ClientPicker } from "./client-picker";
@@ -91,6 +92,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   const [values, setValues] = useState<Values>(() => initial(lead));
   const [more, setMore] = useState(() => !!lead && !!(lead.email || lead.venue || lead.requirements || lead.referredBy));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const fields = useEntityFields("lead");
+  const [custom, setCustom] = useState(() => toDraft(lead?.custom));
   const busy = create.isPending || update.isPending;
 
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -115,10 +118,13 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
       ...(canPickClient ? { referredByClientId: referral ? (referrer?.id ?? null) : null } : {}),
       requirements: values.requirements,
       ...(canAssign && values.assignedToUserId ? { assignedToUserId: values.assignedToUserId } : {}),
+      custom: customPayload(fields, custom),
     };
     const check = validate(createLeadInput, payload);
-    if (check.errors) {
-      setErrors(check.errors);
+    const customErrors = checkDraft(fields, custom);
+    if (check.errors || Object.keys(customErrors).length) {
+      setErrors({ ...check.errors, ...customErrors });
+      if (!check.errors) return;
       if (["email", "venue", "guestCount", "requirements", "city", ...(referral ? [] : ["referredBy"])].some((k) => check.errors[k])) setMore(true);
       return;
     }
@@ -206,6 +212,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
           ))}
         </SelectField>
       )}
+
+      <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />
 
       {more ? (
         <div className="space-y-5 border-t border-line pt-5">

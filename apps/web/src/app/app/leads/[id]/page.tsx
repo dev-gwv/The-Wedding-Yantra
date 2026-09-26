@@ -37,6 +37,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
+import { CustomFieldList } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { QuoteRow } from "@/components/bookings/quote-row";
 import { FollowUpBadge } from "@/components/sales/follow-up-badge";
@@ -344,6 +345,7 @@ function Details({ lead }: { lead: Lead }) {
           </div>
         ))}
       </dl>
+      <CustomFieldList entity="lead" values={lead.custom} className="mt-4" />
       {lead.requirements && (
         <div className="mt-4 rounded-2xl bg-cream p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">What they need</p>

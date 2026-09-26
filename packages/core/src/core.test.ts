@@ -521,3 +521,27 @@ describe("repeating tasks", () => {
     expect(describeRepeat({ frequency: "monthly", weekdays: [], monthDay: 11 })).toBe("Every month on the 11th");
   });
 });
+
+import { checkCustomValue, formatCustomValue } from "./index.js";
+
+describe("custom fields", () => {
+  const f = (kind: "text" | "number" | "date" | "choice" | "yes_no", options: string[] = []) => ({ id: "f", label: "L", kind, options });
+  it("cleans values and says what's wrong", () => {
+    expect(checkCustomValue(f("text"), "  Oily skin ")).toEqual({ value: "Oily skin" });
+    expect(checkCustomValue(f("text"), "")).toEqual({ value: null });
+    expect(checkCustomValue(f("number"), "1,20,000")).toEqual({ value: 120000 });
+    expect(checkCustomValue(f("number"), "lots")).toEqual({ error: "Enter a number" });
+    expect(checkCustomValue(f("date"), "2026-11-20")).toEqual({ value: "2026-11-20" });
+    expect(checkCustomValue(f("date"), "20/11/2026")).toEqual({ error: "Pick a date" });
+    expect(checkCustomValue(f("choice", ["Dry", "Oily"]), "Oily")).toEqual({ value: "Oily" });
+    expect(checkCustomValue(f("choice", ["Dry", "Oily"]), "Wet")).toEqual({ error: "Pick one from the list" });
+    expect(checkCustomValue(f("yes_no"), "true")).toEqual({ value: true });
+    expect(checkCustomValue(f("yes_no"), "maybe")).toEqual({ error: "Choose yes or no" });
+  });
+  it("shows values the way people read them", () => {
+    expect(formatCustomValue(f("yes_no"), false)).toBe("No");
+    expect(formatCustomValue(f("date"), "2026-11-20")).toBe("20 Nov 2026");
+    expect(formatCustomValue(f("number"), 120000)).toBe("1,20,000");
+    expect(formatCustomValue(f("text"), null)).toBeNull();
+  });
+});

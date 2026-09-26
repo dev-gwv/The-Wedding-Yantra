@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { optionalText } from "./common.js";
+import type { CustomValues } from "@wedding-yantra/core";
 import { personName, phone } from "./auth.js";
+import { customValuesInput } from "./custom.js";
 
 // ---------------------------------------------------------------------------
 // Fixed lists
@@ -142,6 +144,8 @@ export interface Lead extends LeadSummary {
   referredBy: string | null;
   /** The client who referred them, when they're one of yours */
   referredByClient: PersonRef | null;
+  /** The business's own fields, keyed by field id */
+  custom: CustomValues;
   requirements: string | null;
   lostReason: LostReason | null;
   createdBy: PersonRef | null;
@@ -205,6 +209,7 @@ const leadFields = {
   /** One of your clients who referred them */
   referredByClientId: z.uuid().nullable().optional(),
   requirements: optionalText(2000),
+  custom: customValuesInput,
   stageId: z.uuid().optional(),
   assignedToUserId: z.uuid().nullable().optional(),
   nextFollowUpAt: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -274,6 +279,7 @@ export interface Client extends ClientSummary {
   referredLeads: LeadSummary[];
   /** Their own page is shared at /c/<token>. Only owners and managers see it; null when not shared. */
   portalToken: string | null;
+  custom: CustomValues;
 }
 
 export const clientInput = z.object({
@@ -282,6 +288,7 @@ export const clientInput = z.object({
   email: optionalEmail,
   city: optionalText(60),
   notes: optionalText(2000),
+  custom: customValuesInput,
 });
 export type ClientInput = z.input<typeof clientInput>;
 export const updateClientInput = clientInput.partial();

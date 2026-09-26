@@ -26,6 +26,7 @@ import {
   Plus,
   QrCode,
   ReceiptText,
+  ListPlus,
   Users,
   UsersRound,
   type LucideIcon,
@@ -105,6 +106,7 @@ export default function MorePage() {
       <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
+        {can(workspace.role, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/team" icon={Users} label="Team" />

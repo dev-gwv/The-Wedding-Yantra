@@ -12,6 +12,7 @@ import {
 } from "@wedding-yantra/types";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useDeferredValue, useState, type FormEvent } from "react";
+import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
@@ -53,6 +54,8 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
       : [{ key: key(), name: "Wedding", date: "", startTime: "", venue: "" }],
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const fields = useEntityFields("event");
+  const [custom, setCustom] = useState(() => toDraft(event?.custom));
 
   const dates = fns.map((f) => f.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
   const clashes = useClashes(workspace.id, dates, event?.id);
@@ -61,12 +64,13 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
   async function submit(e: FormEvent) {
     e.preventDefault();
     const functions = fns.map((f) => ({ name: f.name, date: f.date, startTime: f.startTime, venue: f.venue }));
-    const common = { title, eventType: (eventType || null) as EventType | null, value, venue, city, notes, functions };
+    const common = { title, eventType: (eventType || null) as EventType | null, value, venue, city, notes, functions, custom: customPayload(fields, custom) };
     const payload = event
       ? common
       : { ...common, ...(clientMode === "pick" ? { clientId } : { newClient: { name: newClient.name, phone: newClient.phone } }) };
     const check = event ? validate(updateEventInput, payload) : validate(eventInput, payload);
-    if (check.errors) return setErrors(check.errors);
+    const customErrors = checkDraft(fields, custom);
+    if (check.errors || Object.keys(customErrors).length) return setErrors({ ...check.errors, ...customErrors });
     setErrors({});
     try {
       onSaved(event ? await update.mutateAsync(common) : await create.mutateAsync(payload as Parameters<typeof create.mutateAsync>[0]));
@@ -239,6 +243,7 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
         </div>
       )}
 
+      <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />
       <TextAreaField label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} error={errors.notes} placeholder="Family contacts, special requests, anything the team should know" />
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       <Button type="submit" size="lg" loading={create.isPending || update.isPending} className="sm:w-auto sm:px-10">

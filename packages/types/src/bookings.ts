@@ -1,5 +1,7 @@
+import type { CustomValues } from "@wedding-yantra/core";
 import { z } from "zod";
 import { personName, phone } from "./auth.js";
+import { customValuesInput } from "./custom.js";
 import { SERVICE_UNITS, type ServiceUnit } from "./business-types.js";
 import { optionalText } from "./common.js";
 import { EVENT_TYPES, type EventType } from "./sales.js";
@@ -242,6 +244,8 @@ export interface WeddingEvent extends EventSummary {
   team: TeamMember[];
   /** When the client was asked for a review of it */
   reviewRequestedAt: string | null;
+  /** The business's own fields, keyed by field id */
+  custom: CustomValues;
   createdAt: string;
 }
 
@@ -278,6 +282,7 @@ export const eventInput = z
     city: optionalText(60),
     venue: optionalText(120),
     notes: optionalText(2000),
+    custom: customValuesInput,
     functions: z.array(eventFunctionInput).min(1, "Add at least one function with a date").max(20),
   })
   .refine((e) => !!e.clientId || !!e.newClient, { message: "Choose the client", path: ["clientId"] });
@@ -295,6 +300,7 @@ export const updateEventInput = z.object({
   city: optionalText(60),
   venue: optionalText(120),
   notes: optionalText(2000),
+  custom: customValuesInput,
   functions: z.array(eventFunctionInput).min(1, "Keep at least one function").max(20).optional(),
 });
 export type UpdateEventInput = z.input<typeof updateEventInput>;

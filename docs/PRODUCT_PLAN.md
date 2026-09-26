@@ -932,3 +932,21 @@ their events.
 - **Tasks, Repeating** lists the rules with their next day. Anyone can repeat their own
   tasks; owners and managers can give repeating tasks to others and see everyone's. The
   person, whoever set it up, or a manager can stop one; copies already made stay.
+
+## 31. Built: your own fields
+
+Every trade asks for something different: skin type for a makeup artist, power needed for
+sound and light, plates confirmed for a caterer.
+- **More, Your own fields** (owners and managers): a list each for enquiries, clients and
+  events, up to 20 each, in the order they show. Each holds text, a number, a date, yes or
+  no, or one of the business's own choices. Suggestions for the business's trade are one
+  tap away.
+- **On the forms and pages.** The fields sit on the add and edit forms for the whole team,
+  and filled values show on the enquiry's details, the client card and the event page.
+- **Checked the same way everywhere.** The web form and the API use the same rules, so a
+  wrong value is named under its own field. Editing merges: blanks clear, values left out
+  stay.
+- **Removing is safe.** A removed field disappears from every form and page; what was
+  filled in stays saved but hidden. Values are kept per enquiry, client and event as JSON,
+  so adding a field never needs a database change.
+

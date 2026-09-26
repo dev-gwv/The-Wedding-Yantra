@@ -22,6 +22,7 @@ import { Card, Notice, Pill } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
+import { CustomFieldCard } from "@/components/app/custom-fields";
 
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
@@ -167,6 +168,8 @@ function EventView({ event }: { event: WeddingEvent }) {
           </ol>
         )}
       </section>
+
+      <CustomFieldCard entity="event" values={event.custom} />
 
       <EventTeamCard event={event} />
 

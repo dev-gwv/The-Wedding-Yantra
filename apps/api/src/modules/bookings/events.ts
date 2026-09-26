@@ -13,6 +13,7 @@ import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { writeCustom } from "../fields/service.js";
 
 /** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
@@ -143,12 +144,13 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
       lead_created_by: string | null;
       client_phone: string | null;
       review_requested_at: Date | null;
+      custom: Record<string, string | number | boolean | null>;
       created_at: Date;
     }
   >(
     `SELECT e.id, e.title, e.event_type, e.status, e.client_id, c.name AS client_name, c.phone AS client_phone,
             e.value, e.city, e.venue, e.notes, l.id AS live_lead_id, l.assigned_to AS lead_assigned_to,
-            l.created_by AS lead_created_by, e.review_requested_at, e.created_at,
+            l.created_by AS lead_created_by, e.review_requested_at, e.custom, e.created_at,
             (SELECT min(date)::text FROM event_functions WHERE event_id = e.id) AS start_date,
             (SELECT max(date)::text FROM event_functions WHERE event_id = e.id) AS end_date,
             (SELECT count(*) FROM event_functions WHERE event_id = e.id) AS function_count
@@ -225,6 +227,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
             eventId,
           ),
     reviewRequestedAt: r.review_requested_at?.toISOString() ?? null,
+    custom: r.custom,
     createdAt: r.created_at.toISOString(),
   };
 }
@@ -271,6 +274,7 @@ export interface EventFields {
   venue?: string | null;
   notes?: string | null;
   functions: FunctionFields[];
+  custom?: Record<string, unknown>;
 }
 
 export async function createEvent(db: Db, ctx: MemberContext, input: EventFields): Promise<WeddingEvent> {
@@ -319,6 +323,7 @@ export async function createEvent(db: Db, ctx: MemberContext, input: EventFields
     );
     const id = rows[0]!.id;
     await writeFunctions(tx, ctx.workspaceId, id, input.functions);
+    await writeCustom(tx, ctx.workspaceId, "event", id, input.custom);
     await logActivity(tx, {
       workspaceId: ctx.workspaceId,
       actorUserId: ctx.userId,
@@ -362,6 +367,7 @@ export async function updateEvent(
     }
     if (sets.length) await tx.query(`UPDATE events SET ${sets.join(", ")} WHERE id = $1`, values);
     if (input.functions) await writeFunctions(tx, ctx.workspaceId, eventId, input.functions);
+    await writeCustom(tx, ctx.workspaceId, "event", eventId, input.custom);
     if (input.status) {
       await logActivity(tx, {
         workspaceId: ctx.workspaceId,

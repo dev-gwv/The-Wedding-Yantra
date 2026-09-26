@@ -1,4 +1,6 @@
 import type {
+  CustomField,
+  SaveCustomFieldsInput,
   TaskRepeat,
   TaskRepeatInput,
   InventoryBooking,
@@ -412,6 +414,12 @@ export function createApiClient(options: ApiClientOptions) {
         request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/pay`, input),
       unpay: (workspaceId: string, id: string) => request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/unpay`),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`),
+    },
+    customFields: {
+      /** The business's own fields on enquiries, clients and events */
+      list: (workspaceId: string) => request<CustomField[]>("GET", `${ws(workspaceId)}/custom-fields`),
+      /** Replaces one list in order; fields left out are removed */
+      save: (workspaceId: string, input: SaveCustomFieldsInput) => request<CustomField[]>("PUT", `${ws(workspaceId)}/custom-fields`, input),
     },
     taskRepeats: {
       /** Your own; "team" for everyone's (owners and managers) */

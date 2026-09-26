@@ -3,6 +3,7 @@ import type { Client, ClientSummary } from "@wedding-yantra/types";
 import type { Db } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { writeCustom } from "../fields/service.js";
 import { scopeCondition, toSummary, type SummaryRow } from "./leads.js";
 
 interface ClientRow {
@@ -13,6 +14,7 @@ interface ClientRow {
   city: string | null;
   notes: string | null;
   portal_token: string | null;
+  custom: Record<string, string | number | boolean | null>;
   lead_count: string;
   created_at: Date;
 }
@@ -28,7 +30,7 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
 });
 
 const SELECT = `
-  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.portal_token, c.created_at,
+  SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.portal_token, c.custom, c.created_at,
          (SELECT count(*) FROM leads l WHERE l.client_id = c.id AND l.deleted_at IS NULL) AS lead_count
     FROM clients c`;
 
@@ -91,6 +93,7 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     notes: row.notes,
     leads,
     referredLeads,
+    custom: row.custom,
     // The page link lets anyone see the client's bills, so only those who share it see it.
     portalToken: can(ctx.role, "clients.manage") ? row.portal_token : null,
   };
@@ -102,6 +105,7 @@ export interface ClientFields {
   email?: string | null;
   city?: string | null;
   notes?: string | null;
+  custom?: Record<string, unknown>;
 }
 
 export async function createClient(db: Db, ctx: MemberContext, input: Required<Pick<ClientFields, "name">> & ClientFields) {
@@ -113,6 +117,7 @@ export async function createClient(db: Db, ctx: MemberContext, input: Required<P
       [ctx.workspaceId, input.name, input.phone ?? null, input.email ?? null, input.city ?? null, input.notes ?? null, ctx.userId],
     )
     .catch(duplicatePhone);
+  await writeCustom(db, ctx.workspaceId, "client", rows[0]!.id, input.custom);
   return getClient(db, ctx, rows[0]!.id);
 }
 
@@ -143,5 +148,8 @@ export async function updateClient(db: Db, ctx: MemberContext, clientId: string,
       .catch(duplicatePhone);
     if (!result.rowCount) throw notFound("This client");
   }
+  const exists = await db.query(`SELECT 1 FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [clientId, ctx.workspaceId]);
+  if (!exists.rowCount) throw notFound("This client");
+  await writeCustom(db, ctx.workspaceId, "client", clientId, input.custom);
   return getClient(db, ctx, clientId);
 }
