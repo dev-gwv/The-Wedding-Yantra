@@ -7,6 +7,7 @@ import { buildApp } from "../src/app.js";
 import { localFileStore } from "../src/lib/storage.js";
 import type { Files } from "../src/modules/files/service.js";
 import type { PaymentGateway } from "../src/modules/billing/gateway.js";
+import type { PushSend } from "../src/modules/notifications/push.js";
 import { loadConfig } from "../src/config.js";
 import { createPool, type Db } from "../src/db.js";
 import { runMigrations } from "../src/db/migrate.js";
@@ -24,7 +25,9 @@ export interface TestContext {
  * A fresh, fully migrated database and an app instance. Wipes TEST_DATABASE_URL.
  * `env` adds settings (e.g. billing); `gateway` stands in for the payment provider.
  */
-export async function setup(options: { env?: Record<string, string>; gateway?: PaymentGateway | null } = {}): Promise<TestContext> {
+export async function setup(
+  options: { env?: Record<string, string>; gateway?: PaymentGateway | null; pushSend?: PushSend | null } = {},
+): Promise<TestContext> {
   if (!TEST_DATABASE_URL) throw new Error("Set TEST_DATABASE_URL to a throwaway Postgres database");
   const db = createPool(TEST_DATABASE_URL);
   await db.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
@@ -42,7 +45,7 @@ export async function setup(options: { env?: Record<string, string>; gateway?: P
   // Uploads go to a throwaway folder that is removed afterwards.
   const uploads = await mkdtemp(join(tmpdir(), "wy-uploads-"));
   const files: Files = { store: localFileStore(uploads), secret: randomBytes(32) };
-  const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined }, files, gateway: options.gateway });
+  const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined }, files, gateway: options.gateway, pushSend: options.pushSend ?? null });
   await app.ready();
   return {
     app,

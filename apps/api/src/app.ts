@@ -22,6 +22,8 @@ import { vendorRoutes } from "./modules/vendors/routes.js";
 import type { Files } from "./modules/files/service.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { moneyRoutes } from "./modules/money/routes.js";
+import { createPusher, vapidKeys, webPushSender, type Pusher, type PushSend } from "./modules/notifications/push.js";
+import { notificationRoutes } from "./modules/notifications/routes.js";
 import { reportRoutes } from "./modules/reports/routes.js";
 import { reviewRoutes } from "./modules/review/routes.js";
 import { bookingRoutes } from "./modules/bookings/routes.js";
@@ -39,6 +41,31 @@ export interface AppDeps {
   files?: Files;
   /** The payment provider; tests pass a fake. Defaults to Razorpay when its keys are set. */
   gateway?: PaymentGateway | null;
+  /** Sends a push to a phone; tests pass a fake, null turns push off */
+  pushSend?: PushSend | null;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Pushes waiting alerts to phones; the scheduler flushes it every minute. */
+    pusher: Pusher;
+  }
+}
+
+/** Push signing keys are read (or made) on first use, after migrations have run. */
+function lazyWebPush(db: Db, subject: string): { send: PushSend; publicKey: () => Promise<string> } {
+  let keys: ReturnType<typeof vapidKeys> | null = null;
+  const load = () => {
+    keys ??= vapidKeys(db).catch((err) => {
+      keys = null;
+      throw err;
+    });
+    return keys;
+  };
+  return {
+    publicKey: async () => (await load()).publicKey,
+    send: async (target, payload) => webPushSender(await load(), subject)(target, payload),
+  };
 }
 
 /**
@@ -96,6 +123,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   const gateway = deps.gateway !== undefined ? deps.gateway : config.billing.razorpay ? razorpayGateway(config.billing.razorpay) : null;
 
+  const web = lazyWebPush(db, config.pushSubject);
+  const pusher = createPusher(db, deps.pushSend !== undefined ? deps.pushSend : web.send, (err) => app.log.warn({ err }, "push failed"));
+  app.decorate("pusher", pusher);
+  // Alerts made by a change go out to phones right after it's saved.
+  app.addHook("onResponse", async (request, reply) => {
+    if (request.method !== "GET" && reply.statusCode < 400) pusher.nudge();
+  });
+  app.addHook("onClose", async () => pusher.stop());
+
   registerAuth(app, db);
   healthRoutes(app, { db, config });
 
@@ -122,6 +158,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       optionRoutes(v1, { db });
       invoicingRoutes(v1, { db });
       broadcastRoutes(v1, { db });
+      notificationRoutes(v1, { db, pusher, publicKey: web.publicKey });
       billingRoutes(v1, { db, config, gateway });
     },
     { prefix: "/api/v1" },

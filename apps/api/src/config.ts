@@ -25,6 +25,8 @@ export interface Config {
     /** 2Factor.in: SMS codes from its ready-approved template, no DLT registration of your own */
     twoFactor: { apiKey: string; template: string | null } | null;
   };
+  /** Who sends push alerts: a mailto: or https: address the push services can reach. */
+  pushSubject: string;
   /** Where uploaded photos (bill photos, receipts) are kept on disk. */
   uploadsDir: string;
   /** Signs the short-lived links that show uploaded files. */
@@ -88,6 +90,13 @@ function otpConfig(env: NodeJS.ProcessEnv): Config["otp"] {
   return { providers: [...new Set(providers)] as OtpProvider[], whatsapp, msg91, twoFactor };
 }
 
+/** PUSH_VAPID_SUBJECT, else the web app's address, else a placeholder that still validates. */
+function pushSubject(env: NodeJS.ProcessEnv): string {
+  if (env.PUSH_VAPID_SUBJECT) return env.PUSH_VAPID_SUBJECT;
+  const web = (env.CORS_ORIGINS ?? "").split(",").map((o) => o.trim()).find((o) => o.startsWith("https://"));
+  return web ?? "mailto:alerts@wedding-yantra.invalid";
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -109,6 +118,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     otpDevEcho: env.AUTH_OTP_DEV_ECHO === "true",
     otpMaxPerIp: Number(env.AUTH_OTP_MAX_PER_IP ?? 20),
     otp: otpConfig(env),
+    pushSubject: pushSubject(env),
     uploadsDir: env.UPLOADS_DIR ?? "uploads",
     // FILES_SECRET is optional: by default it's derived from the database password, which
     // is already secret and stable across restarts.

@@ -639,3 +639,42 @@ describe("delegation rules", () => {
     );
   });
 });
+
+import { dayReportText, eveningDigestText, groupOf, inQuietHours, morningDigestText, taskAlertText } from "./notifications.js";
+
+describe("alerts", () => {
+  it("quiet hours cross midnight", () => {
+    expect(inQuietHours("23:10", "22:00", "07:00")).toBe(true);
+    expect(inQuietHours("06:59", "22:00", "07:00")).toBe(true);
+    expect(inQuietHours("07:00", "22:00", "07:00")).toBe(false);
+    expect(inQuietHours("14:00", "13:00", "15:00")).toBe(true);
+    expect(inQuietHours("14:00", null, null)).toBe(false);
+  });
+  it("groups kinds, the test alert has none", () => {
+    expect(groupOf("task.sent_back")).toBe("checks");
+    expect(groupOf("digest.evening")).toBe("digests");
+    expect(groupOf("test")).toBeNull();
+  });
+  it("words task alerts", () => {
+    expect(taskAlertText("task.assigned", { who: "Rohit Sharma", title: "Album layout" })).toEqual({ title: "New task from Rohit", body: "Album layout" });
+    expect(taskAlertText("task.sent_back", { who: "Anu", title: "Album", reason: "Warmer colours" }).body).toBe("Album: Warmer colours");
+    expect(taskAlertText("task.due_soon", { title: "Call florist", dueTime: "17:00" }).title).toBe("Due at 5 pm");
+  });
+  it("morning digest only when there's something", () => {
+    expect(morningDigestText({ late: 0, dueToday: 0, toCheck: 0, events: [] })).toBeNull();
+    const d = morningDigestText({ late: 1, dueToday: 2, toCheck: 0, events: [{ title: "Sharma wedding", callTime: "16:00" }], top: "Album" })!;
+    expect(d.title).toBe("Your day: 3 tasks");
+    expect(d.body).toBe("Sharma wedding, reach by 4 pm · 1 late · 2 due today\nStart with: Album");
+  });
+  it("evening digest names who is late", () => {
+    expect(eveningDigestText({ doneToday: 0, lateBy: [], stuck: 0, toCheck: 0, dueTomorrow: 0 })).toBeNull();
+    const e = eveningDigestText({ doneToday: 4, lateBy: [{ name: "Rohit K", count: 2 }, { name: "Anu", count: 1 }], stuck: 1, toCheck: 2, dueTomorrow: 0 })!;
+    expect(e.title).toBe("Team today: 4 tasks done, 3 late");
+    expect(e.body).toBe("Late: Rohit 2, Anu 1\n2 waiting for a check · 1 stuck");
+  });
+  it("day report reads well on WhatsApp", () => {
+    expect(dayReportText({ name: "Rohit K", date: "26 Sep", done: ["Album"], left: [], tomorrow: ["Call florist"] })).toBe(
+      "*Rohit's day, 26 Sep*\n\nDone (1):\n✓ Album\n\nTomorrow:\n• Call florist",
+    );
+  });
+});

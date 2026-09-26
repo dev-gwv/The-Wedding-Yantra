@@ -1,10 +1,12 @@
 "use client";
 
 import { can, eventScope, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
-import { useLogout } from "@wedding-yantra/api-client/react";
+import { useApi, useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  Bell,
+  Sun,
   Boxes,
   Building2,
   CalendarOff,
@@ -42,15 +44,19 @@ import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Avatar, Card, PageHeader } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
+import { disablePush } from "@/lib/push";
 import { clearSession } from "@/lib/session";
 
 export default function MorePage() {
   const { me, workspace, switchTo } = useCurrentWorkspace();
   const logout = useLogout();
+  const api = useApi();
   const queryClient = useQueryClient();
   const [switching, setSwitching] = useState(false);
 
   async function signOut() {
+    // This phone stops getting this person's alerts.
+    await disablePush(api).catch(() => undefined);
     await logout.mutateAsync().catch(() => undefined);
     queryClient.clear();
     clearSession();
@@ -92,6 +98,7 @@ export default function MorePage() {
         <>
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Work</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
+            <Row href="/app/my-day" icon={Sun} label="My day" />
             <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
             <Row href="/app/deliverables" icon={Package} label="Deliverables" />
             {eventScope(workspace.role) === "all" && <Row href="/app/inventory" icon={Boxes} label="Stock" />}
@@ -114,6 +121,7 @@ export default function MorePage() {
         {can(workspace.role, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
+        <Row href="/app/notifications?tab=settings" icon={Bell} label="Alerts: what reaches you, and when" />
         <Row href="/app/team" icon={Users} label="Team" />
         {can(workspace.role, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
         {me.workspaces.length > 1 && (

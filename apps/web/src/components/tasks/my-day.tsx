@@ -24,8 +24,8 @@ export function MyDayCard({ day }: { day: MyDay }) {
     <section>
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-lg font-extrabold">Your day</h2>
-        <Link href="/app/tasks" className="text-sm font-bold text-brand-strong hover:text-brand-deep">
-          All my tasks
+        <Link href="/app/my-day" className="text-sm font-bold text-brand-strong hover:text-brand-deep">
+          Open my day
         </Link>
       </div>
       <Card className="overflow-hidden">

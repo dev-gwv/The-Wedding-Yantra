@@ -21,6 +21,7 @@ import {
 import type { Db } from "../../db.js";
 import type { Files } from "../files/service.js";
 import * as delegation from "./delegation.js";
+import { markEntityRead } from "../notifications/service.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as repeats from "./repeats.js";
@@ -81,7 +82,11 @@ export function taskRoutes(app: FastifyInstance, deps: { db: Db; files: Files })
   });
   app.get<WsId>("/workspaces/:workspaceId/tasks/:id", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
-    return ok(await delegation.getTaskDetail(db, files.secret, ctx, assertId(request.params.id, "This task")));
+    const id = assertId(request.params.id, "This task");
+    const task = await delegation.getTaskDetail(db, files.secret, ctx, id);
+    // Opening a task reads its alerts.
+    await markEntityRead(db, ctx, id);
+    return ok(task);
   });
   const detail = async (ctx: Awaited<ReturnType<typeof member>>, id: string) => delegation.getTaskDetail(db, files.secret, ctx, id);
   app.post<WsId>("/workspaces/:workspaceId/tasks/:id/move", async (request) => {

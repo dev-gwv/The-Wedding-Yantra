@@ -6,6 +6,7 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { eventTeam, listEvents } from "../bookings/events.js";
 import { makeDueRepeats } from "./repeats.js";
+import { taskAlert } from "./alerts.js";
 import { moveTask } from "./delegation.js";
 import { writeCustom } from "../fields/service.js";
 import { assertOption, optionJoin } from "../options/service.js";
@@ -67,6 +68,7 @@ export interface TaskRow {
   last_sub_at: Date | null;
   last_sub_link: string | null;
   last_sub_decision: "approved" | "sent_back" | null;
+  last_sub_reason: string | null;
 }
 
 export const TASK_SELECT = `
@@ -82,12 +84,12 @@ export const TASK_SELECT = `
          (SELECT count(*)::int FROM task_steps s WHERE s.task_id = t.id) AS steps_total,
          (SELECT count(*)::int FROM task_comments k WHERE k.task_id = t.id AND k.deleted_at IS NULL) AS comment_count,
          (SELECT count(*)::int FROM task_files f WHERE f.task_id = t.id) AS file_count,
-         ls.created_at AS last_sub_at, ls.link AS last_sub_link, ls.decision AS last_sub_decision
+         ls.created_at AS last_sub_at, ls.link AS last_sub_link, ls.decision AS last_sub_decision, ls.reason AS last_sub_reason
     FROM tasks t
     LEFT JOIN task_repeats rp ON rp.id = t.repeat_id
     LEFT JOIN clients cl ON cl.id = t.client_id
     ${optionJoin("tg", "task_tag", "t.workspace_id", "t.tag")}
-    LEFT JOIN LATERAL (SELECT created_at, link, decision FROM task_submissions WHERE task_id = t.id ORDER BY created_at DESC LIMIT 1) ls ON true
+    LEFT JOIN LATERAL (SELECT created_at, link, decision, reason FROM task_submissions WHERE task_id = t.id ORDER BY created_at DESC LIMIT 1) ls ON true
     JOIN workspaces w ON w.id = t.workspace_id
     LEFT JOIN events e ON e.id = t.event_id
     LEFT JOIN users a ON a.id = t.assignee_id
@@ -130,7 +132,7 @@ export const toTask = (r: TaskRow): TaskItem => ({
   steps: { done: r.steps_done, total: r.steps_total },
   comments: r.comment_count,
   files: r.file_count,
-  lastSubmission: r.last_sub_at ? { at: r.last_sub_at.toISOString(), link: r.last_sub_link, decision: r.last_sub_decision } : null,
+  lastSubmission: r.last_sub_at ? { at: r.last_sub_at.toISOString(), link: r.last_sub_link, decision: r.last_sub_decision, reason: r.last_sub_reason } : null,
   custom: r.custom ?? {},
   fromChecklist: r.template_id !== null,
   repeat:
@@ -340,6 +342,7 @@ export async function createTask(db: Db, ctx: MemberContext, input: TaskFields):
         entityId: id,
         meta: { title: input.title, assigneeId: assignee },
       });
+      await taskAlert(tx, ctx, "task.assigned", { id, title: input.title }, [assignee]);
     }
     return toTask(await loadTask(tx, ctx, id));
   });
@@ -402,6 +405,7 @@ export async function updateTask(db: Db, ctx: MemberContext, id: string, input: 
           entityId: id,
           meta: { title: input.title ?? row.title, assigneeId: input.assigneeId },
         });
+        await taskAlert(tx, ctx, "task.assigned", { id, title: input.title ?? row.title }, [input.assigneeId]);
       }
     }
     if (input.dueDate !== undefined && input.dueDate !== row.due_date) {
@@ -594,11 +598,32 @@ export async function myDay(db: Db, ctx: MemberContext): Promise<MyDay> {
         .map((e) => ({ ...e, callTime: mine.get(e.id)?.call_time ?? null, roleNote: mine.get(e.id)?.role_note ?? null }))
     : [];
 
+  // Sent back to change: first in "waiting on you", not repeated further down.
+  const sentBack = open.filter((t) => t.lastSubmission?.decision === "sent_back" && (t.status === "doing" || t.status === "open"));
+  // Handed in: with whoever gave it now, not on your to-do.
+  const handedIn = open.filter((t) => t.status === "review");
+  const rest = open.filter((t) => !sentBack.includes(t) && t.status !== "review");
+  const [toCheck, done] = await Promise.all([
+    listTasks(db, ctx, { scope: "given", state: "review" }),
+    db.query<TaskRow>(
+      `${TASK_SELECT}
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.assignee_id = $2 AND t.status IN ('done', 'review')
+          AND (coalesce(t.completed_at, t.done_at) AT TIME ZONE w.timezone)::date = (now() AT TIME ZONE w.timezone)::date
+        ORDER BY coalesce(t.completed_at, t.done_at) DESC LIMIT 50`,
+      [ctx.workspaceId, ctx.userId],
+    ),
+  ]);
+
   return {
     today,
-    overdue: open.filter((t) => t.overdue),
-    dueToday: open.filter((t) => t.dueDate === today),
-    upcoming: open.filter((t) => t.dueDate !== null && t.dueDate > today && t.dueDate <= week),
+    overdue: rest.filter((t) => t.overdue),
+    dueToday: rest.filter((t) => t.dueDate === today && !t.overdue),
+    upcoming: rest.filter((t) => t.dueDate !== null && t.dueDate > today && t.dueDate <= week),
+    noDate: rest.filter((t) => t.dueDate === null),
+    sentBack,
+    handedIn,
+    toCheck,
+    doneToday: done.rows.map(toTask),
     events,
   };
 }

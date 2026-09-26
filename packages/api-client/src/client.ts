@@ -55,6 +55,8 @@ import type {
   TeamScores,
   ChecklistItem,
   MyDay,
+  NotificationList,
+  NotificationPrefs,
   SaveChecklistInput,
   SaveEventTeamInput,
   TaskInput,
@@ -419,6 +421,29 @@ export function createApiClient(options: ApiClientOptions) {
       attach: (workspaceId: string, id: string, fileId: string) => request<TaskDetail>("POST", `${task(workspaceId, id)}/files`, { fileId }),
       detach: (workspaceId: string, id: string, fileId: string) =>
         request<TaskDetail>("DELETE", `${task(workspaceId, id)}/files/${encodeURIComponent(fileId)}`),
+    },
+    notifications: {
+      list: (workspaceId: string, query: { unread?: boolean; before?: string; limit?: number } = {}) =>
+        request<NotificationList>(
+          "GET",
+          `${ws(workspaceId)}/notifications${qs({ unread: query.unread ? "true" : undefined, before: query.before, limit: query.limit?.toString() })}`,
+        ),
+      /** For the bell: cheap to ask every minute */
+      unread: (workspaceId: string) => request<{ unread: number }>("GET", `${ws(workspaceId)}/notifications/unread`),
+      read: (workspaceId: string, input: { ids: string[] } | { all: true }) =>
+        request<{ unread: number }>("POST", `${ws(workspaceId)}/notifications/read`, input),
+      prefs: (workspaceId: string) => request<NotificationPrefs>("GET", `${ws(workspaceId)}/notifications/prefs`),
+      savePrefs: (workspaceId: string, input: Omit<NotificationPrefs, "devices">) =>
+        request<NotificationPrefs>("PUT", `${ws(workspaceId)}/notifications/prefs`, input),
+      /** Sends yourself an alert, to see it arrive */
+      test: (workspaceId: string) => request<{ sent: true }>("POST", `${ws(workspaceId)}/notifications/test`),
+    },
+    push: {
+      /** The key browsers need to subscribe to push */
+      key: () => request<{ publicKey: string }>("GET", `/push/key`),
+      subscribe: (input: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+        request<{ subscribed: true }>("POST", `/push/subscriptions`, input),
+      unsubscribe: (endpoint: string) => request<{ subscribed: false }>("POST", `/push/unsubscribe`, { endpoint }),
     },
     checklist: {
       get: (workspaceId: string) => request<ChecklistItem[]>("GET", `${ws(workspaceId)}/checklist`),

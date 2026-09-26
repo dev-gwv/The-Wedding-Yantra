@@ -3,6 +3,7 @@ import { loadConfig } from "./config.js";
 import { createPool } from "./db.js";
 import { runMigrations } from "./db/migrate.js";
 import { cleanupAuth } from "./modules/auth/service.js";
+import { runSchedule } from "./modules/notifications/scheduler.js";
 
 let config;
 try {
@@ -28,8 +29,24 @@ const housekeeping = setInterval(
 );
 housekeeping.unref();
 
+// Reminders and round-ups every minute (each business in its own time zone), then push
+// anything waiting. A slow run is never overlapped by the next.
+let scheduling = false;
+const scheduler = setInterval(() => {
+  if (scheduling) return;
+  scheduling = true;
+  runSchedule(pool)
+    .catch((err) => app.log.warn({ err }, "scheduled alerts failed"))
+    .then(() => app.pusher.flush())
+    .finally(() => {
+      scheduling = false;
+    });
+}, 60 * 1000);
+scheduler.unref();
+
 app.addHook("onClose", async () => {
   clearInterval(housekeeping);
+  clearInterval(scheduler);
   await pool.end();
 });
 

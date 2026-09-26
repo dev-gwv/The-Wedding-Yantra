@@ -21,6 +21,16 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   const workspaces = me.data?.workspaces;
+
+  // An alert tapped on the phone names its business (?ws=): open that one.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const wanted = url.searchParams.get("ws");
+    if (!wanted || !workspaces) return;
+    if (workspaces.some((w) => w.id === wanted) && wanted !== savedId) setWorkspaceId(wanted);
+    url.searchParams.delete("ws");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [workspaces, savedId]);
   const workspace = useMemo(
     () => workspaces?.find((w) => w.id === savedId) ?? workspaces?.[0] ?? null,
     [workspaces, savedId],

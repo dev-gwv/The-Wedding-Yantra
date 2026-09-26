@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarDays, House, IndianRupee, Inbox, Menu, type LucideIcon } from "lucide-react";
+import { CalendarDays, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { AlertBell } from "./alert-bell";
 import { BusinessMark } from "./business-mark";
 import { Logo } from "./logo";
 import { useCurrentWorkspace } from "./workspace-context";
@@ -20,7 +21,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
@@ -67,9 +68,47 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+        <div className="mt-4 flex flex-col gap-1 border-t border-line pt-4">
+          <Link
+            href="/app/my-day"
+            aria-current={pathname.startsWith("/app/my-day") ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
+              pathname.startsWith("/app/my-day") ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+            )}
+          >
+            <Sun className="size-[18px] shrink-0" strokeWidth={2} />
+            My day
+          </Link>
+          <AlertBell
+            label
+            className={cn(
+              "rounded-2xl px-3 py-2.5 text-sm font-semibold",
+              pathname.startsWith("/app/notifications") ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+            )}
+          />
+        </div>
       </aside>
 
-      <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10 print:max-w-none print:p-0">{children}</main>
+      {/* Phone: the business and the bell, above every page */}
+      <header className="flex items-center gap-3 px-4 pt-3 sm:px-6 lg:hidden print:hidden">
+        <Link href="/app/more" className="flex min-w-0 flex-1 items-center gap-2.5">
+          <BusinessMark logoUrl={workspace.logoUrl} icon={workspace.businessTypeIcon} name={workspace.name} size="sm" tone="cream" />
+          <span className="truncate text-sm font-bold">{workspace.name}</span>
+        </Link>
+        <Link
+          href="/app/my-day"
+          aria-label="My day"
+          className={cn("grid size-10 place-items-center rounded-full text-ink-muted hover:bg-cream", pathname.startsWith("/app/my-day") && "bg-cream text-brand-strong")}
+        >
+          <Sun className="size-5" strokeWidth={2} />
+        </Link>
+        <AlertBell
+          className={cn("grid size-10 place-items-center rounded-full text-ink-muted hover:bg-cream", pathname.startsWith("/app/notifications") && "bg-cream text-brand-strong")}
+        />
+      </header>
+
+      <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10 print:max-w-none print:p-0">{children}</main>
 
       {/* Phone: white tab bar; the active icon sits in a small gradient pill */}
       <nav

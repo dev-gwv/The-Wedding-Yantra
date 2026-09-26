@@ -8,8 +8,9 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type {
+  NotificationPrefs,
   TaskRepeatInput,
   SaveCustomFieldsInput,
   BillListQuery,
@@ -148,6 +149,11 @@ export const queryKeys = {
   monthReport: (id: string, month: string) => ["workspace", id, "bookings", "report", month] as const,
   /** Tasks and My Day; invalidate this after any task change. */
   work: (id: string) => ["workspace", id, "work"] as const,
+  /** Alerts live under work too: any task change can make or read one. */
+  alerts: (id: string) => ["workspace", id, "work", "alerts"] as const,
+  alertList: (id: string, unread: boolean) => ["workspace", id, "work", "alerts", "list", unread] as const,
+  alertCount: (id: string) => ["workspace", id, "work", "alerts", "count"] as const,
+  alertPrefs: (id: string) => ["workspace", id, "alert-prefs"] as const,
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   task: (id: string, taskId: string) => ["workspace", id, "work", "task", taskId] as const,
@@ -826,7 +832,14 @@ export function useDeleteTask(workspaceId: string) {
 /** One task in full: steps, comments, files, hand-ins and history. */
 export function useTask(workspaceId: string, taskId: string | null) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.task(workspaceId, taskId ?? ""), queryFn: () => api.tasks.get(workspaceId, taskId!), enabled: !!taskId });
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: queryKeys.task(workspaceId, taskId ?? ""), queryFn: () => api.tasks.get(workspaceId, taskId!), enabled: !!taskId });
+  // Opening a task reads its alerts on the server: bring the bell up to date.
+  const loadedAt = query.dataUpdatedAt;
+  useEffect(() => {
+    if (loadedAt) void qc.invalidateQueries({ queryKey: queryKeys.alerts(workspaceId) });
+  }, [loadedAt, qc, workspaceId]);
+  return query;
 }
 
 export function usePeopleBoard(workspaceId: string, enabled = true) {
@@ -851,6 +864,70 @@ function useTaskDetailMutation<TInput>(workspaceId: string, taskId: string, fn: 
 export function useMoveAnyTask(workspaceId: string) {
   const api = useApi();
   return useTaskMutation(workspaceId, ({ id, ...input }: MoveTaskInput & { id: string }) => api.tasks.move(workspaceId, id, input));
+}
+
+/** Moves any task to a later day by id: for "tomorrow" on a row. */
+export function useSnoozeAnyTask(workspaceId: string) {
+  const api = useApi();
+  return useTaskMutation(workspaceId, ({ id, ...input }: SnoozeTaskInput & { id: string }) => api.tasks.snooze(workspaceId, id, input));
+}
+
+// ---- Alerts -------------------------------------------------------------------
+
+/** The bell's count, asked every minute while the app is open. */
+export function useUnreadAlerts(workspaceId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.alertCount(workspaceId),
+    queryFn: () => api.notifications.unread(workspaceId),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useAlerts(workspaceId: string, unread = false) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: queryKeys.alertList(workspaceId, unread),
+    queryFn: ({ pageParam }) => api.notifications.list(workspaceId, { unread, before: pageParam ?? undefined }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextBefore,
+  });
+}
+
+export function useMarkAlertsRead(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[] } | { all: true }) => api.notifications.read(workspaceId, input),
+    onSuccess: ({ unread }) => {
+      qc.setQueryData(queryKeys.alertCount(workspaceId), { unread });
+      void qc.invalidateQueries({ queryKey: queryKeys.alerts(workspaceId), predicate: (q) => q.queryKey[4] !== "count" });
+    },
+  });
+}
+
+export function useAlertPrefs(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.alertPrefs(workspaceId), queryFn: () => api.notifications.prefs(workspaceId) });
+}
+
+export function useSaveAlertPrefs(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<NotificationPrefs, "devices">) => api.notifications.savePrefs(workspaceId, input),
+    onSuccess: (prefs) => qc.setQueryData(queryKeys.alertPrefs(workspaceId), prefs),
+  });
+}
+
+export function useTestAlert(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.notifications.test(workspaceId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.alerts(workspaceId) }),
+  });
 }
 
 export function useMoveTask(workspaceId: string, taskId: string) {

@@ -52,7 +52,8 @@ export interface TaskItem {
   comments: number;
   files: number;
   /** The latest work handed in, for "Handed in · Open" on the card */
-  lastSubmission: { at: string; link: string | null; decision: "approved" | "sent_back" | null } | null;
+  /** The latest hand-in; `reason` is why it was sent back */
+  lastSubmission: { at: string; link: string | null; decision: "approved" | "sent_back" | null; reason: string | null } | null;
   custom: CustomValues;
   /** Made from the event checklist */
   fromChecklist: boolean;
@@ -222,6 +223,16 @@ export interface MyDay {
   dueToday: TaskItem[];
   /** The next seven days */
   upcoming: TaskItem[];
+  /** Your open tasks with no date */
+  noDate: TaskItem[];
+  /** Your work sent back to change */
+  sentBack: TaskItem[];
+  /** Your work handed in, waiting for whoever gave it to check */
+  handedIn: TaskItem[];
+  /** Work handed in to you, waiting for your check */
+  toCheck: TaskItem[];
+  /** What you finished today */
+  doneToday: TaskItem[];
   /** Events you're on the team for, today and the next seven days */
   events: (EventSummary & { callTime: string | null; roleNote: string | null })[];
 }

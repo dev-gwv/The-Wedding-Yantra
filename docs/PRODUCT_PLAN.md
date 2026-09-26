@@ -1088,3 +1088,27 @@ After studying IPC Studios' control center (task manager, accountability board, 
 - Freelancers can now attach photos to their tasks.
 - Next (part 2): alerts in the app and on the phone, a morning "your day" and evening owner digest.
 
+## 39. Built: delegation, part 2: alerts and My Day
+
+- **Alerts in the app:** a bell with the unread count (phone: top strip; desktop: side menu) and an
+  Alerts page with All / Unread, mark all read, and older pages. Tapping an alert opens its task;
+  opening a task reads its alerts.
+- **Who hears what:** a task given or handed to you; work handed in to you; your work approved
+  or sent back (with the reason); a task you gave ticked off or stuck (with the reason);
+  comments on your tasks and @mentions. Nobody is told about their own doing.
+- **From the clock** (each business in its own time zone, once a day each, never twice after a
+  restart): an hour before a task's time; the 8 am "Your day" plan (late, today, to check, today's
+  events, where to start), skipped for people off that day; the morning after a task was missed;
+  the 7 pm team round-up for owners and managers (done today, late by person, stuck, waiting for
+  a check, due tomorrow). Runs inside the API every minute: nothing else to deploy.
+- **On the phone:** web push to the installed app (Android, desktop, iPhone from the Home Screen).
+  The signing keys are made once and kept in the database (or set PUSH_VAPID_PUBLIC/PRIVATE);
+  alerts go out after the change is saved; removed phones are forgotten; one card per task.
+  Signing out stops the phone's alerts. Tapping opens the right business.
+- **Settings per person and business:** switch off any of six groups, phone buzz on/off, quiet
+  hours (default 10 pm to 7 am; alerts wait in the app), send a test.
+- **My day** (`/app/my-day`): events, Late, Today, Waiting on you (sent back with the reason, work
+  to check), This week, No date, Handed in. One-tap Start, Done, Hand in, Tomorrow, Stuck.
+  **Done for the day**: done, still open, tomorrow, and the same as a WhatsApp message.
+- Next (part 3): points and the monthly leaderboard.
+

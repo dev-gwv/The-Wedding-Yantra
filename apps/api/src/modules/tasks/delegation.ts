@@ -5,6 +5,7 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { assertWorkspaceFile, toUploaded } from "../files/service.js";
+import { taskAlert } from "./alerts.js";
 import { loadTask, manages, taskEvent, toTask, type TaskRow } from "./service.js";
 
 /** Whether a finished task was on time: finished on or before its day, in the business's time zone. */
@@ -85,8 +86,12 @@ export async function moveTask(db: Db, ctx: MemberContext, id: string, input: { 
         action: from === "review" ? "task.approved" : "task.done",
         meta: { title: row.title, eventId: row.event_id, dueDate: row.due_date, late: await isLate(tx, id), assigneeId: row.assignee_id },
       });
+      // Approved: tell whoever did it. Ticked off: tell whoever gave it.
+      if (from === "review") await taskAlert(tx, ctx, "task.approved", row, [row.assignee_id]);
+      else await taskAlert(tx, ctx, "task.done", row, [row.created_by]);
     } else if (to === "waiting") {
       await logActivity(tx, { ...base, action: "task.stuck", meta: { title: row.title, reason: input.reason, assigneeId: row.assignee_id } });
+      await taskAlert(tx, ctx, "task.stuck", row, [row.created_by], { reason: input.reason });
     } else if (to === "cancelled") {
       await logActivity(tx, { ...base, action: "task.cancelled", meta: { title: row.title, assigneeId: row.assignee_id } });
     }
@@ -132,6 +137,7 @@ export async function submitTask(
       entityId: id,
       meta: { title: row.title, giverId: row.created_by, revision: row.revisions },
     });
+    await taskAlert(tx, ctx, "task.submitted", row, [row.created_by]);
     return toTask(await loadTask(tx, ctx, id));
   });
 }
@@ -173,6 +179,7 @@ export async function reviewTask(db: Db, ctx: MemberContext, id: string, input: 
         firstTime: input.approve && row.revisions === 0,
       },
     });
+    await taskAlert(tx, ctx, input.approve ? "task.approved" : "task.sent_back", row, [row.assignee_id], { reason: input.reason });
     return toTask(await loadTask(tx, ctx, id));
   });
 }
@@ -292,6 +299,9 @@ export async function addComment(db: Db, ctx: MemberContext, taskId: string, inp
     entityId: taskId,
     meta: { title: row.title, mentions, assigneeId: row.assignee_id, giverId: row.created_by },
   });
+  const task = { id: taskId, title: row.title };
+  await taskAlert(db, ctx, "task.mentioned", task, mentions, { comment: input.body });
+  await taskAlert(db, ctx, "task.commented", task, [row.assignee_id, row.created_by].filter((u) => !u || !mentions.includes(u)), { comment: input.body });
 }
 
 export async function deleteComment(db: Db, ctx: MemberContext, taskId: string, commentId: string): Promise<void> {
