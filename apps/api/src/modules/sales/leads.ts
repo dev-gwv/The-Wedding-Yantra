@@ -500,29 +500,44 @@ export async function addActivity(
 /** Numbers and the short to-do list for the Home screen. */
 export async function salesSummary(db: Db, ctx: MemberContext) {
   const scope = leadScope(ctx.role);
-  if (scope === "none") return { overdue: 0, dueToday: 0, newLeads: 0, openValue: 0, due: [] };
+  if (scope === "none") return { overdue: 0, dueToday: 0, newLeads: 0, openValue: 0, monthEnquiries: 0, monthBooked: 0, monthBookedValue: 0, due: [] };
 
   const params: unknown[] = [ctx.workspaceId];
   const scopeSql = scopeCondition(ctx, params);
-  const { rows } = await db.query<{ overdue: string; due_today: string; new_leads: string; open_value: string }>(
-    `WITH mine AS (SELECT ${SUMMARY_COLUMNS}, s.position ${FROM}
-                    WHERE l.workspace_id = $1 AND l.deleted_at IS NULL AND ${scopeSql})
-     SELECT count(*) FILTER (WHERE follow_up_state = 'overdue') AS overdue,
-            count(*) FILTER (WHERE follow_up_state = 'today') AS due_today,
-            count(*) FILTER (WHERE stage_id = (SELECT id FROM pipeline_stages
-                                               WHERE workspace_id = $1 AND kind = 'open'
-                                               ORDER BY position LIMIT 1)) AS new_leads,
-            coalesce(sum(budget) FILTER (WHERE stage_kind = 'open'), 0) AS open_value
-       FROM mine`,
-    params,
-  );
-  const due = await listLeads(db, ctx, { followUp: "due" });
-  const r = rows[0]!;
+  const [counts, due, booked] = await Promise.all([
+    db.query<{ overdue: string; due_today: string; new_leads: string; open_value: string; month_new: string }>(
+      `WITH mine AS (SELECT ${SUMMARY_COLUMNS}, s.position, l.stage_changed_at,
+                            date_trunc('month', now() AT TIME ZONE w.timezone) AS month_start, w.timezone ${FROM}
+                      WHERE l.workspace_id = $1 AND l.deleted_at IS NULL AND ${scopeSql})
+       SELECT count(*) FILTER (WHERE follow_up_state = 'overdue') AS overdue,
+              count(*) FILTER (WHERE follow_up_state = 'today') AS due_today,
+              count(*) FILTER (WHERE stage_id = (SELECT id FROM pipeline_stages
+                                                 WHERE workspace_id = $1 AND kind = 'open'
+                                                 ORDER BY position LIMIT 1)) AS new_leads,
+              coalesce(sum(budget) FILTER (WHERE stage_kind = 'open'), 0) AS open_value,
+              count(*) FILTER (WHERE created_at AT TIME ZONE timezone >= month_start) AS month_new
+         FROM mine`,
+      params,
+    ),
+    listLeads(db, ctx, { followUp: "due" }),
+    // Bookings: events made this month, however they came in (enquiry, quote or typed in).
+    db.query<{ n: string; value: string }>(
+      `SELECT count(*) AS n, coalesce(sum(e.value), 0) AS value
+         FROM events e JOIN workspaces w ON w.id = e.workspace_id
+        WHERE e.workspace_id = $1 AND e.deleted_at IS NULL AND e.status <> 'cancelled'
+          AND e.created_at AT TIME ZONE w.timezone >= date_trunc('month', now() AT TIME ZONE w.timezone)`,
+      [ctx.workspaceId],
+    ),
+  ]);
+  const r = counts.rows[0]!;
   return {
     overdue: Number(r.overdue),
     dueToday: Number(r.due_today),
     newLeads: Number(r.new_leads),
     openValue: Number(r.open_value),
+    monthEnquiries: Number(r.month_new),
+    monthBooked: Number(booked.rows[0]?.n ?? 0),
+    monthBookedValue: Number(booked.rows[0]?.value ?? 0),
     due: due.leads.slice(0, 5),
   };
 }

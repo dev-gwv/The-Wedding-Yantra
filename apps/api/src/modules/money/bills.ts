@@ -25,6 +25,7 @@ import type { MemberContext } from "../auth/guard.js";
 import { nextNumber } from "../bookings/quotes.js";
 import { requireBillsManage as requireManage, requireMoneyView } from "./access.js";
 import { listPayments } from "./payments.js";
+import { logoPath } from "../files/logo.js";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -676,8 +677,9 @@ export async function getPublicBill(db: Db, token: string): Promise<PublicBill> 
     email: string | null;
     address: string | null;
     upi_id: string | null;
+    logo_file_id: string | null;
   }>(
-    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.upi_id
+    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.upi_id, w.logo_file_id
        FROM workspaces w JOIN business_types bt ON bt.id = w.business_type_id WHERE w.id = $1`,
     [row.workspace_id],
   );
@@ -704,6 +706,7 @@ export async function getPublicBill(db: Db, token: string): Promise<PublicBill> 
       email: b.email,
       address: b.address,
       upiId: row.status === "cancelled" ? null : b.upi_id,
+      logoUrl: logoPath(row.workspace_id, b.logo_file_id),
     },
     bill: {
       ...visible,

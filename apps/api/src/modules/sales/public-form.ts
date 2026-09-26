@@ -2,6 +2,7 @@ import type { PublicLeadForm } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, notFound } from "../../lib/http.js";
 import { firstOpenStage } from "./leads.js";
+import { logoPath } from "../files/logo.js";
 
 const MAX_PER_IP_PER_HOUR = 10;
 
@@ -11,12 +12,13 @@ interface FormRow {
   city: string;
   business_type_name: string;
   business_type_icon: string;
+  logo_file_id: string | null;
   owner_id: string | null;
 }
 
 async function loadForm(db: Db, slug: string): Promise<FormRow> {
   const { rows } = await db.query<FormRow>(
-    `SELECT f.workspace_id, w.name, w.city, bt.name AS business_type_name, bt.icon AS business_type_icon,
+    `SELECT f.workspace_id, w.name, w.city, bt.name AS business_type_name, bt.icon AS business_type_icon, w.logo_file_id,
             (SELECT m.user_id FROM memberships m
               WHERE m.workspace_id = w.id AND m.role = 'owner' AND m.removed_at IS NULL) AS owner_id
        FROM lead_forms f
@@ -47,6 +49,7 @@ export async function getPublicForm(db: Db, slug: string, ref?: string): Promise
     businessTypeName: f.business_type_name,
     businessTypeIcon: f.business_type_icon,
     city: f.city,
+    logoUrl: logoPath(f.workspace_id, f.logo_file_id),
     // Only the first name: the link travels between friends.
     referrer: referrer ? (referrer.name.trim().split(/\s+/)[0] ?? null) : null,
   };

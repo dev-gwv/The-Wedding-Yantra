@@ -11,7 +11,9 @@
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@tanstack/query-sync-storage-persister": "^5.103.2",
     "@tanstack/react-query": "^5.103.2",
+    "@tanstack/react-query-persist-client": "^5.103.2",
     "@wedding-yantra/api-client": "workspace:*",
     "@wedding-yantra/core": "workspace:*",
     "@wedding-yantra/types": "workspace:*",

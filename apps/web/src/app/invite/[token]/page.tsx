@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ROLE_INFO } from "@wedding-yantra/core";
 import { useAcceptInvitation, useInvitationPreview } from "@wedding-yantra/api-client/react";
 import { MailX } from "lucide-react";
@@ -16,6 +17,7 @@ import { clearSession, setWorkspaceId, useToken } from "@/lib/session";
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const session = useToken();
   const preview = useInvitationPreview(token);
   const accept = useAcceptInvitation();
@@ -83,6 +85,7 @@ export default function InvitePage() {
                   size="lg"
                   variant="ghost"
                   onClick={() => {
+                    queryClient.clear();
                     clearSession();
                     router.replace(`/login?next=${encodeURIComponent(here)}`);
                   }}

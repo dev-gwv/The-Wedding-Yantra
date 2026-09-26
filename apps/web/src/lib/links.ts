@@ -3,8 +3,8 @@ import type { SetupStepKey } from "@wedding-yantra/types";
 /** Where each Home setup step takes you. */
 export const SETUP_LINKS: Record<SetupStepKey, string | null> = {
   create_business: null,
-  business_profile: "/app/settings/business",
-  price_list: "/app/settings/services",
+  business_profile: "/app/settings/business?from=setup",
+  price_list: "/app/settings/services?from=setup",
   first_enquiry: "/app/leads",
   first_quote: "/app/quotes/new",
   getting_paid: "/app/settings/business",

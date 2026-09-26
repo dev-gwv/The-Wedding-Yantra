@@ -235,6 +235,9 @@ export function useHome(id: string | null) {
     queryKey: queryKeys.home(id ?? ""),
     queryFn: () => api.workspaces.home(id!),
     enabled: !!id,
+    // Home sums up everything else, so it's checked again each time it's opened (the last
+    // copy shows meanwhile, so it never waits on a spinner).
+    refetchOnMount: "always",
   });
 }
 

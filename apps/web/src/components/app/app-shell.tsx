@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { BusinessIcon } from "./business-icon";
+import { BusinessMark } from "./business-mark";
 import { Logo } from "./logo";
 import { useCurrentWorkspace } from "./workspace-context";
 
@@ -40,9 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           href="/app/more"
           className="mb-4 flex items-center gap-3 rounded-2xl bg-cream px-3 py-2.5 transition hover:bg-sun-100"
         >
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface text-brand-strong shadow-soft">
-            <BusinessIcon name={workspace.businessTypeIcon} className="size-4" />
-          </span>
+          <BusinessMark logoUrl={workspace.logoUrl} icon={workspace.businessTypeIcon} name={workspace.name} size="sm" tone="surface" />
           <span className="min-w-0">
             <span className="block truncate text-sm font-bold">{workspace.name}</span>
             <span className="block truncate text-xs text-ink-muted">{workspace.businessTypeName}</span>
@@ -71,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10 print:max-w-none print:p-0">{children}</main>
+      <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10 print:max-w-none print:p-0">{children}</main>
 
       {/* Phone: white tab bar; the active icon sits in a small gradient pill */}
       <nav

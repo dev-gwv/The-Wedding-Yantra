@@ -37,3 +37,26 @@ export async function prepareUpload(file: File): Promise<{ contentType: UploadTy
   );
   return { contentType: "image/jpeg", data: await toBase64(blob), name: file.name.replace(/\.[^.]+$/, "") + ".jpg" };
 }
+
+/** A logo, shrunk to 512px. PNG and WebP stay PNG so a see-through background stays see-through. */
+export async function prepareLogo(file: File): Promise<{ contentType: UploadType; data: string; name: string }> {
+  if (!file.type.startsWith("image/")) throw new Error("Use a picture of your logo (JPG or PNG)");
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Couldn't read this picture. Try another one.");
+  }
+  const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const png = file.type === "image/png" || file.type === "image/webp" || file.type === "image/svg+xml";
+  const type = png ? "image/png" : "image/jpeg";
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't prepare this picture"))), type, 0.9),
+  );
+  return { contentType: type, data: await toBase64(blob), name: `logo.${png ? "png" : "jpg"}` };
+}

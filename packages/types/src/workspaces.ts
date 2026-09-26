@@ -13,6 +13,8 @@ export const workspaceSummary = z.object({
   businessTypeIcon: z.string(),
   /** The time zone the business's days are counted in, e.g. Asia/Kolkata */
   timezone: z.string(),
+  /** API path of the logo, when there is one */
+  logoUrl: z.string().nullable(),
   role,
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummary>;
@@ -75,6 +77,10 @@ export const updateWorkspaceInput = z
       .regex(/^[A-Z0-9-]{1,5}$/, "Use up to 5 letters or numbers"),
     /** Printed at the bottom of every bill: bank details, payment terms */
     billTerms: optionalText(2000),
+    /** An uploaded photo (see files), or null to remove the logo */
+    logoFileId: z.uuid().nullable(),
+    /** The owner checked the starter prices and they're right as they are */
+    pricesConfirmed: z.literal(true),
   })
   .partial();
 export type UpdateWorkspaceInput = z.input<typeof updateWorkspaceInput>;
@@ -95,6 +101,8 @@ export const workspace = z.object({
   billPrefix: z.string(),
   billTerms: z.string().nullable(),
   reviewUrl: z.string().nullable(),
+  /** API path of the logo, when there is one */
+  logoUrl: z.string().nullable(),
   /** The time zone the business's days are counted in, e.g. Asia/Kolkata */
   timezone: z.string(),
   createdAt: z.string(),

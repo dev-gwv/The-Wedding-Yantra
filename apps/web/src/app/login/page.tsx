@@ -86,6 +86,8 @@ function LoginFlow() {
     setErrors({});
     try {
       const session = await verifyOtp.mutateAsync({ phone: normalized, code });
+      // Nothing from a previous account on this device carries over.
+      queryClient.clear();
       setToken(session.token);
       // Invitees skip the name step: accepting the invite fills in the name the owner typed.
       if (session.isNewUser && !next?.startsWith("/invite/")) setStep("name");
@@ -146,8 +148,9 @@ function LoginFlow() {
           <div>
             <h1 className="font-display text-3xl font-extrabold">Enter the code</h1>
             <p className="mt-1 text-[15px] text-ink-muted">
-              We sent a 6-digit code {channel === "whatsapp" ? "on WhatsApp " : channel === "sms" ? "by SMS " : ""}to{" "}
+              We sent a 6-digit code {channel === "whatsapp" ? "on WhatsApp " : ""}to{" "}
               <span className="font-medium text-ink tabular">{formatPhone(normalized)}</span>
+              {channel === "sms" && ". It comes by SMS, or as a phone call that reads it out."}
             </p>
           </div>
           {devCode && (

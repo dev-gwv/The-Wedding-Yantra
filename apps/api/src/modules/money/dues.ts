@@ -117,12 +117,24 @@ export async function moneyOverview(db: Queryable, ctx: MemberContext): Promise<
 /** What Home shows about money: only for roles that see money. */
 export async function homeMoney(db: Queryable, ctx: MemberContext): Promise<HomeSummary["money"]> {
   if (!can(ctx.role, "finance.view")) return null;
-  const overview = await moneyOverview(db, ctx);
+  const [overview, pendingExpenses, month] = await Promise.all([
+    moneyOverview(db, ctx),
+    pendingExpenseCount(db, ctx),
+    db.query<{ received: string; spent: string }>(
+      `WITH m AS (SELECT date_trunc('month', now() AT TIME ZONE timezone)::date AS start FROM workspaces WHERE id = $1)
+       SELECT (SELECT coalesce(sum(amount), 0) FROM payments p, m WHERE p.workspace_id = $1 AND p.deleted_at IS NULL AND p.paid_on >= m.start) AS received,
+              (SELECT coalesce(sum(amount), 0) FROM expenses x, m
+                WHERE x.workspace_id = $1 AND x.deleted_at IS NULL AND x.status = 'approved' AND x.spent_on >= m.start) AS spent`,
+      [ctx.workspaceId],
+    ),
+  ]);
   return {
     toCollect: overview.toCollect,
     overdue: overview.overdue,
     due: overview.dues.slice(0, 3),
-    pendingExpenses: await pendingExpenseCount(db, ctx),
+    pendingExpenses,
+    receivedThisMonth: Number(month.rows[0]?.received ?? 0),
+    spentThisMonth: Number(month.rows[0]?.spent ?? 0),
   };
 }
 

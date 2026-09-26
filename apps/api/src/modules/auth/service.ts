@@ -3,6 +3,7 @@ import type { Db, Queryable } from "../../db.js";
 import { otpCode, randomToken, sha256 } from "../../lib/crypto.js";
 import { AppError } from "../../lib/http.js";
 import type { OtpSender } from "./otp-sender.js";
+import { logoPath } from "../files/logo.js";
 
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
@@ -159,9 +160,10 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
     business_type_name: string;
     business_type_icon: string;
     timezone: string;
+    logo_file_id: string | null;
     role: Me["workspaces"][number]["role"];
   }>(
-    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, m.role
+    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, w.logo_file_id, m.role
        FROM memberships m
        JOIN workspaces w ON w.id = m.workspace_id AND w.deleted_at IS NULL
        JOIN business_types bt ON bt.id = w.business_type_id
@@ -178,6 +180,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       businessTypeName: r.business_type_name,
       businessTypeIcon: r.business_type_icon,
       timezone: r.timezone,
+      logoUrl: logoPath(r.id, r.logo_file_id),
       role: r.role,
     })),
   };

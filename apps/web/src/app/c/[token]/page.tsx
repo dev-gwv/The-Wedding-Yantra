@@ -7,7 +7,7 @@ import { CalendarHeart, ChevronRight, Clock, Copy, ExternalLink, Heart, MapPin, 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { BusinessIcon } from "@/components/app/business-icon";
+import { BusinessMark } from "@/components/app/business-mark";
 import { LogoMark } from "@/components/app/logo";
 import { eventDates } from "@/components/bookings/event-card";
 import { buttonClass } from "@/components/ui/button";
@@ -49,9 +49,7 @@ function Portal({ data }: { data: ClientPortal }) {
       <header className="bg-hero">
         <div className="mx-auto max-w-3xl px-4 pb-10 pt-8 sm:px-6 sm:pt-10">
           <div className="flex items-center gap-3">
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand shadow-soft">
-              <BusinessIcon name={business.icon} className="size-6" />
-            </span>
+            <BusinessMark logoUrl={business.logoUrl} icon={business.icon} name={business.name} />
             <div className="min-w-0">
               <p className="truncate font-display text-lg font-extrabold">{business.name}</p>
               <p className="text-sm text-ink-muted">

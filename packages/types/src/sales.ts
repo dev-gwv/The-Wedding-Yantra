@@ -330,6 +330,7 @@ export interface PublicLeadForm {
   businessTypeName: string;
   businessTypeIcon: string;
   city: string;
+  logoUrl: string | null;
   /** First name of the client whose "recommend us" link was opened */
   referrer: string | null;
 }

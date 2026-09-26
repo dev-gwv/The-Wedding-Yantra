@@ -5,6 +5,7 @@ import { withTransaction, type Db } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { logoPath } from "../files/logo.js";
 
 const requireShare = (ctx: MemberContext) => {
   if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can share a client's page");
@@ -83,10 +84,11 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
     email: string | null;
     review_url: string | null;
     form_slug: string | null;
+    logo_file_id: string | null;
     today: string;
   }>(
     `SELECT c.id, c.workspace_id, c.name, c.referral_code, w.name AS business, bt.name AS type_name, bt.icon,
-            w.city, w.phone, w.email, w.review_url, f.slug AS form_slug,
+            w.city, w.phone, w.email, w.review_url, f.slug AS form_slug, w.logo_file_id,
             (now() AT TIME ZONE w.timezone)::date::text AS today
        FROM clients c
        JOIN workspaces w ON w.id = c.workspace_id AND w.deleted_at IS NULL
@@ -205,6 +207,7 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
       city: c.city,
       phone: c.phone,
       email: c.email,
+      logoUrl: logoPath(c.workspace_id, c.logo_file_id),
       reviewUrl: c.review_url,
       formSlug: c.form_slug,
     },

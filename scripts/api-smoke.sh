@@ -60,7 +60,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
-  0017_custom_fields 0018_broadcasts; do
+  0017_custom_fields 0018_broadcasts 0019_logo_and_setup; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -74,7 +74,7 @@ echo "  ok: signed in with a phone code"
 WS="$(api POST /api/v1/workspaces '{"name":"Smoke Test Studio","businessTypeId":"makeup_artist","city":"Jaipur"}' "$TOKEN")"
 expect "business created with the owner role" '.success and .data.role == "owner"' "$WS"
 WS_ID="$(echo "$WS" | jq -r '.data.id')"
-expect "Home summary is worked out by the server" '.success and .data.setupTotal == 7 and .data.setupDone == 1' \
+expect "Home summary is worked out by the server" '.success and .data.setupTotal == 3 and .data.setupDone == 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/home" "" "$TOKEN")"
 LEAD="$(api POST "/api/v1/workspaces/$WS_ID/leads" '{"name":"Smoke Lead","phone":"9811100000","budget":50000}' "$TOKEN")"
 expect "a lead can be added to the first stage" '.success and .data.stageName == "New enquiry" and .data.budget == 50000' "$LEAD"

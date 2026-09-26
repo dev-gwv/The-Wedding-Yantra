@@ -51,7 +51,15 @@ export function useWorkspaceId(): string | null | undefined {
   return useSyncExternalStore(subscribe, getWorkspaceId, () => undefined);
 }
 
+/** Where the last-seen data is kept on this device (see providers.tsx). */
+export const CACHE_KEY = "wy.cache";
+
 export function clearSession() {
   write(TOKEN_KEY, null);
   write(WORKSPACE_KEY, null);
+  try {
+    window.localStorage.removeItem(CACHE_KEY);
+  } catch {
+    // Storage blocked: nothing was kept.
+  }
 }

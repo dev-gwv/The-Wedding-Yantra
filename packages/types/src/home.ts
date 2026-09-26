@@ -34,6 +34,10 @@ export interface HomeSummary {
     dueToday: number;
     newLeads: number;
     openValue: number;
+    /** Enquiries that came in this month; events booked this month and what they're worth */
+    monthEnquiries: number;
+    monthBooked: number;
+    monthBookedValue: number;
     /** Up to five leads to act on first: overdue, then due today. */
     due: LeadSummary[];
   };
@@ -46,6 +50,9 @@ export interface HomeSummary {
     due: DueItem[];
     /** Expenses the team sent that wait for approval (for those who approve) */
     pendingExpenses: number;
+    /** Payments received and expenses spent this month */
+    receivedThisMonth: number;
+    spentThisMonth: number;
   } | null;
   /** Your tasks, and the team's overdue ones for those who manage tasks */
   tasks: { overdue: number; dueToday: number; teamOverdue: number | null };

@@ -1,15 +1,16 @@
 "use client";
 
 import { can, formatMoney } from "@wedding-yantra/core";
-import { useCatalogue, useCreateCatalogueItem, useUpdateCatalogueItem } from "@wedding-yantra/api-client/react";
+import { useCatalogue, useCreateCatalogueItem, useHome, useUpdateCatalogueItem, useUpdateWorkspace } from "@wedding-yantra/api-client/react";
 import { catalogueItemInput, GST_RATES, SERVICE_UNITS, UNIT_LABELS, type CatalogueItem, type ServiceUnit } from "@wedding-yantra/types";
-import { Package, Plus } from "lucide-react";
+import { Check, Package, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { SelectField, TextField } from "@/components/ui/field";
-import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
+import { Card, EmptyState, NextStepCard, Notice, PageHeader } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
@@ -42,6 +43,7 @@ export default function ServicesPage() {
         </div>
       )}
       {items.isError && <Notice tone="danger">{errorMessage(items.error)}</Notice>}
+      {items.data && items.data.length > 0 && can(workspace.role, "workspace.update") && <ConfirmPrices />}
       {items.data?.length === 0 && (
         <Card>
           <EmptyState icon={Package} title="No services yet">
@@ -170,3 +172,40 @@ function ServiceForm({ item, onDone }: { item?: CatalogueItem; onDone: () => voi
     </form>
   );
 }
+
+/** The setup step "Check your prices": done by changing one, or by saying they're right. */
+function ConfirmPrices() {
+  const { workspace } = useCurrentWorkspace();
+  const home = useHome(workspace.id);
+  const update = useUpdateWorkspace(workspace.id);
+  const toast = useToast();
+  const router = useRouter();
+  const step = home.data?.setup.find((s) => s.key === "price_list");
+  if (!step || step.done) return null;
+  return (
+    <NextStepCard className="mb-5 flex flex-wrap items-center gap-4 p-5">
+      <div className="min-w-0 flex-1">
+        <p className="font-bold">Are these your prices?</p>
+        <p className="text-sm text-ink-muted">Tap a service to change its price. If they&apos;re right as they are, say so.</p>
+      </div>
+      <Button
+        loading={update.isPending}
+        onClick={() =>
+          update.mutate(
+            { pricesConfirmed: true },
+            {
+              onSuccess: () => {
+                toast("Prices confirmed. That step is done");
+                if (new URLSearchParams(window.location.search).get("from") === "setup") router.push("/app");
+              },
+              onError: (err) => toast(errorMessage(err), "error"),
+            },
+          )
+        }
+      >
+        <Check className="size-4" strokeWidth={3} /> These prices are right
+      </Button>
+    </NextStepCard>
+  );
+}
+

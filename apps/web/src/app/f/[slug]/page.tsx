@@ -5,7 +5,7 @@ import { EVENT_LABELS, EVENT_TYPES, submitLeadFormInput, type EventType } from "
 import { CircleCheck, Heart, MailX } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
-import { BusinessIcon } from "@/components/app/business-icon";
+import { BusinessMark } from "@/components/app/business-mark";
 import { LogoMark } from "@/components/app/logo";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
@@ -55,9 +55,7 @@ function PublicEnquiry() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10 sm:px-5">
         {business && (
           <div className="mb-8 flex flex-col items-center text-center">
-            <span className="grid size-14 place-items-center rounded-2xl bg-gradient-primary text-on-brand shadow-soft">
-              <BusinessIcon name={business.businessTypeIcon} className="size-7" />
-            </span>
+            <BusinessMark logoUrl={business.logoUrl} icon={business.businessTypeIcon} name={business.businessName} size="lg" />
             <h1 className="mt-4 font-display text-3xl font-extrabold">{business.businessName}</h1>
             <p className="mt-1 text-ink-muted">
               {business.businessTypeName} · {business.city}

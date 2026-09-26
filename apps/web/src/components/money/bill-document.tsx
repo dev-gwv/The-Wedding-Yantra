@@ -1,6 +1,6 @@
 import { formatDate, formatMoney, formatPhone, PAYMENT_METHOD_LABELS, rupeesInWords, stateName } from "@wedding-yantra/core";
 import { UNIT_LABELS, type Bill, type Payment } from "@wedding-yantra/types";
-import { BusinessIcon } from "@/components/app/business-icon";
+import { BusinessMark } from "@/components/app/business-mark";
 import { cn } from "@/lib/cn";
 import { BillStatusPill } from "./bill-status";
 
@@ -13,6 +13,7 @@ export interface BillDocumentProps {
     phone: string | null;
     email: string | null;
     address: string | null;
+  logoUrl?: string | null;
   };
   bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
     payments: Pick<Payment, "number" | "amount" | "paidOn" | "method">[];
@@ -50,9 +51,7 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
 
       <header className="flex flex-wrap items-start justify-between gap-6 border-b border-line p-6 sm:p-8">
         <div className="flex items-start gap-4">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand shadow-soft print:shadow-none">
-            <BusinessIcon name={business.icon} className="size-6" />
-          </span>
+          <BusinessMark logoUrl={business.logoUrl} icon={business.icon} name={business.name} />
           <div className="min-w-0">
             <p className="font-display text-2xl font-extrabold leading-tight">{business.name}</p>
             <p className="text-sm text-ink-muted">

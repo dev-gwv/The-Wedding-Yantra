@@ -194,6 +194,7 @@ export interface PublicBill {
     address: string | null;
     /** Clients pay the balance to this UPI ID */
     upiId: string | null;
+    logoUrl: string | null;
   };
   bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
     payments: Pick<Payment, "number" | "amount" | "paidOn" | "method">[];

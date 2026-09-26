@@ -1,10 +1,13 @@
 "use client";
 
 import { can } from "@wedding-yantra/core";
-import { useUpdateWorkspace, useWorkspace } from "@wedding-yantra/api-client/react";
+import { useUpdateWorkspace, useUploadFile, useWorkspace } from "@wedding-yantra/api-client/react";
 import { updateWorkspaceInput, type Workspace } from "@wedding-yantra/types";
-import { useState, type FormEvent } from "react";
+import { ImagePlus, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useRef, useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
+import { BusinessMark } from "@/components/app/business-mark";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { TextAreaField, TextField } from "@/components/ui/field";
@@ -12,8 +15,17 @@ import { Card, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
+import { prepareLogo } from "@/lib/images";
 
 export default function BusinessProfilePage() {
+  return (
+    <Suspense>
+      <BusinessProfile />
+    </Suspense>
+  );
+}
+
+function BusinessProfile() {
   const { workspace } = useCurrentWorkspace();
   const details = useWorkspace(workspace.id);
 
@@ -35,6 +47,9 @@ export default function BusinessProfilePage() {
 function ProfileForm({ workspace }: { workspace: Workspace }) {
   const update = useUpdateWorkspace(workspace.id);
   const toast = useToast();
+  const router = useRouter();
+  // Opened from the setup list on Home: go back there once the step is done.
+  const fromSetup = useSearchParams().get("from") === "setup";
   const editable = can(workspace.role, "workspace.update");
   const [values, setValues] = useState({
     name: workspace.name,
@@ -61,7 +76,9 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     setErrors({});
     try {
       await update.mutateAsync(values);
-      toast("Business profile saved");
+      const done = values.phone.trim() !== "" && values.address.trim() !== "";
+      toast(done && fromSetup ? "Saved. That step is done" : "Business profile saved");
+      if (done && fromSetup) router.push("/app");
     } catch (err) {
       const fields = apiFieldErrors(err);
       setErrors(Object.keys(fields).length ? fields : { _: errorMessage(err) });
@@ -75,7 +92,14 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
           <Notice>Only the owner or a manager can change these details.</Notice>
         </div>
       )}
+      {editable && (!workspace.phone || !workspace.address) && (
+        <div className="mb-4">
+          <Notice>Add your business phone and address, then save. They go on every quote and bill.</Notice>
+        </div>
+      )}
       <fieldset disabled={!editable} className="space-y-6">
+        <LogoCard workspace={workspace} editable={editable} />
+
         <Card className="space-y-5 p-5">
           <TextField label="Business name" value={values.name} onChange={set("name")} error={errors.name} />
           <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} />
@@ -184,3 +208,63 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     </form>
   );
 }
+
+/** The logo goes on quotes, bills, the client's page and the enquiry form. Saved as soon as it's picked. */
+function LogoCard({ workspace, editable }: { workspace: Workspace; editable: boolean }) {
+  const upload = useUploadFile(workspace.id);
+  const update = useUpdateWorkspace(workspace.id);
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busy = upload.isPending || update.isPending;
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try {
+      const uploaded = await upload.mutateAsync(await prepareLogo(file));
+      await update.mutateAsync({ logoFileId: uploaded.id });
+      toast("Logo saved");
+    } catch (err) {
+      setError(err instanceof Error && !("status" in err) ? err.message : errorMessage(err));
+    } finally {
+      if (input.current) input.current.value = "";
+    }
+  }
+
+  async function remove() {
+    try {
+      await update.mutateAsync({ logoFileId: null });
+      toast("Logo removed");
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <Card className="flex flex-wrap items-center gap-5 p-5">
+      <BusinessMark logoUrl={workspace.logoUrl} icon={workspace.businessTypeIcon} name={workspace.name} size="xl" tone="cream" />
+      <div className="min-w-0 flex-1 space-y-3">
+        <div>
+          <h2 className="font-display text-lg font-extrabold">Logo</h2>
+          <p className="text-sm text-ink-muted">Shown on your quotes, bills, your clients&apos; page and your enquiry form.</p>
+        </div>
+        {editable && (
+          <div className="flex flex-wrap gap-2">
+            <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
+            <Button variant="secondary" size="sm" onClick={() => input.current?.click()} loading={busy}>
+              {!busy && <ImagePlus className="size-4" />} {workspace.logoUrl ? "Change logo" : "Add your logo"}
+            </Button>
+            {workspace.logoUrl && !busy && (
+              <Button variant="ghost" size="sm" onClick={() => void remove()}>
+                <Trash2 className="size-4" /> Remove
+              </Button>
+            )}
+          </div>
+        )}
+        {error && <p className="text-sm text-danger">{error}</p>}
+      </div>
+    </Card>
+  );
+}
+

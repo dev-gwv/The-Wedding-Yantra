@@ -35,6 +35,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { BusinessIcon } from "@/components/app/business-icon";
+import { BusinessMark } from "@/components/app/business-mark";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Avatar, Card, PageHeader } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
@@ -49,8 +50,8 @@ export default function MorePage() {
 
   async function signOut() {
     await logout.mutateAsync().catch(() => undefined);
-    clearSession();
     queryClient.clear();
+    clearSession();
     window.location.replace("/login");
   }
 
@@ -59,9 +60,7 @@ export default function MorePage() {
       <PageHeader title="More" />
 
       <Card className="mb-6 flex items-center gap-4 p-5">
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-cream text-brand-strong">
-          <BusinessIcon name={workspace.businessTypeIcon} className="size-6" />
-        </span>
+        <BusinessMark logoUrl={workspace.logoUrl} icon={workspace.businessTypeIcon} name={workspace.name} tone="cream" />
         <div className="min-w-0">
           <p className="truncate font-display text-lg font-extrabold">{workspace.name}</p>
           <p className="truncate text-sm text-ink-muted">

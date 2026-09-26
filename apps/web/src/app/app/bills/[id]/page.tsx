@@ -122,6 +122,7 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
           phone: business.phone,
           email: business.email,
           address: business.address,
+          logoUrl: business.logoUrl,
         }}
         bill={bill}
       />

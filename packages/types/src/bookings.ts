@@ -176,6 +176,7 @@ export interface PublicQuote {
     email: string | null;
     address: string | null;
     gstin: string | null;
+    logoUrl: string | null;
   };
   quote: Omit<Quote, "shareToken" | "leadId" | "clientId" | "eventId" | "customerPhone">;
 }

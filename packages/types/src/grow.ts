@@ -58,6 +58,7 @@ export interface ClientPortal {
     city: string;
     phone: string | null;
     email: string | null;
+    logoUrl: string | null;
     /** Where to leave a review, once an event is over */
     reviewUrl: string | null;
     /** The enquiry form friends are sent to, when it's switched on */

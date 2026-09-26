@@ -128,6 +128,7 @@ function QuoteView({ quote, business }: { quote: Quote; business: Workspace }) {
           email: business.email,
           address: business.address,
           gstin: business.gstin,
+          logoUrl: business.logoUrl,
         }}
         quote={quote}
       />

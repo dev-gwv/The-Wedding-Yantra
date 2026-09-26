@@ -15,6 +15,7 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { upsertClientForLead } from "../sales/leads.js";
+import { logoPath } from "../files/logo.js";
 
 const requireView = (ctx: MemberContext) => {
   if (!can(ctx.role, "quotes.view")) throw forbidden("Your role doesn't include quotes");
@@ -534,8 +535,9 @@ export async function getPublicQuote(db: Db, token: string): Promise<PublicQuote
     email: string | null;
     address: string | null;
     gstin: string | null;
+    logo_file_id: string | null;
   }>(
-    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.gstin
+    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.gstin, w.logo_file_id
        FROM workspaces w JOIN business_types bt ON bt.id = w.business_type_id WHERE w.id = $1`,
     [row.workspace_id],
   );
@@ -557,6 +559,7 @@ export async function getPublicQuote(db: Db, token: string): Promise<PublicQuote
       email: b.email,
       address: b.address,
       gstin: b.gstin,
+      logoUrl: logoPath(row.workspace_id, b.logo_file_id),
     },
     quote: visible,
   };
