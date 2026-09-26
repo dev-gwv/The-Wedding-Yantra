@@ -2,7 +2,13 @@ import type { FastifyBaseLogger } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { createFallbackOtpSender, createMsg91OtpSender, createWhatsAppOtpSender, type OtpSender } from "../src/modules/auth/otp-sender.js";
+import {
+  createFallbackOtpSender,
+  createMsg91OtpSender,
+  createTwoFactorOtpSender,
+  createWhatsAppOtpSender,
+  type OtpSender,
+} from "../src/modules/auth/otp-sender.js";
 import { setup, type TestContext } from "./helpers.js";
 
 const quiet = { error() {}, warn() {}, info() {} } as unknown as FastifyBaseLogger;
@@ -45,6 +51,17 @@ describe("sign-in code senders", () => {
     await expect(refused.send("+919876543210", "111111")).rejects.toThrow(/Invalid template/);
   });
 
+  it("sends the code by SMS through 2Factor, no DLT template of your own needed", async () => {
+    const f = fakeFetch(200, { Status: "Success", Details: "session-1" });
+    expect(await createTwoFactorOtpSender({ apiKey: "key-1", template: null }, f.fn).send("+919876543210", "482913")).toBe("sms");
+    expect(f.calls[0]!.url).toBe("https://2factor.in/API/V1/key-1/SMS/9876543210/482913");
+    const named = fakeFetch(200, { Status: "Success", Details: "s" });
+    await createTwoFactorOtpSender({ apiKey: "key-1", template: "WY Login" }, named.fn).send("+919876543210", "111111");
+    expect(named.calls[0]!.url).toBe("https://2factor.in/API/V1/key-1/SMS/9876543210/111111/WY%20Login");
+    const refused = createTwoFactorOtpSender({ apiKey: "bad", template: null }, fakeFetch(200, { Status: "Error", Details: "Invalid API Key" }).fn);
+    await expect(refused.send("+919876543210", "111111")).rejects.toThrow(/Invalid API Key/);
+  });
+
   it("falls back to the next provider, and says so plainly when none gets through", async () => {
     const broken: OtpSender = { send: async () => Promise.reject(new Error("down")) };
     const sms: OtpSender = { send: async () => "sms" };
@@ -60,6 +77,8 @@ describe("sign-in code senders", () => {
     expect(() => loadConfig({ ...base, OTP_PROVIDER: "whatsapp" })).toThrow(/WHATSAPP_TOKEN/);
     expect(() => loadConfig({ ...base, OTP_PROVIDER: "msg91" })).toThrow(/MSG91_AUTH_KEY/);
     expect(() => loadConfig({ ...base, OTP_PROVIDER: "pigeon" })).toThrow(/isn't known/);
+    expect(() => loadConfig({ ...base, OTP_PROVIDER: "2factor" })).toThrow(/TWOFACTOR_API_KEY/);
+    expect(loadConfig({ ...base, OTP_PROVIDER: "2factor", TWOFACTOR_API_KEY: "k" }).otp.twoFactor).toEqual({ apiKey: "k", template: null });
     const both = loadConfig({
       ...base,
       OTP_PROVIDER: "whatsapp, msg91",

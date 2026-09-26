@@ -81,6 +81,24 @@ export function createMsg91OtpSender(opts: { authKey: string; templateId: string
 }
 
 /**
+ * 2Factor.in: an SMS from its own ready-approved sign-in template, so there's no DLT
+ * registration to wait for. `template` picks one of your own templates instead.
+ */
+export function createTwoFactorOtpSender(opts: { apiKey: string; template: string | null }, fetchImpl: typeof fetch = fetch): OtpSender {
+  return {
+    async send(phone, code) {
+      // Indian numbers go as the 10-digit mobile number.
+      const to = phone.startsWith("+91") ? phone.slice(3) : digits(phone);
+      const path = [opts.apiKey, "SMS", to, code, ...(opts.template ? [opts.template] : [])].map(encodeURIComponent).join("/");
+      const res = await fetchImpl(`https://2factor.in/API/V1/${path}`);
+      const body = (await res.json().catch(() => ({}))) as { Status?: string; Details?: string };
+      if (!res.ok || body.Status !== "Success") throw new Error(`2Factor didn't send the code: ${body.Details ?? res.status}`);
+      return "sms";
+    },
+  };
+}
+
+/**
  * Tries each sender in turn (e.g. WhatsApp, then SMS). If none gets through, the person is
  * told to try again, and the failures are logged for whoever runs the service.
  */
@@ -102,7 +120,11 @@ export function createFallbackOtpSender(senders: OtpSender[], log: FastifyBaseLo
 /** The senders the settings ask for, in order. */
 export function createOtpSender(config: Config, log: FastifyBaseLogger, fetchImpl: typeof fetch = fetch): OtpSender {
   const senders = config.otp.providers.map((p) =>
-    p === "whatsapp" ? createWhatsAppOtpSender(config.otp.whatsapp!, fetchImpl) : createMsg91OtpSender(config.otp.msg91!, fetchImpl),
+    p === "whatsapp"
+      ? createWhatsAppOtpSender(config.otp.whatsapp!, fetchImpl)
+      : p === "msg91"
+        ? createMsg91OtpSender(config.otp.msg91!, fetchImpl)
+        : createTwoFactorOtpSender(config.otp.twoFactor!, fetchImpl),
   );
   if (senders.length === 0) {
     return createConsoleOtpSender(log, { revealCode: config.nodeEnv !== "production" || config.otpDevEcho });

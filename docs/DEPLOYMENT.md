@@ -343,8 +343,21 @@ paying. You can also look it up with `SELECT id, name FROM workspaces;`.
 
 ## 12. Sign-in codes by WhatsApp or SMS
 
-Until a provider is set, codes aren't delivered. `AUTH_OTP_DEV_ECHO=true` shows them in the
-app for testing, but then anyone can sign in as any number. Before real customers:
+Until a provider is set, codes aren't delivered and the sign-in screen says so.
+`AUTH_OTP_DEV_ECHO=true` shows them in the app for testing, but then anyone can sign in as any
+number.
+
+**Quickest start: SMS through 2Factor.in (minutes, no DLT paperwork).**
+1. Sign up at 2factor.in and add some credit.
+2. Copy the API key from the dashboard.
+3. In the VPS `.env` set `OTP_PROVIDER=2factor`, `TWOFACTOR_API_KEY=<your key>` and
+   `AUTH_OTP_DEV_ECHO=false`.
+4. Run `docker compose -p wedding-yantra -f docker-compose.prod.yml up -d`.
+
+Codes then go by SMS from 2Factor's own approved sign-in message. Later you can add WhatsApp
+in front of it: `OTP_PROVIDER=whatsapp,2factor`.
+
+The other providers, for later:
 
 1. **WhatsApp (recommended).** In Meta Business Manager, set up the WhatsApp Cloud API for
    the business number.

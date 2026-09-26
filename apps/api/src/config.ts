@@ -19,9 +19,11 @@ export interface Config {
   otpMaxPerIp: number;
   /** How sign-in codes reach people, tried in order. Empty: not delivered (development). */
   otp: {
-    providers: ("whatsapp" | "msg91")[];
+    providers: OtpProvider[];
     whatsapp: { token: string; phoneNumberId: string; template: string; language: string } | null;
     msg91: { authKey: string; templateId: string } | null;
+    /** 2Factor.in: SMS codes from its ready-approved template, no DLT registration of your own */
+    twoFactor: { apiKey: string; template: string | null } | null;
   };
   /** Where uploaded photos (bill photos, receipts) are kept on disk. */
   uploadsDir: string;
@@ -56,14 +58,17 @@ function parsePlanIds(value: string | undefined): Record<string, string> {
   return out;
 }
 
-/** OTP_PROVIDER="whatsapp,msg91": which providers send sign-in codes, and in what order. */
+const OTP_PROVIDERS = ["whatsapp", "msg91", "2factor"] as const;
+type OtpProvider = (typeof OTP_PROVIDERS)[number];
+
+/** OTP_PROVIDER="whatsapp,2factor": which providers send sign-in codes, and in what order. */
 function otpConfig(env: NodeJS.ProcessEnv): Config["otp"] {
   const providers = (env.OTP_PROVIDER ?? "")
     .split(",")
     .map((p) => p.trim().toLowerCase())
     .filter((p) => p && p !== "console");
   for (const p of providers) {
-    if (p !== "whatsapp" && p !== "msg91") throw new Error(`OTP_PROVIDER: "${p}" isn't known. Use whatsapp, msg91 or both.`);
+    if (!(OTP_PROVIDERS as readonly string[]).includes(p)) throw new Error(`OTP_PROVIDER: "${p}" isn't known. Use whatsapp, msg91 or 2factor.`);
   }
   const whatsapp =
     env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID
@@ -78,7 +83,9 @@ function otpConfig(env: NodeJS.ProcessEnv): Config["otp"] {
   // Fail at start-up rather than silently not sending codes.
   if (providers.includes("whatsapp") && !whatsapp) throw new Error("OTP_PROVIDER=whatsapp needs WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID");
   if (providers.includes("msg91") && !msg91) throw new Error("OTP_PROVIDER=msg91 needs MSG91_AUTH_KEY and MSG91_OTP_TEMPLATE_ID");
-  return { providers: [...new Set(providers)] as ("whatsapp" | "msg91")[], whatsapp, msg91 };
+  const twoFactor = env.TWOFACTOR_API_KEY ? { apiKey: env.TWOFACTOR_API_KEY, template: env.TWOFACTOR_OTP_TEMPLATE || null } : null;
+  if (providers.includes("2factor") && !twoFactor) throw new Error("OTP_PROVIDER=2factor needs TWOFACTOR_API_KEY");
+  return { providers: [...new Set(providers)] as OtpProvider[], whatsapp, msg91, twoFactor };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
