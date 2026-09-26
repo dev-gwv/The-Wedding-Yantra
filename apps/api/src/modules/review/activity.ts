@@ -230,7 +230,7 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         const x = id ? expenses.get(id) : undefined;
         item.amount = num(m.amount) ?? (x ? Number(x.amount) : null);
         item.subject = x?.event_title ?? null;
-        item.other = x?.submitter ?? null;
+        item.other = str(m.to) ?? x?.submitter ?? null;
         item.detail = str(m.reason);
         item.link = r.action === "expense.deleted" ? null : { kind: "expenses", id: null };
         break;

@@ -260,8 +260,15 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
     approved_by: string | null;
     note: string | null;
     has_photo: boolean;
+    vendor_name: string | null;
+    vendor_invoice_no: string | null;
+    gst_amount: string;
+    paid_by: string | null;
+    reimbursed_on: string | null;
   }>(
     `SELECT x.spent_on::text AS spent_on, coalesce(xc.label, x.category) AS category, x.paid_to, e.title AS event_title,
+            v.name AS vendor_name, x.vendor_invoice_no, x.gst_amount, pu.name AS paid_by,
+            (x.reimbursed_at AT TIME ZONE 'Asia/Kolkata')::date::text AS reimbursed_on,
             CASE WHEN x.method IS NULL THEN NULL ELSE coalesce(xm.label, x.method) END AS method, x.amount, x.status,
             su.name AS added_by, ru.name AS approved_by, x.note, x.receipt_file_id IS NOT NULL AS has_photo
        FROM expenses x
@@ -270,18 +277,40 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
        LEFT JOIN events e ON e.id = x.event_id
        LEFT JOIN users su ON su.id = x.submitted_by
        LEFT JOIN users ru ON ru.id = x.reviewed_by
+       LEFT JOIN users pu ON pu.id = x.paid_by
+       LEFT JOIN vendors v ON v.id = x.vendor_id
       WHERE x.workspace_id = $1 AND x.deleted_at IS NULL AND to_char(x.spent_on, 'YYYY-MM') = $2
       ORDER BY x.spent_on, x.created_at`,
     [ws, month],
   );
-  const header = ["Date", "Category", "Paid to", "For event", "Paid by", "Amount", "Status", "Added by", "Approved by", "Note", "Bill photo"];
+  const header = [
+    "Date",
+    "Category",
+    "Paid to",
+    "Their bill no.",
+    "For event",
+    "Paid with",
+    "Amount",
+    "GST in it",
+    "Paid by",
+    "Paid back on",
+    "Status",
+    "Added by",
+    "Approved by",
+    "Note",
+    "Bill photo",
+  ];
   const data = rows.map((r) => [
     indianDate(r.spent_on),
     r.category,
-    r.paid_to,
+    r.vendor_name ?? r.paid_to,
+    r.vendor_invoice_no,
     r.event_title,
     r.method,
     n(r.amount),
+    Number(r.gst_amount) ? n(r.gst_amount) : null,
+    r.paid_by ?? "Business",
+    r.reimbursed_on ? indianDate(r.reimbursed_on) : null,
     EXPENSE_STATUS_LABELS[r.status],
     r.added_by,
     r.status === "approved" ? r.approved_by : null,

@@ -995,3 +995,24 @@ and a study of IPC Studios' invoicing, generalised for every wedding trade:
 - Messages and screens say "invoice".
 - Next: expenses in depth (who paid and paying staff back, GST on purchases, vendors), then
   notes and terms templates, bank accounts and invoice designs.
+
+## 34. Built: expenses in depth
+
+The third of the money sections, after invoices and payments:
+- **Who paid.** The business, or a team member from their own pocket. The team can say they
+  paid; owners and managers can note it for anyone. Approved ones show under "To pay back"
+  until an owner or manager marks them paid back (it's in the activity log; undo is there
+  too). Changing who paid starts the paying back over. Team members see the expenses they
+  paid, even when the owner added them.
+- **GST on purchases.** Pick the bill's GST rate (0, 5, 18 or 40%) and the GST inside the
+  amount is worked out, or type what the bill says. The vendor's bill number is kept. The
+  amount stays what was paid.
+- **Vendor and payment mode.** Owners and managers link an expense to a vendor from their
+  list; anyone picks the payment mode from the business's own list.
+- **Expenses list:** period (month, last month, this or last financial year, all), totals
+  that double as filters (spent, waiting for approval, to pay back, GST on bills), "where it
+  went" by category, category chips, who-paid chips, search by who was paid, vendor, bill
+  number or note, and a spreadsheet export with all of the above. The monthly CA spreadsheet
+  gains the bill number, GST, who paid and when they were paid back.
+- Next: notes and terms templates, bank accounts and invoice designs; then payment plans and
+  deliverables on invoices.

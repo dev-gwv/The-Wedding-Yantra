@@ -74,6 +74,17 @@ export interface Expense {
   receipt: UploadedFile | null;
   submittedBy: PersonRef | null;
   reviewedBy: PersonRef | null;
+  /** Paid from a team member's own pocket; null means the business paid */
+  paidBy: PersonRef | null;
+  /** When the business paid that person back */
+  reimbursedAt: string | null;
+  vendorId: string | null;
+  vendorName: string | null;
+  /** GST included in the amount: input tax the CA can claim */
+  gstRate: number | null;
+  gstAmount: number;
+  /** The vendor's bill number */
+  vendorInvoiceNo: string | null;
   createdAt: string;
 }
 
@@ -88,6 +99,12 @@ const expenseFields = {
   method: optionKey.nullable().optional(),
   note: optionalText(300),
   receiptFileId: z.uuid().nullable().optional(),
+  /** A team member who paid from their own pocket; null for the business */
+  paidBy: z.uuid().nullable().optional(),
+  vendorId: z.uuid().nullable().optional(),
+  gstRate: z.coerce.number().min(0).max(40).nullable().optional(),
+  gstAmount: z.coerce.number().min(0, "Can't be negative").max(1_000_000_000).optional(),
+  vendorInvoiceNo: optionalText(40),
 };
 
 export const expenseInput = z.object(expenseFields);
@@ -110,7 +127,32 @@ export const expenseListQuery = z.object({
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-11")
     .optional(),
   status: z.enum(EXPENSE_STATUSES).optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  category: optionKey.optional(),
+  /** "business", "reimburse" (paid from a pocket, not paid back yet), or a person's id */
+  paidBy: z.union([z.enum(["business", "reimburse"]), z.uuid()]).optional(),
+  /** Paid to, note, vendor or bill number */
+  q: z.string().trim().max(80).optional(),
 });
+
+/** Totals for exactly what a list shows. */
+export interface ExpenseListSummary {
+  count: number;
+  /** Approved money: what counts in profit */
+  spent: number;
+  /** Waiting for approval */
+  pending: number;
+  pendingCount: number;
+  /** Paid from someone's pocket and not paid back yet (approved ones) */
+  toReimburse: number;
+  /** GST on approved expenses */
+  gst: number;
+  byCategory: { category: string; label: string; total: number }[];
+}
+
+export const reimburseExpenseInput = z.object({ reimbursed: z.boolean() });
+export type ReimburseExpenseInput = z.input<typeof reimburseExpenseInput>;
 export type ExpenseListQuery = z.input<typeof expenseListQuery>;
 
 /** One month of spending: what counts (approved), what's waiting, and where it went. */

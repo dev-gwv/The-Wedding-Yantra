@@ -125,8 +125,8 @@ describe("monthly report and exports", () => {
 
     const expenses = (await call<ExportFile>(t.app, "GET", `/workspaces/${ws}/exports?kind=expenses&month=2026-10`, { token: owner })).body.data;
     expect(expenses.rows).toBe(2);
-    expect(expenses.content).toContain("04-10-2026,Materials,Flower market,Wedding decor,,3000.00,Approved,Owner Person,Owner Person,,No");
-    expect(expenses.content).toContain("07-10-2026,Travel,,,,500.00,Waiting for approval,Staff Person,,,No");
+    expect(expenses.content).toContain("04-10-2026,Materials,Flower market,,Wedding decor,,3000.00,,Business,,Approved,Owner Person,Owner Person,,No");
+    expect(expenses.content).toContain("07-10-2026,Travel,,,,,500.00,,Business,,Waiting for approval,Staff Person,,,No");
 
     // Staff don't see the business's money.
     expect((await call(t.app, "GET", `/workspaces/${ws}/reports/month?month=2026-10`, { token: staff })).status).toBe(403);

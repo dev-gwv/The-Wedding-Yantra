@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices; do
+  0020_lists_and_invoices 0021_expenses_deep; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -152,6 +152,10 @@ expect "an invoice for someone new, with money received in the same save" '.succ
   "$(api POST "/api/v1/workspaces/$WS_ID/bills" '{"billTo":{"name":"Smoke Walk In"},"issueDate":"2026-09-20","items":[{"name":"Trial","unit":"event","quantity":1,"rate":1500}],"payment":{"amount":500,"paidOn":"2026-09-20","method":"cash"}}' "$TOKEN")"
 expect "invoice totals answer" '.success and .data.count >= 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/bills/summary" "" "$TOKEN")"
+expect "an expense keeps the GST inside it" '.success and .data.gstAmount == 180 and .data.vendorInvoiceNo == "SMK/1"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/expenses" '{"category":"materials","amount":1180,"gstRate":18,"vendorInvoiceNo":"SMK/1","spentOn":"2026-09-25","method":"upi"}' "$TOKEN")"
+expect "expense totals answer, with the GST" '.success and .data.gst >= 180 and .data.toReimburse == 0' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/expenses/summary" "" "$TOKEN")"
 expect "a message to clients can be lined up" '.success and .data.count >= 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/broadcasts/audience?audience=all_clients" "" "$TOKEN")"
 expect "and the list of messages answers" '.success and (.data | type) == "array"' \

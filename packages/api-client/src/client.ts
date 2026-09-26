@@ -65,7 +65,9 @@ import type {
   Expense,
   ExpenseInput,
   ExpenseListQuery,
+  ExpenseListSummary,
   ExpenseMonth,
+  ReimburseExpenseInput,
   ReviewExpenseInput,
   UpdateExpenseInput,
   UploadedFile,
@@ -351,6 +353,12 @@ export function createApiClient(options: ApiClientOptions) {
     expenses: {
       list: (workspaceId: string, query: ExpenseListQuery = {}) =>
         request<Expense[]>("GET", `${ws(workspaceId)}/expenses${qs(query)}`),
+      /** Totals for the same filters as the list: spent, waiting, to pay back, GST, by category */
+      summary: (workspaceId: string, query: ExpenseListQuery = {}) =>
+        request<ExpenseListSummary>("GET", `${ws(workspaceId)}/expenses/summary${qs(query)}`),
+      /** Mark an expense a team member paid from their pocket as paid back (or undo) */
+      reimburse: (workspaceId: string, id: string, input: ReimburseExpenseInput) =>
+        request<Expense>("POST", `${ws(workspaceId)}/expenses/${encodeURIComponent(id)}/reimburse`, input),
       month: (workspaceId: string, month: string) => request<ExpenseMonth>("GET", `${ws(workspaceId)}/expense-month${qs({ month })}`),
       create: (workspaceId: string, input: ExpenseInput) => request<Expense>("POST", `${ws(workspaceId)}/expenses`, input),
       update: (workspaceId: string, id: string, input: UpdateExpenseInput) =>

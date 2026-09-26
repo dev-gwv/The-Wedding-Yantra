@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   expenseInput,
   expenseListQuery,
+  reimburseExpenseInput,
   reviewExpenseInput,
   updateExpenseInput,
   billDraftQuery,
@@ -97,6 +98,15 @@ export function moneyRoutes(app: FastifyInstance, deps: { db: Db; files: Files }
   app.get<Ws>("/workspaces/:workspaceId/expenses", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     return ok(await expenses.listExpenses(db, secret, ctx, parse(expenseListQuery, request.query)));
+  });
+  app.get<Ws>("/workspaces/:workspaceId/expenses/summary", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await expenses.expensesSummary(db, ctx, parse(expenseListQuery, request.query)));
+  });
+  app.post<WsId>("/workspaces/:workspaceId/expenses/:id/reimburse", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const id = assertId(request.params.id, "This expense");
+    return ok(await expenses.reimburseExpense(db, secret, ctx, id, parse(reimburseExpenseInput, request.body).reimbursed));
   });
   app.get<Ws & { Querystring: { month?: string } }>("/workspaces/:workspaceId/expense-month", async (request) => {
     const ctx = await member(request, request.params.workspaceId);

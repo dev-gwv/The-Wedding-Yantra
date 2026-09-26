@@ -45,6 +45,7 @@ import type {
   UpdateTaskInput,
   ExpenseInput,
   ExpenseListQuery,
+  ReimburseExpenseInput,
   ReviewExpenseInput,
   UpdateExpenseInput,
   UploadFileInput,
@@ -129,6 +130,7 @@ export const queryKeys = {
   payments: (id: string, query: object) => ["workspace", id, "bookings", "payments", query] as const,
   publicBill: (token: string) => ["public-bill", token] as const,
   expenses: (id: string, query: object) => ["workspace", id, "bookings", "expenses", query] as const,
+  expensesSummary: (id: string, query: object) => ["workspace", id, "bookings", "expenses-summary", query] as const,
   expenseMonth: (id: string, month: string) => ["workspace", id, "bookings", "expense-month", month] as const,
   monthReport: (id: string, month: string) => ["workspace", id, "bookings", "report", month] as const,
   /** Tasks and My Day; invalidate this after any task change. */
@@ -703,7 +705,29 @@ export function useUploadFile(workspaceId: string) {
 
 export function useExpenses(workspaceId: string, query: ExpenseListQuery = {}, enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.expenses(workspaceId, query), queryFn: () => api.expenses.list(workspaceId, query), enabled });
+  return useQuery({
+    queryKey: queryKeys.expenses(workspaceId, query),
+    queryFn: () => api.expenses.list(workspaceId, query),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useExpensesSummary(workspaceId: string, query: ExpenseListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.expensesSummary(workspaceId, query),
+    queryFn: () => api.expenses.summary(workspaceId, query),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useReimburseExpense(workspaceId: string) {
+  const api = useApi();
+  return useBookingMutation(workspaceId, ({ id, ...input }: ReimburseExpenseInput & { id: string }) =>
+    api.expenses.reimburse(workspaceId, id, input),
+  );
 }
 
 export function useExpenseMonth(workspaceId: string, month: string, enabled = true) {

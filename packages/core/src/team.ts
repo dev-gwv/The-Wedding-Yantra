@@ -126,6 +126,10 @@ export function activityText(a: ActivityFacts): string {
       return `approved ${a.other ? `${a.other}'s` : "an"} expense${money ? ` of ${money}` : ""}`;
     case "expense.rejected":
       return `sent back ${a.other ? `${a.other}'s` : "an"} expense${money ? ` of ${money}` : ""}${a.detail ? `: ${a.detail}` : ""}`;
+    case "expense.reimbursed":
+      return `paid back ${a.other ?? "a team member"} for an expense${money ? ` of ${money}` : ""}`;
+    case "expense.unreimbursed":
+      return `marked ${a.other ? `${a.other}'s` : "an"} expense as not paid back yet`;
     case "expense.deleted":
       return `removed an expense${money ? ` of ${money}` : ""}`;
     case "task.assigned":

@@ -88,6 +88,9 @@ const GUIDES: Guide[] = [
     title: "Expenses, profit and reports",
     steps: [
       "Add money spent with a photo of the bill: materials, travel, helpers. Staff's expenses wait for the owner or a manager to approve.",
+      "Paid from your own pocket? Pick who paid. It shows under To pay back until the owner or a manager marks it paid back.",
+      "If a purchase bill has GST on it, open GST and bill number and pick the rate: the GST inside the amount is worked out for you, and your CA can claim it back.",
+      "Money, Expenses filters by period, category and who paid, searches by who you paid or their bill number, and downloads it all as a spreadsheet.",
       "Every event shows its profit: what you billed before GST, minus what you spent on it.",
       "Keep your vendors in More, Vendors and payouts: florists, helpers, a generator, a second shooter. Note what each event owes them, and pay by UPI in one tap. Paying adds it to the event's expenses, so its profit stays right.",
       "Money, Monthly report shows the month's cash, profit, GST, where the work came from and what sold, with spreadsheets for your CA.",
