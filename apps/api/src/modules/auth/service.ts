@@ -30,7 +30,7 @@ const hashCode = (phone: string, code: string) => sha256(`${phone}:${code}`);
 export async function requestOtp(
   db: Db,
   sender: OtpSender,
-  input: { phone: string; ip: string; echo: boolean; maxPerIp: number },
+  input: { phone: string; ip: string; echo: boolean; maxPerIp: number; production?: boolean },
 ): Promise<OtpRequestResult> {
   const { rows } = await db.query<{ by_phone: string; by_ip: string }>(
     `SELECT count(*) FILTER (WHERE phone = $1)        AS by_phone,
@@ -52,6 +52,15 @@ export async function requestOtp(
     [input.phone, hashCode(input.phone, code), OTP_TTL_SECONDS, input.ip],
   );
   const channel = (await sender.send(input.phone, code)) ?? "none";
+  // Never tell someone "we sent a code" when nothing went out: in production with no
+  // WhatsApp or SMS provider (and test mode off), nobody could ever sign in.
+  if (channel === "none" && !input.echo && input.production) {
+    throw new AppError(
+      503,
+      "CODE_NOT_SENT",
+      "We can't send sign-in codes yet: WhatsApp and SMS aren't connected. Please try again later.",
+    );
+  }
 
   const result: OtpRequestResult = { sent: true, phone: input.phone, expiresInSeconds: OTP_TTL_SECONDS, channel };
   if (input.echo) result.devCode = code;

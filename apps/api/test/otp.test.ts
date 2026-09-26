@@ -104,6 +104,21 @@ describe("asking for a sign-in code", () => {
     await app.close();
   });
 
+  it("in production, says codes can't be sent instead of pretending one went out", async () => {
+    const app = await buildApp({
+      config: loadConfig({ DATABASE_URL: process.env.TEST_DATABASE_URL, NODE_ENV: "production", AUTH_OTP_MAX_PER_IP: "10000" }),
+      db: t.db,
+      logger: false,
+      otpSender: { send: async () => "none" },
+      files: t.files,
+    });
+    await app.ready();
+    const res = await app.inject({ method: "POST", url: "/api/v1/auth/otp/request", payload: { phone: "9876500003" } });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error.code).toBe("CODE_NOT_SENT");
+    await app.close();
+  });
+
   it("asks the person to try again when the code couldn't be sent", async () => {
     const app = await appWith(createFallbackOtpSender([{ send: async () => Promise.reject(new Error("down")) }], quiet));
     const res = await app.inject({ method: "POST", url: "/api/v1/auth/otp/request", payload: { phone: "9876500002" } });
