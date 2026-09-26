@@ -1,10 +1,11 @@
 "use client";
 
-import { can, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
+import { can, eventScope, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
 import { useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  Boxes,
   Building2,
   CalendarOff,
   Check,
@@ -89,6 +90,7 @@ export default function MorePage() {
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
             <Row href="/app/deliverables" icon={Package} label="Deliverables" />
+            {eventScope(workspace.role) === "all" && <Row href="/app/inventory" icon={Boxes} label="Stock" />}
             <Row href="/app/time-off" icon={CalendarOff} label="Days off" />
             {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
               <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />

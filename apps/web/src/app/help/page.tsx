@@ -80,6 +80,7 @@ const GUIDES: Guide[] = [
       "Mark the days people are away in More, Days off. Choosing an event's team then warns you about anyone who's off.",
       "Plan what each event owes the client under “For the client”: edited photos, the film, the album, hampers, a song mix. Your trade's usual ones are one tap, dated from the event.",
       "Whoever makes it marks it delivered with the link, and tells the client on WhatsApp in one tap. The client's own page shows what's coming and opens the link once it's ready. More, Deliverables lists what's late and due this week.",
+      "Keep your stock in More, Stock: chairs, lights, speakers, glassware, and how many you own. Set it aside for each event from its page; you're warned when overlapping events need more than you have. The crew marks it out and back, and anything missing comes off the stock.",
     ],
   },
   {

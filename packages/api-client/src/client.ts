@@ -1,4 +1,12 @@
 import type {
+  InventoryBooking,
+  InventoryBookingInput,
+  InventoryBookingListQuery,
+  InventoryItem,
+  InventoryItemInput,
+  InventoryListQuery,
+  UpdateInventoryBookingInput,
+  UpdateInventoryItemInput,
   Payout,
   PayoutInput,
   PayoutListQuery,
@@ -402,6 +410,21 @@ export function createApiClient(options: ApiClientOptions) {
         request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/pay`, input),
       unpay: (workspaceId: string, id: string) => request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/unpay`),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`),
+    },
+    inventory: {
+      /** With from and to: how many of each are free across those days */
+      list: (workspaceId: string, query: InventoryListQuery = {}) => request<InventoryItem[]>("GET", `${ws(workspaceId)}/inventory${qs(query)}`),
+      create: (workspaceId: string, input: InventoryItemInput) => request<InventoryItem>("POST", `${ws(workspaceId)}/inventory`, input),
+      update: (workspaceId: string, id: string, input: UpdateInventoryItemInput) =>
+        request<InventoryItem>("PATCH", `${ws(workspaceId)}/inventory/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/inventory/${encodeURIComponent(id)}`),
+      bookings: (workspaceId: string, query: InventoryBookingListQuery = {}) =>
+        request<InventoryBooking[]>("GET", `${ws(workspaceId)}/inventory-bookings${qs(query)}`),
+      book: (workspaceId: string, input: InventoryBookingInput) => request<InventoryBooking>("POST", `${ws(workspaceId)}/inventory-bookings`, input),
+      updateBooking: (workspaceId: string, id: string, input: UpdateInventoryBookingInput) =>
+        request<InventoryBooking>("PATCH", `${ws(workspaceId)}/inventory-bookings/${encodeURIComponent(id)}`, input),
+      removeBooking: (workspaceId: string, id: string) =>
+        request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/inventory-bookings/${encodeURIComponent(id)}`),
     },
     grow: {
       /** Turns on the client's own page; asking again returns the same link */

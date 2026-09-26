@@ -59,7 +59,7 @@ start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
-  0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts; do
+  0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -164,6 +164,12 @@ expect "what the event owes them is noted" '.success and .data.status == "owed"'
 api POST "/api/v1/workspaces/$WS_ID/payouts/$(echo "$PAYOUT" | jq -r '.data.id')/pay" '{"paidOn":"2026-09-25","method":"upi"}' "$TOKEN" >/dev/null
 expect "paying the vendor counts in the event's profit" '.success and .data.spent == 8000 and .data.profit == 17000 and .data.toPay == 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/money" "" "$TOKEN")"
+ITEM="$(api POST "/api/v1/workspaces/$WS_ID/inventory" '{"name":"Smoke chairs","category":"Furniture","quantity":10}' "$TOKEN")"
+expect "stock can be added" '.success and .data.quantity == 10' "$ITEM"
+expect "and set aside for the event, on its days" '.success and .data.status == "booked" and .data.short == 0' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/inventory-bookings" "{\"itemId\":\"$(echo "$ITEM" | jq -r '.data.id')\",\"eventId\":\"$EVENT_ID\",\"quantity\":4,\"fromDate\":\"2099-12-01\",\"toDate\":\"2099-12-02\"}" "$TOKEN")"
+expect "what's free on those days is worked out" '.success and .data[0].available == 6' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/inventory?from=2099-12-01&to=2099-12-02" "" "$TOKEN")"
 stop_api
 
 echo "== second start (same database)"

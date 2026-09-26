@@ -13,6 +13,7 @@ import { eventDates } from "@/components/bookings/event-card";
 import { EventDeliverables } from "@/components/deliverables/deliverables";
 import { ReviewCard } from "@/components/grow/review-card";
 import { EventPayouts } from "@/components/vendors/payouts";
+import { EventStock } from "@/components/inventory/inventory";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
 import { EventTasks, EventTeamCard } from "@/components/tasks/event-work";
@@ -172,6 +173,8 @@ function EventView({ event }: { event: WeddingEvent }) {
       <EventTasks event={event} />
 
       <EventDeliverables event={event} />
+
+      <EventStock event={event} />
 
       <EventMoneyCard event={event} />
 

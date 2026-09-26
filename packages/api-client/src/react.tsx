@@ -10,6 +10,12 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  InventoryBookingInput,
+  InventoryBookingListQuery,
+  InventoryItemInput,
+  InventoryListQuery,
+  UpdateInventoryBookingInput,
+  UpdateInventoryItemInput,
   PayoutInput,
   PayoutListQuery,
   PayPayoutInput,
@@ -132,6 +138,10 @@ export const queryKeys = {
   vendors: (id: string) => ["workspace", id, "bookings", "vendors"] as const,
   vendor: (id: string, vendorId: string) => ["workspace", id, "bookings", "vendor", vendorId] as const,
   payouts: (id: string, query: object) => ["workspace", id, "bookings", "payouts", query] as const,
+  /** Stock and what events need of it. */
+  inventory: (id: string) => ["workspace", id, "inventory"] as const,
+  inventoryItems: (id: string, query: object) => ["workspace", id, "inventory", "items", query] as const,
+  inventoryBookings: (id: string, query: object) => ["workspace", id, "inventory", "bookings", query] as const,
   portal: (token: string) => ["public-portal", token] as const,
 };
 
@@ -965,4 +975,53 @@ export function useUnpayPayout(workspaceId: string) {
 export function useDeletePayout(workspaceId: string) {
   const api = useApi();
   return useVendorMutation(workspaceId, (id: string) => api.payouts.remove(workspaceId, id));
+}
+
+// ---- Inventory ----------------------------------------------------------------------
+
+export function useInventory(workspaceId: string, query: InventoryListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.inventoryItems(workspaceId, query), queryFn: () => api.inventory.list(workspaceId, query), enabled });
+}
+
+export function useInventoryBookings(workspaceId: string, query: InventoryBookingListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.inventoryBookings(workspaceId, query), queryFn: () => api.inventory.bookings(workspaceId, query), enabled });
+}
+
+function useInventoryMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.inventory(workspaceId) }) });
+}
+
+export function useCreateInventoryItem(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, (input: InventoryItemInput) => api.inventory.create(workspaceId, input));
+}
+
+export function useUpdateInventoryItem(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, ({ id, ...input }: UpdateInventoryItemInput & { id: string }) => api.inventory.update(workspaceId, id, input));
+}
+
+export function useDeleteInventoryItem(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, (id: string) => api.inventory.remove(workspaceId, id));
+}
+
+export function useBookInventory(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, (input: InventoryBookingInput) => api.inventory.book(workspaceId, input));
+}
+
+export function useUpdateInventoryBooking(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, ({ id, ...input }: UpdateInventoryBookingInput & { id: string }) =>
+    api.inventory.updateBooking(workspaceId, id, input),
+  );
+}
+
+export function useDeleteInventoryBooking(workspaceId: string) {
+  const api = useApi();
+  return useInventoryMutation(workspaceId, (id: string) => api.inventory.removeBooking(workspaceId, id));
 }

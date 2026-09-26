@@ -897,3 +897,22 @@ helper: florists, a generator, a setup crew, a second shooter. Each has a phone 
 
 **Roles and log.** Owners and managers run payouts; the accountant can read them. The
 activity log records each payment.
+
+---
+
+## 29. Built in Phase 6, part 4: stock
+
+**What you own, and where it is.** More, Stock lists what the business owns, in groups:
+chairs, tables, fairy lights, speakers, glassware, and how many of each. Decorators,
+sound and light, bars and caterers use it; businesses without stock never see it on
+their events.
+- **Set aside for an event** from its page, on its days or on days you pick. The item
+  list shows how many are free on those days.
+- **Shortages warn, they don't block.** When overlapping events need more than you own,
+  the sheet says so before you save, and the event keeps a red "20 short" note. You can
+  still set them aside and hire the rest.
+- **Out and back.** The crew marks items out when loaded and back when they return, and
+  says how many didn't come back. Those come off the stock; undoing puts them back.
+- **Free again.** A cancelled event frees its stock at once. Stock that's out can't be
+  freed or deleted.
+- **Roles.** Owners and managers plan stock; staff load it; the accountant can look.

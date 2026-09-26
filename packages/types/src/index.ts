@@ -12,6 +12,7 @@ export * from "./deliverables.js";
 export * from "./expenses.js";
 export * from "./grow.js";
 export * from "./home.js";
+export * from "./inventory.js";
 export * from "./money.js";
 export * from "./reports.js";
 export * from "./review.js";
