@@ -53,7 +53,9 @@ const GUIDES: Guide[] = [
     steps: [
       "Add your GST number in More, Business profile, to charge GST. Clients in your state get CGST and SGST; clients elsewhere get IGST. Without a GST number, invoices don't charge GST. With one, each invoice can still be with or without GST.",
       "Make an invoice from Money, New invoice, for anyone: a booked event (it starts from the accepted quote), a client, or someone new. Invoices are numbered for the financial year, like INV/26-27/0001. Prices can include GST, the discount can be in rupees or percent, and money already received is recorded in the same save.",
-      "Add your UPI ID in Business profile. Every invoice then carries a QR code, so clients pay in one scan.",
+      "In More, Invoice settings, add your bank account or UPI ID. It prints under Pay to on every new invoice, and the UPI ID gives clients a Pay button and QR code with the amount filled in. Keep more than one account and pick per invoice.",
+      "Save your usual notes and terms there too, and pick one on an invoice with a tap. The default fills in by itself. Changing a saved one later never changes invoices already sent.",
+      "Pick a design (Classic, Modern, Minimal or Bold) and your colour. The preview shows your invoice as clients will see it.",
       "Record money when it comes in, in your own payment modes (add Google Pay or anything else as you go). Each gets a receipt number, and the invoice shows what's still due. Money, Payments lists it all by period and mode, with a spreadsheet for your CA.",
       "Money taken before there's an invoice is kept as an advance and counted in the event's next invoice.",
       "Money, To collect lists everything still due. One tap sends the client a polite reminder on WhatsApp.",

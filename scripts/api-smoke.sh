@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -152,6 +152,14 @@ expect "an invoice for someone new, with money received in the same save" '.succ
   "$(api POST "/api/v1/workspaces/$WS_ID/bills" '{"billTo":{"name":"Smoke Walk In"},"issueDate":"2026-09-20","items":[{"name":"Trial","unit":"event","quantity":1,"rate":1500}],"payment":{"amount":500,"paidOn":"2026-09-20","method":"cash"}}' "$TOKEN")"
 expect "invoice totals answer" '.success and .data.count >= 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/bills/summary" "" "$TOKEN")"
+expect "a bank account can be added for invoices" '.success and .data.isDefault == true and .data.ifsc == "HDFC0001234"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/bank-accounts" '{"label":"Smoke HDFC","accountNumber":"50100123456789","ifsc":"hdfc0001234","upiId":"smoke@okhdfc"}' "$TOKEN")"
+expect "saved terms fill new invoices" '.success and .data.isDefault == true' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/saved-texts" '{"kind":"terms","title":"Usual","body":"Smoke terms"}' "$TOKEN")"
+expect "a new invoice carries the default account and terms" '.success and .data.bank.ifsc == "HDFC0001234" and .data.terms == "Smoke terms"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/bills" '{"billTo":{"name":"Smoke Bank"},"issueDate":"2026-09-20","items":[{"name":"Trial","unit":"event","quantity":1,"rate":1000}]}' "$TOKEN")"
+expect "an invoice design can be picked" '.success and .data.invoiceDesign == "modern"' \
+  "$(api PATCH "/api/v1/workspaces/$WS_ID" '{"invoiceDesign":"modern"}' "$TOKEN")"
 expect "an expense keeps the GST inside it" '.success and .data.gstAmount == 180 and .data.vendorInvoiceNo == "SMK/1"' \
   "$(api POST "/api/v1/workspaces/$WS_ID/expenses" '{"category":"materials","amount":1180,"gstRate":18,"vendorInvoiceNo":"SMK/1","spentOn":"2026-09-25","method":"upi"}' "$TOKEN")"
 expect "expense totals answer, with the GST" '.success and .data.gst >= 180 and .data.toReimburse == 0' \

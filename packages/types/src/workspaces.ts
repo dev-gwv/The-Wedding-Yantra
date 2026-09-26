@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ROLES } from "@wedding-yantra/core";
 import { optionalText } from "./common.js";
+import { INVOICE_DESIGNS, invoiceAccent } from "./invoice-look.js";
 
 export const role = z.enum(ROLES);
 
@@ -77,6 +78,9 @@ export const updateWorkspaceInput = z
       .regex(/^[A-Z0-9-]{1,5}$/, "Use up to 5 letters or numbers"),
     /** Printed at the bottom of every bill: bank details, payment terms */
     billTerms: optionalText(2000),
+    /** How the invoice page looks */
+    invoiceDesign: z.enum(INVOICE_DESIGNS),
+    invoiceAccent,
     /** An uploaded photo (see files), or null to remove the logo */
     logoFileId: z.uuid().nullable(),
     /** The owner checked the starter prices and they're right as they are */
@@ -100,6 +104,8 @@ export const workspace = z.object({
   upiId: z.string().nullable(),
   billPrefix: z.string(),
   billTerms: z.string().nullable(),
+  invoiceDesign: z.enum(INVOICE_DESIGNS),
+  invoiceAccent: z.string(),
   reviewUrl: z.string().nullable(),
   /** API path of the logo, when there is one */
   logoUrl: z.string().nullable(),

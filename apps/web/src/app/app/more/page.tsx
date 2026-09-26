@@ -13,6 +13,7 @@ import {
   CircleHelp,
   ClipboardList,
   CreditCard,
+  FileText,
   HandCoins,
   History,
   MessageSquareText,
@@ -110,6 +111,7 @@ export default function MorePage() {
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         {can(workspace.role, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
         {can(workspace.role, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: payment modes, expense categories" />}
+        {can(workspace.role, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/team" icon={Users} label="Team" />

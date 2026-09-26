@@ -3,7 +3,8 @@
 import { can } from "@wedding-yantra/core";
 import { useUpdateWorkspace, useUploadFile, useWorkspace } from "@wedding-yantra/api-client/react";
 import { updateWorkspaceInput, type Workspace } from "@wedding-yantra/types";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ChevronRight, ImagePlus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -60,8 +61,6 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     gstin: workspace.gstin ?? "",
     quoteTerms: workspace.quoteTerms ?? "",
     upiId: workspace.upiId ?? "",
-    billPrefix: workspace.billPrefix,
-    billTerms: workspace.billTerms ?? "",
     reviewUrl: workspace.reviewUrl ?? "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -164,24 +163,16 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             autoCapitalize="none"
             hint="Clients get a Pay by UPI button on every invoice link. Money goes straight to you."
           />
-          <TextField
-            label="Invoice numbers start with"
-            value={values.billPrefix}
-            onChange={set("billPrefix")}
-            error={errors.billPrefix}
-            autoCapitalize="characters"
-            className="[&_input]:uppercase"
-            hint={`New invoices look like ${(values.billPrefix || "INV").toUpperCase()}/26-27/0001, counted afresh each financial year.`}
-          />
-          <TextAreaField
-            label="Bank details and terms on invoices"
-            rows={4}
-            value={values.billTerms}
-            onChange={set("billTerms")}
-            error={errors.billTerms}
-            placeholder={"Bank: HDFC Bank, A/c 50100123456789, IFSC HDFC0001234\nBalance due before the event."}
-            hint="Printed at the bottom of every new invoice."
-          />
+          <Link
+            href="/app/settings/invoices"
+            className="flex items-center gap-3 rounded-2xl bg-cream px-4 py-3 text-sm font-semibold hover:bg-sun-100"
+          >
+            <span className="min-w-0 flex-1">
+              Invoice settings
+              <span className="block font-normal text-ink-muted">Bank accounts, saved notes and terms, invoice numbers and how invoices look</span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
+          </Link>
         </Card>
 
         <Card id="reviews" className="scroll-mt-6 space-y-5 p-5">

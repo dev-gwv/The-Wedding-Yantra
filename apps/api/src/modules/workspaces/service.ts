@@ -1,5 +1,5 @@
 import { eventScope, type Role } from "@wedding-yantra/core";
-import type { HomeSummary, StarterPack, UpdateWorkspaceInput, Workspace } from "@wedding-yantra/types";
+import type { HomeSummary, InvoiceDesign, StarterPack, UpdateWorkspaceInput, Workspace } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, notFound } from "../../lib/http.js";
@@ -30,6 +30,8 @@ interface WorkspaceRow {
   upi_id: string | null;
   bill_prefix: string;
   bill_terms: string | null;
+  invoice_design: InvoiceDesign;
+  invoice_accent: string;
   review_url: string | null;
   logo_file_id: string | null;
   timezone: string;
@@ -51,6 +53,8 @@ const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
   upiId: row.upi_id,
   billPrefix: row.bill_prefix,
   billTerms: row.bill_terms,
+  invoiceDesign: row.invoice_design,
+  invoiceAccent: row.invoice_accent,
   reviewUrl: row.review_url,
   logoUrl: logoPath(row.id, row.logo_file_id),
   timezone: row.timezone,
@@ -62,7 +66,7 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
             bt.icon AS business_type_icon, w.city,
-            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.review_url, w.logo_file_id, w.timezone, w.created_at
+            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.invoice_design, w.invoice_accent, w.review_url, w.logo_file_id, w.timezone, w.created_at
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -128,6 +132,8 @@ const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "prices
   upiId: "upi_id",
   billPrefix: "bill_prefix",
   billTerms: "bill_terms",
+  invoiceDesign: "invoice_design",
+  invoiceAccent: "invoice_accent",
   reviewUrl: "review_url",
 };
 

@@ -10,6 +10,8 @@ import {
   type BillTaxRow,
 } from "@wedding-yantra/core";
 import type {
+  BankDetails,
+  InvoiceDesign,
   Bill,
   BillDraft,
   BillListSummary,
@@ -31,6 +33,7 @@ import { requirePaymentsRecord } from "./access.js";
 import { upsertClientForLead } from "../sales/leads.js";
 import { optionJoin } from "../options/service.js";
 import { logoPath } from "../files/logo.js";
+import { accountForBill, defaultAccountId, defaultText } from "../invoicing/service.js";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -77,6 +80,8 @@ export interface BillRow {
   subject: string | null;
   prices_include_gst: boolean;
   discount_percent: string | null;
+  bank_account_id: string | null;
+  bank_details: BankDetails | null;
 }
 
 export const BILL_SELECT = `
@@ -89,7 +94,7 @@ export const BILL_SELECT = `
          b.bill_to_name, b.bill_to_phone, b.bill_to_address, b.bill_to_gstin, b.seller_gstin,
          b.place_of_supply, b.inter_state, b.subtotal, b.discount, b.taxable, b.cgst, b.sgst, b.igst,
          b.tax, b.round_off, b.notes, b.terms, b.share_token, b.quote_id, b.cancelled_at, b.cancel_reason,
-         b.subject, b.prices_include_gst, b.discount_percent
+         b.subject, b.prices_include_gst, b.discount_percent, b.bank_account_id, b.bank_details
     FROM bills b
     JOIN workspaces w ON w.id = b.workspace_id
     LEFT JOIN clients c ON c.id = b.client_id
@@ -203,6 +208,8 @@ async function toBill(db: Queryable, ctx: MemberContext | null, r: BillRow): Pro
     byRate: taxRows(items),
     notes: r.notes,
     terms: r.terms,
+    bankAccountId: r.bank_account_id,
+    bank: r.bank_details,
     quoteId: r.quote_id,
     payments: ctx ? await listPayments(db, ctx, { billId: r.id }) : [],
     cancelledAt: r.cancelled_at?.toISOString() ?? null,
@@ -415,8 +422,9 @@ export async function billDraft(
     dueDate,
     items: chargesGst ? items : items.map((i) => ({ ...i, taxRate: 0 })),
     discount,
-    notes: null,
-    terms: ws.bill_terms,
+    notes: await defaultText(db, ctx.workspaceId, "note"),
+    terms: (await defaultText(db, ctx.workspaceId, "terms")) ?? ws.bill_terms,
+    bankAccountId: await defaultAccountId(db, ctx.workspaceId),
     chargesGst,
     homeState: stateFromGstin(ws.gstin),
     advance,
@@ -451,6 +459,7 @@ interface BillFields {
   discount: number;
   notes?: string | null;
   terms?: string | null;
+  bankAccountId?: string | null;
 }
 
 function checkDates(issueDate: string, dueDate: string | null | undefined) {
@@ -584,13 +593,15 @@ export async function createBill(
     const placeOfSupply = chargesGst ? (input.placeOfSupply ?? homeState) : null;
     const interState = chargesGst && !!placeOfSupply && !!homeState && placeOfSupply !== homeState;
 
+    const account = await accountForBill(tx, ctx.workspaceId, input.bankAccountId);
     const fy = financialYear(input.issueDate);
     const seq = await nextNumber(tx, ctx.workspaceId, `bill:${fy}`);
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO bills (workspace_id, fy, seq, number, client_id, event_id, quote_id, issue_date, due_date,
                           bill_to_name, bill_to_phone, bill_to_address, bill_to_gstin, seller_gstin, place_of_supply,
-                          inter_state, notes, terms, share_token, created_by, subject, prices_include_gst, discount_percent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING id`,
+                          inter_state, notes, terms, share_token, created_by, subject, prices_include_gst, discount_percent,
+                          bank_account_id, bank_details)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING id`,
       [
         ctx.workspaceId,
         fy,
@@ -608,13 +619,15 @@ export async function createBill(
         chargesGst ? ws.gstin : null,
         placeOfSupply,
         interState,
-        input.notes ?? null,
-        input.terms !== undefined ? input.terms : ws.bill_terms,
+        input.notes !== undefined ? input.notes : await defaultText(tx, ctx.workspaceId, "note"),
+        input.terms !== undefined ? input.terms : ((await defaultText(tx, ctx.workspaceId, "terms")) ?? ws.bill_terms),
         randomBytes(18).toString("base64url"),
         ctx.userId,
         input.subject ?? null,
         pricesIncludeGst,
         discountPercent,
+        account?.id ?? null,
+        account ? JSON.stringify(account.details) : null,
       ],
     );
     const id = rows[0]!.id;
@@ -690,6 +703,12 @@ export async function updateBill(db: Db, ctx: MemberContext, billId: string, inp
     }
     if (input.notes !== undefined) set("notes", input.notes);
     if (input.terms !== undefined) set("terms", input.terms);
+    // Picking another account copies its details now; the same one keeps what the client was sent.
+    if (input.bankAccountId !== undefined && input.bankAccountId !== current.bank_account_id) {
+      const account = await accountForBill(tx, ctx.workspaceId, input.bankAccountId);
+      set("bank_account_id", account?.id ?? null);
+      set("bank_details", account ? JSON.stringify(account.details) : null);
+    }
     if (input.subject !== undefined) set("subject", input.subject);
     set("seller_gstin", sellerGstin);
     if (!chargesGst) set("bill_to_gstin", null);
@@ -773,8 +792,11 @@ export async function getPublicBill(db: Db, token: string): Promise<PublicBill> 
     address: string | null;
     upi_id: string | null;
     logo_file_id: string | null;
+    invoice_design: InvoiceDesign;
+    invoice_accent: string;
   }>(
-    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.upi_id, w.logo_file_id
+    `SELECT w.name, bt.name AS type_name, bt.icon, w.city, w.phone, w.email, w.address, w.upi_id, w.logo_file_id,
+            w.invoice_design, w.invoice_accent
        FROM workspaces w JOIN business_types bt ON bt.id = w.business_type_id WHERE w.id = $1`,
     [row.workspace_id],
   );
@@ -801,8 +823,11 @@ export async function getPublicBill(db: Db, token: string): Promise<PublicBill> 
       phone: b.phone,
       email: b.email,
       address: b.address,
-      upiId: row.status === "cancelled" ? null : b.upi_id,
+      // The invoice's own account first, so the client pays where the invoice says.
+      upiId: row.status === "cancelled" ? null : (bill.bank?.upiId ?? b.upi_id),
       logoUrl: logoPath(row.workspace_id, b.logo_file_id),
+      invoiceDesign: b.invoice_design,
+      invoiceAccent: b.invoice_accent,
     },
     bill: {
       ...visible,

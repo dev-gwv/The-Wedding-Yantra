@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Card, Notice } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
+import { BankAccountPicker, SavedTextField } from "./invoice-extras";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 const localPhone = (phone: string | null) => (phone?.startsWith("+91") ? phone.slice(3) : (phone ?? ""));
@@ -90,6 +91,7 @@ export function BillEditor({ draft, bill, onSaved }: { draft?: BillDraft; bill?:
   const [discount, setDiscount] = useState(bill?.discountPercent ? String(bill.discountPercent) : start.discount > 0 ? String(start.discount) : "");
   const [notes, setNotes] = useState(start.notes ?? "");
   const [termsText, setTermsText] = useState(start.terms ?? "");
+  const [bankAccountId, setBankAccountId] = useState<string | null>(start.bankAccountId);
 
   // Money received with it (new invoices only)
   const canRecord = !bill && can(workspace.role, "payments.record");
@@ -153,6 +155,7 @@ export function BillEditor({ draft, bill, onSaved }: { draft?: BillDraft; bill?:
       discount: discountMode === "amount" ? discount || "0" : "0",
       notes,
       terms: termsText,
+      bankAccountId,
     };
     const payment = paid ? { amount: payAmount, paidOn: payOn, method: payMethod, reference: payRef } : null;
     const check = bill
@@ -368,23 +371,11 @@ export function BillEditor({ draft, bill, onSaved }: { draft?: BillDraft; bill?:
         </dl>
       </Card>
 
-      <TextAreaField label="Note for the customer (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} error={errors.notes} placeholder="Thank you for choosing us!" />
-      <TextAreaField
-        label="Terms and bank details"
-        rows={4}
-        value={termsText}
-        onChange={(e) => setTermsText(e.target.value)}
-        error={errors.terms}
-        hint={
-          <>
-            Set the usual ones in{" "}
-            <Link href="/app/settings/business" className="font-semibold text-brand-strong">
-              Business profile
-            </Link>
-            .
-          </>
-        }
-      />
+      <Card className="space-y-5 p-5">
+        <BankAccountPicker value={bankAccountId} onChange={setBankAccountId} />
+        <SavedTextField kind="note" label="Note for the customer (optional)" value={notes} onChange={setNotes} error={errors.notes} placeholder="Thank you for choosing us!" />
+        <SavedTextField kind="terms" label="Terms (optional)" rows={4} value={termsText} onChange={setTermsText} error={errors.terms} placeholder="50% advance to book. Balance before the event." />
+      </Card>
 
       {received > 0 && (
         <Notice>

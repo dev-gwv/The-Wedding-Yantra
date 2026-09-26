@@ -12,6 +12,7 @@ import { razorpayGateway, type PaymentGateway } from "./modules/billing/gateway.
 import { businessTypeRoutes } from "./modules/business-types/routes.js";
 import { broadcastRoutes } from "./modules/broadcasts/routes.js";
 import { fieldRoutes } from "./modules/fields/routes.js";
+import { invoicingRoutes } from "./modules/invoicing/routes.js";
 import { optionRoutes } from "./modules/options/routes.js";
 import { fileRoutes } from "./modules/files/routes.js";
 import { deliverableRoutes } from "./modules/deliverables/routes.js";
@@ -119,6 +120,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       inventoryRoutes(v1, { db });
       fieldRoutes(v1, { db });
       optionRoutes(v1, { db });
+      invoicingRoutes(v1, { db });
       broadcastRoutes(v1, { db });
       billingRoutes(v1, { db, config, gateway });
     },

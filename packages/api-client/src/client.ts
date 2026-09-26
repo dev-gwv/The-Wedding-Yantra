@@ -1,11 +1,17 @@
 import type {
   BillListQuery,
   BillListSummary,
+  BankAccount,
+  BankAccountInput,
   CustomOption,
   OptionInput,
   PaymentListQuery,
   ReorderOptionsInput,
+  SavedText,
+  SavedTextInput,
+  UpdateBankAccountInput,
   UpdateOptionInput,
+  UpdateSavedTextInput,
   Broadcast,
   BroadcastAudiencePreview,
   BroadcastDetail,
@@ -454,6 +460,21 @@ export function createApiClient(options: ApiClientOptions) {
       update: (workspaceId: string, id: string, input: UpdateOptionInput) =>
         request<CustomOption>("PATCH", `${ws(workspaceId)}/options/${encodeURIComponent(id)}`, input),
       reorder: (workspaceId: string, input: ReorderOptionsInput) => request<CustomOption[]>("PUT", `${ws(workspaceId)}/options/order`, input),
+    },
+    savedTexts: {
+      /** Notes and terms written once, picked on an invoice */
+      list: (workspaceId: string) => request<SavedText[]>("GET", `${ws(workspaceId)}/saved-texts`),
+      add: (workspaceId: string, input: SavedTextInput) => request<SavedText>("POST", `${ws(workspaceId)}/saved-texts`, input),
+      update: (workspaceId: string, id: string, input: UpdateSavedTextInput) =>
+        request<SavedText>("PATCH", `${ws(workspaceId)}/saved-texts/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/saved-texts/${encodeURIComponent(id)}`),
+    },
+    bankAccounts: {
+      /** Accounts printed on invoices; hidden ones included */
+      list: (workspaceId: string) => request<BankAccount[]>("GET", `${ws(workspaceId)}/bank-accounts`),
+      add: (workspaceId: string, input: BankAccountInput) => request<BankAccount>("POST", `${ws(workspaceId)}/bank-accounts`, input),
+      update: (workspaceId: string, id: string, input: UpdateBankAccountInput) =>
+        request<BankAccount>("PATCH", `${ws(workspaceId)}/bank-accounts/${encodeURIComponent(id)}`, input),
     },
     customFields: {
       /** The business's own fields on enquiries, clients and events */

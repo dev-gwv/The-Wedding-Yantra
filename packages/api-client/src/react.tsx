@@ -14,9 +14,13 @@ import type {
   SaveCustomFieldsInput,
   BillListQuery,
   PaymentListQuery,
+  BankAccountInput,
   CustomOption,
   OptionInput,
+  SavedTextInput,
+  UpdateBankAccountInput,
   UpdateOptionInput,
+  UpdateSavedTextInput,
   BroadcastInput,
   BroadcastRecipientInput,
   BroadcastDetail,
@@ -125,6 +129,8 @@ export const queryKeys = {
   bills: (id: string, query: object) => ["workspace", id, "bookings", "bills", query] as const,
   billsSummary: (id: string, query: object) => ["workspace", id, "bookings", "bills-summary", query] as const,
   options: (id: string) => ["workspace", id, "options"] as const,
+  savedTexts: (id: string) => ["workspace", id, "saved-texts"] as const,
+  bankAccounts: (id: string) => ["workspace", id, "bank-accounts"] as const,
   bill: (id: string, billId: string) => ["workspace", id, "bookings", "bill", billId] as const,
   billDraft: (id: string, query: object) => ["workspace", id, "bookings", "bill-draft", query] as const,
   payments: (id: string, query: object) => ["workspace", id, "bookings", "payments", query] as const,
@@ -1229,3 +1235,55 @@ export function useReorderOptions(workspaceId: string) {
   return useOptionMutation(workspaceId, (input: { list: CustomOption["list"]; ids: string[] }) => api.options.reorder(workspaceId, input));
 }
 
+// ---- Invoice settings: saved notes and terms, bank accounts ------------------------
+
+export function useSavedTexts(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.savedTexts(workspaceId), queryFn: () => api.savedTexts.list(workspaceId), enabled, staleTime: 5 * 60_000 });
+}
+
+function useInvoiceSettingsMutation<TInput, TResult>(workspaceId: string, key: readonly unknown[], fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: key });
+      // A new invoice starts from the defaults.
+      void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "bookings", "bill-draft"] });
+    },
+  });
+}
+
+export function useAddSavedText(workspaceId: string) {
+  const api = useApi();
+  return useInvoiceSettingsMutation(workspaceId, queryKeys.savedTexts(workspaceId), (input: SavedTextInput) => api.savedTexts.add(workspaceId, input));
+}
+
+export function useUpdateSavedText(workspaceId: string) {
+  const api = useApi();
+  return useInvoiceSettingsMutation(workspaceId, queryKeys.savedTexts(workspaceId), ({ id, ...input }: UpdateSavedTextInput & { id: string }) =>
+    api.savedTexts.update(workspaceId, id, input),
+  );
+}
+
+export function useDeleteSavedText(workspaceId: string) {
+  const api = useApi();
+  return useInvoiceSettingsMutation(workspaceId, queryKeys.savedTexts(workspaceId), (id: string) => api.savedTexts.remove(workspaceId, id));
+}
+
+export function useBankAccounts(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.bankAccounts(workspaceId), queryFn: () => api.bankAccounts.list(workspaceId), enabled, staleTime: 5 * 60_000 });
+}
+
+export function useAddBankAccount(workspaceId: string) {
+  const api = useApi();
+  return useInvoiceSettingsMutation(workspaceId, queryKeys.bankAccounts(workspaceId), (input: BankAccountInput) => api.bankAccounts.add(workspaceId, input));
+}
+
+export function useUpdateBankAccount(workspaceId: string) {
+  const api = useApi();
+  return useInvoiceSettingsMutation(workspaceId, queryKeys.bankAccounts(workspaceId), ({ id, ...input }: UpdateBankAccountInput & { id: string }) =>
+    api.bankAccounts.update(workspaceId, id, input),
+  );
+}

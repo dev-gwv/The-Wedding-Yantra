@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { billMessage, can, whatsappLink } from "@wedding-yantra/core";
 import { useBill, useCancelBill, useWorkspace } from "@wedding-yantra/api-client/react";
 import type { Bill, Payment, Workspace } from "@wedding-yantra/types";
@@ -105,10 +106,14 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
         </div>
       )}
 
-      {!business.upiId && !cancelled && bill.due > 0 && manage && (
+      {!(bill.bank?.upiId ?? business.upiId) && !cancelled && bill.due > 0 && manage && (
         <div className="print:hidden">
           <Notice>
-            Add your UPI ID in Business profile, and clients get a Pay button on this invoice&apos;s link.
+            Add a UPI ID to your bank account in{" "}
+            <Link href="/app/settings/invoices" className="font-semibold text-brand-strong underline">
+              Invoice settings
+            </Link>
+            , and clients get a Pay button on this invoice&apos;s link.
           </Notice>
         </div>
       )}
@@ -123,6 +128,8 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
           email: business.email,
           address: business.address,
           logoUrl: business.logoUrl,
+          invoiceDesign: business.invoiceDesign,
+          invoiceAccent: business.invoiceAccent,
         }}
         bill={bill}
       />

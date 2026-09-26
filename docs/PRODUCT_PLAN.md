@@ -1014,5 +1014,24 @@ The third of the money sections, after invoices and payments:
   went" by category, category chips, who-paid chips, search by who was paid, vendor, bill
   number or note, and a spreadsheet export with all of the above. The monthly CA spreadsheet
   gains the bill number, GST, who paid and when they were paid back.
-- Next: notes and terms templates, bank accounts and invoice designs; then payment plans and
-  deliverables on invoices.
+- Next: notes and terms templates, bank accounts and invoice designs (section 35); then payment
+  plans and deliverables on invoices.
+
+## 35. Built: invoice settings (after IPC Studios' invoice templates)
+
+One page, More, Invoice settings, for what every invoice carries:
+- **Bank accounts.** Several accounts, one the default: account name, number, IFSC, bank,
+  branch, and a UPI ID (or just a UPI ID). The default prints under "Pay to" on each new
+  invoice; the editor can pick another or none. Each invoice keeps a copy of the account as it
+  was, so editing or hiding an account never changes an invoice already sent. The UPI ID on
+  the invoice drives the Pay button and QR code on its link. An existing UPI ID on the
+  business profile became the first account.
+- **Saved notes and terms.** Written once, picked on an invoice with a tap, one default of
+  each filled in by itself. "Save for next time" saves what's typed on an invoice. Terms that
+  were in the business profile became the default saved terms.
+- **Design and colour.** Classic, Modern, Minimal and Bold, in one of nine colours that read
+  well with white text (or any colour), with a live preview of a sample invoice. Colours
+  print in the PDF.
+- **Invoice numbers** moved here from the business profile.
+- Next: payment plans (instalments) and deliverables on invoices; reminders; drafts.
+

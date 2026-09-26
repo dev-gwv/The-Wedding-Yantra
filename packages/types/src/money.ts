@@ -6,6 +6,8 @@ import { gstRateInput, moneyInput, optionalDateInput } from "./bookings.js";
 import { optionalText } from "./common.js";
 import type { PersonRef } from "./sales.js";
 import { GSTIN_PATTERN } from "./workspaces.js";
+import type { BankDetails } from "./invoicing.js";
+import type { InvoiceDesign } from "./invoice-look.js";
 import { optionKey } from "./lists.js";
 
 // ---------------------------------------------------------------------------
@@ -110,6 +112,9 @@ export interface Bill extends BillSummary {
   byRate: BillTaxRow[];
   notes: string | null;
   terms: string | null;
+  /** The account the client pays into, as it was when the invoice was saved */
+  bankAccountId: string | null;
+  bank: BankDetails | null;
   quoteId: string | null;
   payments: Payment[];
   cancelledAt: string | null;
@@ -179,6 +184,8 @@ const billFields = {
   discount: moneyInput,
   notes: optionalText(2000),
   terms: optionalText(4000),
+  /** One of the business's bank accounts; null prints none. Left out on a new invoice, the default is used. */
+  bankAccountId: z.uuid().nullable().optional(),
 };
 
 /** For an event, a client, or just a name and number: a new customer becomes a client. */
@@ -232,6 +239,8 @@ export interface PublicBill {
     /** Clients pay the balance to this UPI ID */
     upiId: string | null;
     logoUrl: string | null;
+    invoiceDesign: InvoiceDesign;
+    invoiceAccent: string;
   };
   bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
     payments: Pick<Payment, "number" | "amount" | "paidOn" | "method" | "methodLabel">[];
@@ -356,6 +365,8 @@ export interface BillDraft {
   discount: number;
   notes: string | null;
   terms: string | null;
+  /** The default bank account, if there is one */
+  bankAccountId: string | null;
   /** The business has a GST number, so GST can be charged */
   chargesGst: boolean;
   /** The business's own GST state */
