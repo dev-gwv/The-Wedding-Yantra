@@ -487,3 +487,37 @@ describe("deliverables", () => {
     );
   });
 });
+
+import { describeRepeat, latestOccurrence, nextOccurrence, weekdayOf } from "./index.js";
+
+describe("repeating tasks", () => {
+  // 2026-09-28 is a Monday.
+  const weekly = { frequency: "weekly" as const, weekdays: [1, 3, 5], monthDay: null, startDate: "2026-09-01" };
+  it("knows the day of the week", () => {
+    expect(weekdayOf("2026-09-28")).toBe(1);
+    expect(weekdayOf("2026-10-04")).toBe(7);
+  });
+  it("finds the latest day it falls on, never before it starts", () => {
+    expect(latestOccurrence({ ...weekly, frequency: "daily" }, "2026-09-30")).toBe("2026-09-30");
+    expect(latestOccurrence(weekly, "2026-09-29")).toBe("2026-09-28");
+    expect(latestOccurrence(weekly, "2026-09-27")).toBe("2026-09-25");
+    expect(latestOccurrence({ ...weekly, startDate: "2026-09-29" }, "2026-09-29")).toBeNull();
+    const monthly = { frequency: "monthly" as const, weekdays: [], monthDay: 31, startDate: "2026-01-01" };
+    expect(latestOccurrence(monthly, "2026-09-30")).toBe("2026-09-30");
+    expect(latestOccurrence(monthly, "2026-10-15")).toBe("2026-09-30");
+    expect(latestOccurrence({ ...monthly, monthDay: 5 }, "2026-10-04")).toBe("2026-09-05");
+  });
+  it("finds the next day", () => {
+    expect(nextOccurrence(weekly, "2026-09-29")).toBe("2026-09-30");
+    expect(nextOccurrence({ ...weekly, startDate: "2026-10-10" }, "2026-09-29")).toBe("2026-10-12");
+    expect(nextOccurrence({ frequency: "monthly", weekdays: [], monthDay: 31, startDate: "2026-01-01" }, "2026-02-01")).toBe("2026-02-28");
+  });
+  it("says it plainly", () => {
+    expect(describeRepeat(weekly)).toBe("Every Mon, Wed and Fri");
+    expect(describeRepeat({ frequency: "weekly", weekdays: [1, 2, 3, 4, 5], monthDay: null })).toBe("Every weekday");
+    expect(describeRepeat({ frequency: "weekly", weekdays: [7], monthDay: null })).toBe("Every Sun");
+    expect(describeRepeat({ frequency: "daily", weekdays: [], monthDay: null })).toBe("Every day");
+    expect(describeRepeat({ frequency: "monthly", weekdays: [], monthDay: 22 })).toBe("Every month on the 22nd");
+    expect(describeRepeat({ frequency: "monthly", weekdays: [], monthDay: 11 })).toBe("Every month on the 11th");
+  });
+});

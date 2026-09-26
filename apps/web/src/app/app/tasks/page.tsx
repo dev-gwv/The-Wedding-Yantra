@@ -1,9 +1,9 @@
 "use client";
 
-import { can, timeAgo } from "@wedding-yantra/core";
-import { useTasks } from "@wedding-yantra/api-client/react";
+import { can, formatDueDay, timeAgo } from "@wedding-yantra/core";
+import { useStopTaskRepeat, useTaskRepeats, useTasks } from "@wedding-yantra/api-client/react";
 import type { TaskItem } from "@wedding-yantra/types";
-import { ListChecks, Lock, Plus } from "lucide-react";
+import { ListChecks, Lock, Plus, Repeat } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -13,6 +13,7 @@ import { TaskSheet } from "@/components/tasks/task-sheet";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { useBusinessDay } from "@/lib/today";
@@ -139,6 +140,8 @@ function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => 
         <TaskGroups tasks={list} today={today} show={{ event: true, assignee: scope === "team" }} onOpen={onOpen} />
       )}
 
+      <Repeats scope={scope} today={today} />
+
       <section>
         <button
           type="button"
@@ -177,6 +180,53 @@ function TaskList({ scope, onOpen }: { scope: View; onOpen: (task: TaskItem) => 
         )}
       </section>
     </div>
+  );
+}
+
+/** Rules that make a task on each of their days. */
+function Repeats({ scope, today }: { scope: View; today: string }) {
+  const { workspace, me } = useCurrentWorkspace();
+  const manage = can(workspace.role, "tasks.manage");
+  const rules = useTaskRepeats(workspace.id, scope);
+  const stop = useStopTaskRepeat(workspace.id);
+  const toast = useToast();
+  if (!rules.data || rules.data.length === 0) return null;
+  return (
+    <section>
+      <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-extrabold">
+        <Repeat className="size-4 text-brand-strong" /> Repeating
+      </h2>
+      <Card className="divide-y divide-line overflow-hidden">
+        {rules.data.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+            <div className="min-w-48 flex-1">
+              <p className="font-semibold">{r.title}</p>
+              <p className="text-sm text-ink-muted">
+                {r.label}
+                {r.nextDate && ` · Next: ${formatDueDay(r.nextDate, today)}`}
+                {scope === "team" && ` · ${r.assignee.id === me.user.id ? "You" : (r.assignee.name ?? "Team member")}`}
+              </p>
+            </div>
+            {(manage || r.assignee.id === me.user.id || r.createdBy?.id === me.user.id) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await stop.mutateAsync(r.id);
+                    toast(`Stopped: ${r.title}`);
+                  } catch (err) {
+                    toast(errorMessage(err), "error");
+                  }
+                }}
+              >
+                Stop
+              </Button>
+            )}
+          </div>
+        ))}
+      </Card>
+    </section>
   );
 }
 

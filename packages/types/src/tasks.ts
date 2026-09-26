@@ -1,3 +1,4 @@
+import { REPEAT_FREQUENCIES, type RepeatFrequency } from "@wedding-yantra/core";
 import { z } from "zod";
 import { optionalText } from "./common.js";
 import type { EventSummary } from "./bookings.js";
@@ -27,8 +28,29 @@ export interface TaskItem {
   overdue: boolean;
   /** Made from the event checklist */
   fromChecklist: boolean;
+  /** Made by a repeating rule: "Every Mon, Wed and Fri" */
+  repeat: { id: string; label: string; active: boolean } | null;
   createdBy: PersonRef | null;
   createdAt: string;
+}
+
+/** A rule that makes a task on each of its days. */
+export interface TaskRepeat {
+  id: string;
+  title: string;
+  notes: string | null;
+  assignee: PersonRef;
+  priority: TaskPriority;
+  dueTime: string | null;
+  frequency: RepeatFrequency;
+  weekdays: number[];
+  monthDay: number | null;
+  startDate: string;
+  /** "Every Mon, Wed and Fri" */
+  label: string;
+  /** The next day it makes a task, today included */
+  nextDate: string | null;
+  createdBy: PersonRef | null;
 }
 
 const time = z
@@ -58,6 +80,24 @@ export type TaskInput = z.input<typeof taskInput>;
 export const updateTaskInput = z.object(taskFields).partial();
 export type UpdateTaskInput = z.input<typeof updateTaskInput>;
 export const setTaskDoneInput = z.object({ done: z.boolean() });
+
+export const taskRepeatInput = z
+  .object({
+    title: z.string().trim().min(2, "Say what needs doing").max(160),
+    notes: optionalText(1000),
+    /** Who does it. Leave empty for yourself. */
+    assigneeId: z.uuid().nullable().optional(),
+    priority: z.enum(TASK_PRIORITIES).optional(),
+    dueTime: time,
+    frequency: z.enum(REPEAT_FREQUENCIES, "How often?"),
+    weekdays: z.array(z.coerce.number().int().min(1).max(7)).max(7).optional(),
+    monthDay: z.coerce.number().int().min(1, "Pick a day of the month").max(31, "Pick a day of the month").nullable().optional(),
+    /** YYYY-MM-DD; default today */
+    startDate: z.iso.date("Pick a valid date").optional(),
+  })
+  .refine((r) => r.frequency !== "weekly" || (r.weekdays?.length ?? 0) > 0, { message: "Pick at least one day", path: ["weekdays"] })
+  .refine((r) => r.frequency !== "monthly" || !!r.monthDay, { message: "Pick a day of the month", path: ["monthDay"] });
+export type TaskRepeatInput = z.input<typeof taskRepeatInput>;
 
 export const taskListQuery = z.object({
   /** mine: given to me; team: everyone's (owners and managers) */

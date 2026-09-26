@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import type {
+  TaskRepeatInput,
   InventoryBookingInput,
   InventoryBookingListQuery,
   InventoryItemInput,
@@ -124,6 +125,7 @@ export const queryKeys = {
   tasks: (id: string, query: object) => ["workspace", id, "work", "tasks", query] as const,
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
+  taskRepeats: (id: string, scope: string) => ["workspace", id, "work", "repeats", scope] as const,
   checklist: (id: string) => ["workspace", id, "checklist"] as const,
   /** Scores, the activity log and the daily summary: read-only views over everything. */
   scores: (id: string, month: string) => ["workspace", id, "review", "scores", month] as const,
@@ -1024,4 +1026,32 @@ export function useUpdateInventoryBooking(workspaceId: string) {
 export function useDeleteInventoryBooking(workspaceId: string) {
   const api = useApi();
   return useInventoryMutation(workspaceId, (id: string) => api.inventory.removeBooking(workspaceId, id));
+}
+
+// ---- Repeating tasks ----------------------------------------------------------------
+
+export function useTaskRepeats(workspaceId: string, scope: "mine" | "team" = "mine", enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.taskRepeats(workspaceId, scope), queryFn: () => api.taskRepeats.list(workspaceId, scope), enabled });
+}
+
+function useWorkMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.work(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+export function useCreateTaskRepeat(workspaceId: string) {
+  const api = useApi();
+  return useWorkMutation(workspaceId, (input: TaskRepeatInput) => api.taskRepeats.create(workspaceId, input));
+}
+
+export function useStopTaskRepeat(workspaceId: string) {
+  const api = useApi();
+  return useWorkMutation(workspaceId, (id: string) => api.taskRepeats.stop(workspaceId, id));
 }

@@ -1,10 +1,11 @@
-import { can, checklistDays, eventScope } from "@wedding-yantra/core";
+import { can, checklistDays, describeRepeat, eventScope, type RepeatFrequency } from "@wedding-yantra/core";
 import type { ChecklistItem, ChecklistWhen, MyDay, StarterPack, TaskItem, TaskPriority, TeamMember } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { eventTeam, listEvents } from "../bookings/events.js";
+import { makeDueRepeats } from "./repeats.js";
 
 const manages = (ctx: MemberContext) => can(ctx.role, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
@@ -38,14 +39,22 @@ interface TaskRow {
   created_by_name: string | null;
   created_at: Date;
   today: string;
+  repeat_id: string | null;
+  repeat_frequency: RepeatFrequency | null;
+  repeat_weekdays: number[] | null;
+  repeat_month_day: number | null;
+  repeat_stopped: boolean | null;
 }
 
 const TASK_SELECT = `
   SELECT t.id, t.title, t.notes, t.event_id, e.title AS event_title, t.assignee_id, a.name AS assignee_name,
          t.due_date::text AS due_date, to_char(t.due_time, 'HH24:MI') AS due_time, t.priority, t.status,
          t.done_at, t.done_by, d.name AS done_by_name, t.template_id, t.created_by, c.name AS created_by_name,
-         t.created_at, (now() AT TIME ZONE w.timezone)::date::text AS today
+         t.created_at, (now() AT TIME ZONE w.timezone)::date::text AS today,
+         t.repeat_id, rp.frequency AS repeat_frequency, rp.weekdays AS repeat_weekdays, rp.month_day AS repeat_month_day,
+         (rp.stopped_at IS NOT NULL) AS repeat_stopped
     FROM tasks t
+    LEFT JOIN task_repeats rp ON rp.id = t.repeat_id
     JOIN workspaces w ON w.id = t.workspace_id
     LEFT JOIN events e ON e.id = t.event_id
     LEFT JOIN users a ON a.id = t.assignee_id
@@ -70,6 +79,14 @@ const toTask = (r: TaskRow): TaskItem => ({
   doneBy: r.done_by ? { id: r.done_by, name: r.done_by_name } : null,
   overdue: r.status === "open" && r.due_date !== null && r.due_date < r.today,
   fromChecklist: r.template_id !== null,
+  repeat:
+    r.repeat_id && r.repeat_frequency
+      ? {
+          id: r.repeat_id,
+          label: describeRepeat({ frequency: r.repeat_frequency, weekdays: r.repeat_weekdays ?? [], monthDay: r.repeat_month_day }),
+          active: !r.repeat_stopped,
+        }
+      : null,
   createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
   createdAt: r.created_at.toISOString(),
 });
@@ -127,6 +144,8 @@ export async function listTasks(
     }
     // A cancelled event's tasks stay on the event but leave everyone's list.
     where.push(ACTIVE_EVENT);
+    // Today's copies of repeating tasks appear the first time anyone looks.
+    await makeDueRepeats(db, ctx.workspaceId);
   }
   if (filters.status) where.push(`t.status = ${add(filters.status)}`);
   // Finished tasks: the latest first. Otherwise by day, urgent ones first within a day.
@@ -450,6 +469,7 @@ export async function myDay(db: Db, ctx: MemberContext): Promise<MyDay> {
 
 export async function homeTasks(db: Queryable, ctx: MemberContext): Promise<{ overdue: number; dueToday: number; teamOverdue: number | null }> {
   if (!can(ctx.role, "tasks.work")) return { overdue: 0, dueToday: 0, teamOverdue: null };
+  await makeDueRepeats(db, ctx.workspaceId);
   const { rows } = await db.query<{ overdue: string; due_today: string; team_overdue: string }>(
     `WITH today AS (SELECT (now() AT TIME ZONE timezone)::date AS d FROM workspaces WHERE id = $1)
      SELECT count(*) FILTER (WHERE t.assignee_id = $2 AND t.due_date < today.d) AS overdue,

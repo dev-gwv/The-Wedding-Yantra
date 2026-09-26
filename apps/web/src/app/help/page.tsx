@@ -99,6 +99,7 @@ const GUIDES: Guide[] = [
     steps: [
       "Invite people by phone from More, Team. They join with one tap on the link you send them on WhatsApp.",
       "Everyone sees their own day on Home: their events this week, when to reach, and what's due.",
+      "Make a task repeat: every day, on chosen days of the week, or on a day each month. A fresh copy appears on each of those days; missed days don't pile up. Stop it any time from Tasks, Repeating.",
       "Scores are worked out each month from the work itself: tasks done on time, follow-ups kept, enquiries booked and expenses added in a day.",
       "Owners and managers see who did what in More, Activity, and can send the day's summary on WhatsApp at closing time.",
     ],

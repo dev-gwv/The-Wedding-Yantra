@@ -5,6 +5,7 @@ import {
   setTaskDoneInput,
   taskInput,
   taskListQuery,
+  taskRepeatInput,
   timeOffInput,
   timeOffQuery,
   updateTaskInput,
@@ -12,6 +13,7 @@ import {
 import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
+import * as repeats from "./repeats.js";
 import * as tasks from "./service.js";
 import * as timeOff from "./time-off.js";
 
@@ -21,6 +23,21 @@ type WsId = { Params: { workspaceId: string; id: string } };
 export function taskRoutes(app: FastifyInstance, deps: { db: Db }) {
   const { db } = deps;
   const member = (request: Parameters<typeof requireMember>[1], workspaceId: string) => requireMember(db, request, workspaceId);
+
+  // ---- Repeating tasks ------------------------------------------------------------
+  app.get<Ws & { Querystring: { scope?: string } }>("/workspaces/:workspaceId/task-repeats", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await repeats.listRepeats(db, ctx, request.query.scope === "team" ? "team" : "mine"));
+  });
+  app.post<Ws>("/workspaces/:workspaceId/task-repeats", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return reply.status(201).send(ok(await repeats.createRepeat(db, ctx, parse(taskRepeatInput, request.body))));
+  });
+  app.delete<WsId>("/workspaces/:workspaceId/task-repeats/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    await repeats.stopRepeat(db, ctx, assertId(request.params.id, "This repeating task"));
+    return ok({ stopped: true as const });
+  });
 
   // ---- Tasks ------------------------------------------------------------------
   app.get<Ws>("/workspaces/:workspaceId/tasks", async (request) => {

@@ -1,9 +1,18 @@
 "use client";
 
-import { can, eventScope, formatDate, timeAgo } from "@wedding-yantra/core";
-import { useCreateTask, useDeleteTask, useEvents, useSetTaskDone, useTeam, useUpdateTask } from "@wedding-yantra/api-client/react";
-import { taskInput, updateTaskInput, type TaskItem } from "@wedding-yantra/types";
-import { Flag } from "lucide-react";
+import { can, describeRepeat, eventScope, formatDate, timeAgo, WEEKDAY_NAMES, weekdayOf, type RepeatFrequency } from "@wedding-yantra/core";
+import {
+  useCreateTask,
+  useCreateTaskRepeat,
+  useDeleteTask,
+  useEvents,
+  useSetTaskDone,
+  useStopTaskRepeat,
+  useTeam,
+  useUpdateTask,
+} from "@wedding-yantra/api-client/react";
+import { taskInput, taskRepeatInput, updateTaskInput, type TaskItem } from "@wedding-yantra/types";
+import { Flag, Repeat } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
@@ -61,6 +70,12 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
   const [notes, setNotes] = useState(task?.notes ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Repeating: only for new tasks that aren't for an event.
+  const createRepeat = useCreateTaskRepeat(workspace.id);
+  const stopRepeat = useStopTaskRepeat(workspace.id);
+  const [repeat, setRepeat] = useState<"none" | RepeatFrequency>("none");
+  const [weekdays, setWeekdays] = useState<number[]>(() => [weekdayOf(today)]);
+  const [monthDay, setMonthDay] = useState(() => String(Number(today.slice(8, 10))));
 
   const quickDays: [string, number][] = [
     ["Today", 0],
@@ -68,8 +83,34 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
     ["In a week", 7],
   ];
 
+  async function submitRepeat() {
+    const fields = {
+      title,
+      notes,
+      dueTime,
+      priority: urgent ? ("high" as const) : ("normal" as const),
+      frequency: repeat as RepeatFrequency,
+      weekdays,
+      monthDay: repeat === "monthly" ? monthDay : null,
+      startDate: dueDate || today,
+      ...(manage ? { assigneeId: assigneeId || null } : {}),
+    };
+    const check = validate(taskRepeatInput, fields);
+    if (check.errors) return setErrors(check.errors);
+    setErrors({});
+    try {
+      const made = await createRepeat.mutateAsync(fields);
+      toast(`${made.label}: ${made.title}`);
+      onDone();
+    } catch (err) {
+      const f = apiFieldErrors(err);
+      setErrors(Object.keys(f).length ? f : { _: errorMessage(err) });
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (repeat !== "none") return submitRepeat();
     const fields = {
       title,
       notes,
@@ -126,6 +167,7 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
   const missingEvent = task?.eventId && !eventOptions.some((e) => e.id === task.eventId) ? { id: task.eventId, title: task.eventTitle ?? "Event" } : null;
   const members = team.data?.members ?? [];
   const eventChosen = !!(forEvent || eventId);
+  const canRepeat = !task && !eventChosen;
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
@@ -159,10 +201,16 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
 
         <div>
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="By when" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} error={errors.dueDate} />
-            <TextField label="Time (optional)" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} error={errors.dueTime} disabled={!dueDate} />
+            <TextField
+              label={repeat === "none" ? "By when" : "Starting"}
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              error={errors.dueDate ?? errors.startDate}
+            />
+            <TextField label="Time (optional)" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} error={errors.dueTime} disabled={!dueDate && repeat === "none"} />
           </div>
-          {editable && (
+          {editable && repeat === "none" && (
             <div className="mt-2 flex flex-wrap gap-2">
               {quickDays.map(([label, days]) => {
                 const value = day(days);
@@ -196,6 +244,74 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
             </div>
           )}
         </div>
+
+        {canRepeat && (
+          <div>
+            <p className="mb-2 text-sm font-semibold text-ink">Repeat</p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["none", "Doesn't repeat"],
+                  ["daily", "Every day"],
+                  ["weekly", "Every week"],
+                  ["monthly", "Every month"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setRepeat(key)}
+                  aria-pressed={repeat === key}
+                  className={cn(
+                    "h-9 rounded-full px-3.5 text-sm font-bold transition",
+                    repeat === key ? "bg-gradient-primary text-on-brand shadow-soft" : "bg-cream text-ink hover:bg-sun-100",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {repeat === "weekly" && (
+              <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="On these days">
+                {WEEKDAY_NAMES.map((name, i) => {
+                  const d = i + 1;
+                  const on = weekdays.includes(d);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setWeekdays((w) => (on ? w.filter((x) => x !== d) : [...w, d]))}
+                      className={cn(
+                        "h-10 w-12 rounded-xl border text-sm font-bold",
+                        on ? "border-sun-300 bg-cream text-brand-strong" : "border-line text-ink-muted hover:bg-cream",
+                      )}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {repeat === "monthly" && (
+              <TextField
+                label="On day of the month"
+                inputMode="numeric"
+                value={monthDay}
+                onChange={(e) => setMonthDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                error={errors.monthDay}
+                hint="Short months use their last day."
+                className="mt-3 max-w-48"
+              />
+            )}
+            {errors.weekdays && <p className="mt-1.5 text-sm text-danger">{errors.weekdays}</p>}
+            {repeat !== "none" && (
+              <p className="mt-2 text-sm text-ink-muted">
+                {describeRepeat({ frequency: repeat, weekdays, monthDay: Number(monthDay) || null })}. A new task appears on each of these days.
+              </p>
+            )}
+          </div>
+        )}
 
         {manage && editable && (
           <SelectField label="Who does it" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} error={errors.assigneeId}>
@@ -237,6 +353,32 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
         <TextAreaField label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} error={errors.notes} maxLength={1000} />
       </fieldset>
 
+      {task?.repeat && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-cream px-4 py-3 text-sm">
+          <Repeat className="size-4 text-brand-strong" />
+          <span className="flex-1">
+            {task.repeat.active ? `Repeats: ${task.repeat.label.toLowerCase()}.` : `Stopped repeating (${task.repeat.label.toLowerCase()}).`}
+          </span>
+          {task.repeat.active && (manage || task.assignee?.id === me.user.id || task.createdBy?.id === me.user.id) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={stopRepeat.isPending}
+              onClick={async () => {
+                try {
+                  await stopRepeat.mutateAsync(task.repeat!.id);
+                  toast("No more new copies. This one stays.");
+                  onDone();
+                } catch (err) {
+                  toast(errorMessage(err), "error");
+                }
+              }}
+            >
+              Stop repeating
+            </Button>
+          )}
+        </div>
+      )}
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       {!editable && task && (
         <Notice>
@@ -247,8 +389,8 @@ function TaskForm({ task, eventId, onDone }: { task?: TaskItem; eventId?: string
 
       {editable && (
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <Button type="submit" size="lg" loading={create.isPending || update.isPending} className="sm:w-auto sm:px-8">
-            {task ? "Save" : manage && assigneeId && assigneeId !== me.user.id ? "Give task" : "Add task"}
+          <Button type="submit" size="lg" loading={create.isPending || update.isPending || createRepeat.isPending} className="sm:w-auto sm:px-8">
+            {task ? "Save" : repeat !== "none" ? "Add repeating task" : manage && assigneeId && assigneeId !== me.user.id ? "Give task" : "Add task"}
           </Button>
           {task && !confirmRemove && (
             <Button variant="danger" onClick={() => setConfirmRemove(true)}>

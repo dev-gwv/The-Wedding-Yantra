@@ -1,4 +1,6 @@
 import type {
+  TaskRepeat,
+  TaskRepeatInput,
   InventoryBooking,
   InventoryBookingInput,
   InventoryBookingListQuery,
@@ -410,6 +412,13 @@ export function createApiClient(options: ApiClientOptions) {
         request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/pay`, input),
       unpay: (workspaceId: string, id: string) => request<Payout>("POST", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}/unpay`),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/payouts/${encodeURIComponent(id)}`),
+    },
+    taskRepeats: {
+      /** Your own; "team" for everyone's (owners and managers) */
+      list: (workspaceId: string, scope: "mine" | "team" = "mine") => request<TaskRepeat[]>("GET", `${ws(workspaceId)}/task-repeats${qs({ scope })}`),
+      create: (workspaceId: string, input: TaskRepeatInput) => request<TaskRepeat>("POST", `${ws(workspaceId)}/task-repeats`, input),
+      /** Stops making new tasks; ones already made stay */
+      stop: (workspaceId: string, id: string) => request<{ stopped: true }>("DELETE", `${ws(workspaceId)}/task-repeats/${encodeURIComponent(id)}`),
     },
     inventory: {
       /** With from and to: how many of each are free across those days */

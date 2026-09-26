@@ -59,7 +59,7 @@ start_api
 for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 0004_leads_and_clients \
   0005_catalogue_quotes_events 0006_bills_and_payments 0007_expenses \
   0008_tasks_and_team 0009_team_review 0010_time_off \
-  0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory; do
+  0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -134,6 +134,10 @@ TASK="$(api POST "/api/v1/workspaces/$WS_ID/tasks" '{"title":"Smoke task","prior
 expect "a task can be added" '.success and .data.done == false' "$TASK"
 expect "and ticked off" '.success and .data.done == true' \
   "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$TASK" | jq -r '.data.id')/done" '{"done":true}' "$TOKEN")"
+expect "a task can repeat every day" '.success and .data.label == "Every day"' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/task-repeats" '{"title":"Smoke daily follow-up","frequency":"daily"}' "$TOKEN")"
+expect "and today's copy is on the list" '.success and (.data | map(.repeat.label) | index("Every day")) != null' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/tasks?scope=mine&status=open" "" "$TOKEN")"
 expect "My Day answers" '.success and (.data.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
   "$(api GET "/api/v1/workspaces/$WS_ID/my-day" "" "$TOKEN")"
 expect "the month's scores are worked out" ".success and (.data.people | length) >= 1 and .data.business != null" \

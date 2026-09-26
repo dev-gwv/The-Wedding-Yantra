@@ -916,3 +916,19 @@ their events.
 - **Free again.** A cancelled event frees its stock at once. Stock that's out can't be
   freed or deleted.
 - **Roles.** Owners and managers plan stock; staff load it; the accountant can look.
+
+---
+
+## 30. Built: repeating tasks
+
+"Post 3 reels every week", "follow up all enquiries daily", "pay the studio rent on the 5th".
+- **When adding a task, choose Repeat:** every day, every week on chosen days, or every month
+  on a day (short months use their last day). It can start on a chosen date and keep a time.
+- **Each day becomes an ordinary task.** It shows on the list and My Day, can be ticked off,
+  and counts in scores like any other. The first time anyone opens the app on one of its
+  days, that day's copy appears.
+- **No piling up.** If nobody opened the app for a while, only the latest day's copy is made.
+  Deleting a copy doesn't bring it back.
+- **Tasks, Repeating** lists the rules with their next day. Anyone can repeat their own
+  tasks; owners and managers can give repeating tasks to others and see everyone's. The
+  person, whoever set it up, or a manager can stop one; copies already made stay.

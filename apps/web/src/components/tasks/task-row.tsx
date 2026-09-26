@@ -3,7 +3,7 @@
 import { can, daysBetween, formatClock, formatDueDay, type Role } from "@wedding-yantra/core";
 import { useSetTaskDone } from "@wedding-yantra/api-client/react";
 import type { TaskItem } from "@wedding-yantra/types";
-import { Check, Flag } from "lucide-react";
+import { Check, Flag, Repeat } from "lucide-react";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Card } from "@/components/ui/misc";
@@ -98,6 +98,11 @@ export function TaskRow({
             <span className={cn(late && "font-semibold text-danger")}>
               {formatDueDay(task.dueDate, today)}
               {task.dueTime && `, ${formatClock(task.dueTime)}`}
+            </span>
+          )}
+          {task.repeat && (
+            <span className="inline-flex items-center gap-1" title={task.repeat.label}>
+              <Repeat className="size-3.5" /> <span className="sr-only">{task.repeat.label}</span>
             </span>
           )}
           {show.event && task.eventTitle && <span className="min-w-0 truncate">{task.eventTitle}</span>}
