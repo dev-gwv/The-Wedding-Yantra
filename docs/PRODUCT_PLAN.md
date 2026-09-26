@@ -1035,3 +1035,21 @@ One page, More, Invoice settings, for what every invoice carries:
 - **Invoice numbers** moved here from the business profile.
 - Next: payment plans (instalments) and deliverables on invoices; reminders; drafts.
 
+## 36. Built: payment plans on invoices
+
+An invoice can be paid in parts, the way wedding bookings are: "30% to book, 40% a week before,
+30% on the day".
+- **In the editor:** "Paid in parts" with 50/50, 30/40/30, 30/30/30/10 and 25% + balance a tap
+  away, or any split in percent or rupees (up to 12 parts), each with a date. It shows the rupees
+  and whether the parts add up as you type; the API refuses a plan that doesn't add up. With
+  dates, the invoice is due on the last one.
+- **Where each part stands:** money received pays the parts in order. Each part is Paid, Part
+  paid, Overdue (its date passed), Due next or Later. An invoice is overdue when a part's date
+  has passed unpaid, not only the final date.
+- **On the invoice:** a Payment plan table. The client's link asks for the part due now, with
+  the full balance a tap away. Money to collect and the WhatsApp reminder name the part and
+  its amount.
+- A plan in percentages follows a new total when the invoice is edited; one in rupees must be
+  fixed first. Clearing it makes the invoice one payment again.
+- Next: deliverables on invoices; then reminders and drafts.
+

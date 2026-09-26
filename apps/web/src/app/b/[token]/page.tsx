@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate, formatMoney, upiLink, whatsappLink } from "@wedding-yantra/core";
+import { formatDate, formatMoney, nextInstalment, upiLink, whatsappLink, type InstalmentStatus } from "@wedding-yantra/core";
 import { usePublicBill } from "@wedding-yantra/api-client/react";
 import { CircleCheck, Copy, FileX, MessageCircle, Printer, Smartphone } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -55,6 +55,8 @@ export default function PublicBillPage() {
             business={business.name}
             businessPhone={business.phone}
             upiId={business.upiId}
+            plan={bill.plan}
+            dueNow={bill.dueNow}
           />
         )}
 
@@ -85,7 +87,11 @@ function PayCard({
   business,
   businessPhone,
   upiId,
+  plan,
+  dueNow,
 }: {
+  plan: InstalmentStatus[];
+  dueNow: number;
   due: number;
   dueDate: string | null;
   overdue: boolean;
@@ -96,7 +102,12 @@ function PayCard({
 }) {
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const link = upiId ? upiLink({ upiId, payee: business, amount: due, note: number }) : null;
+  // Paid in parts: ask for what's due now (or the next part), with the whole balance a tap away.
+  const next = nextInstalment(plan);
+  const part = next ? Math.min(due, dueNow > 0 ? dueNow : next.remaining) : due;
+  const [whole, setWhole] = useState(false);
+  const amount = whole || !next ? due : part;
+  const link = upiId ? upiLink({ upiId, payee: business, amount, note: next && !whole ? `${number} ${next.label}`.slice(0, 50) : number }) : null;
 
   useEffect(() => {
     if (!link) return;
@@ -115,17 +126,48 @@ function PayCard({
     }
   }
 
-  const paidMessage = whatsappLink(`Hi, I have paid ${formatMoney(due)} for bill ${number}. Sharing the payment screenshot.`, businessPhone ?? undefined);
+  const paidMessage = whatsappLink(`Hi, I have paid ${formatMoney(amount)} for invoice ${number}. Sharing the payment screenshot.`, businessPhone ?? undefined);
 
   return (
     <NextStepCard className="mb-5 p-5 sm:p-6 print:hidden">
-      <p className="text-sm font-semibold text-ink-muted">Balance due{dueDate ? ` by ${formatDate(dueDate)}` : ""}</p>
-      <p className={`font-display text-4xl font-extrabold tabular ${overdue ? "text-danger" : ""}`}>{formatMoney(due)}</p>
+      {next ? (
+        <>
+          <p className="text-sm font-semibold text-ink-muted">
+            {dueNow > 0 ? "Due now" : "Next payment"}: {next.label}
+            {next.dueDate ? `, by ${formatDate(next.dueDate)}` : ""}
+          </p>
+          <p className={`font-display text-4xl font-extrabold tabular ${dueNow > 0 ? "text-danger" : ""}`}>{formatMoney(part)}</p>
+          <p className="mt-1 text-sm text-ink-muted">Balance on the invoice: {formatMoney(due)}</p>
+          {part < due && (
+            <div className="mt-3 inline-flex rounded-xl bg-cream p-1" role="group" aria-label="How much to pay">
+              {[
+                [false, "This part"],
+                [true, "Full balance"],
+              ].map(([w, text]) => (
+                <button
+                  key={String(w)}
+                  type="button"
+                  aria-pressed={whole === w}
+                  onClick={() => setWhole(w as boolean)}
+                  className={`h-9 rounded-lg px-3 text-sm font-bold ${whole === w ? "bg-surface shadow-soft" : "text-ink-muted"}`}
+                >
+                  {text as string}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-ink-muted">Balance due{dueDate ? ` by ${formatDate(dueDate)}` : ""}</p>
+          <p className={`font-display text-4xl font-extrabold tabular ${overdue ? "text-danger" : ""}`}>{formatMoney(due)}</p>
+        </>
+      )}
       {link ? (
         <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="flex-1 space-y-3">
             <a href={link} className={buttonClass({ size: "lg" })}>
-              <Smartphone className="size-5" /> Pay {formatMoney(due)} by UPI
+              <Smartphone className="size-5" /> Pay {formatMoney(amount)} by UPI
             </a>
             <p className="text-sm text-ink-muted">Opens GPay, PhonePe, Paytm or any UPI app with the amount filled in.</p>
             <button type="button" onClick={copyUpi} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-strong">

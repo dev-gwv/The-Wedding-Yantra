@@ -47,9 +47,10 @@ export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item
     reminderMessage({
       clientName: item.clientName,
       business: workspace.name,
-      due: item.due,
+      due: item.part?.amount ?? item.due,
       forWhat,
-      dueDate: item.dueDate,
+      dueDate: item.part ? item.part.dueDate : item.dueDate,
+      part: item.part?.label,
       link: item.shareToken ? billUrl(item.shareToken) : null,
       payOnline: false,
     }),
@@ -64,7 +65,13 @@ export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item
             {item.billNumber ? `${item.billNumber} · ` : "No invoice yet · "}
             {withoutName(item.eventTitle, item.clientName) ?? "Invoice"}
           </span>
-          {item.dueDate && (
+          {item.part && (
+            <span className={cn("mt-0.5 block text-sm font-semibold", item.overdue ? "text-danger" : "text-ink-muted")}>
+              {item.part.label}: {formatMoney(item.part.amount)}
+              {item.part.dueDate ? ` ${item.overdue ? "was due" : "due by"} ${formatDate(item.part.dueDate, { year: false })}` : ""}
+            </span>
+          )}
+          {!item.part && item.dueDate && (
             <span className={cn("mt-0.5 block text-sm font-semibold", item.overdue ? "text-danger" : "text-ink-muted")}>
               {item.overdue ? `Was due ${formatDate(item.dueDate, { year: false })}` : `Due by ${formatDate(item.dueDate, { year: false })}`}
             </span>

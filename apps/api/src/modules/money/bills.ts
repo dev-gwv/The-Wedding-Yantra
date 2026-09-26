@@ -3,11 +3,15 @@ import {
   billNumber,
   computeBillTotals,
   financialYear,
+  formatMoney,
+  instalmentAmounts,
+  planStatus,
   prepareBillLines,
   receiptNumber,
   round2,
   stateFromGstin,
   type BillTaxRow,
+  type PlanPartInput,
 } from "@wedding-yantra/core";
 import type {
   BankDetails,
@@ -82,6 +86,7 @@ export interface BillRow {
   discount_percent: string | null;
   bank_account_id: string | null;
   bank_details: BankDetails | null;
+  plan_due_by_today: string;
 }
 
 export const BILL_SELECT = `
@@ -94,7 +99,9 @@ export const BILL_SELECT = `
          b.bill_to_name, b.bill_to_phone, b.bill_to_address, b.bill_to_gstin, b.seller_gstin,
          b.place_of_supply, b.inter_state, b.subtotal, b.discount, b.taxable, b.cgst, b.sgst, b.igst,
          b.tax, b.round_off, b.notes, b.terms, b.share_token, b.quote_id, b.cancelled_at, b.cancel_reason,
-         b.subject, b.prices_include_gst, b.discount_percent, b.bank_account_id, b.bank_details
+         b.subject, b.prices_include_gst, b.discount_percent, b.bank_account_id, b.bank_details,
+         coalesce((SELECT sum(i.amount) FROM bill_instalments i
+                    WHERE i.bill_id = b.id AND i.due_date < (now() AT TIME ZONE w.timezone)::date), 0) AS plan_due_by_today
     FROM bills b
     JOIN workspaces w ON w.id = b.workspace_id
     LEFT JOIN clients c ON c.id = b.client_id
@@ -111,7 +118,8 @@ export function toBillSummary(r: BillRow): BillSummary {
     number: r.number,
     status: r.status,
     payState,
-    overdue: due > 0 && r.due_date !== null && r.due_date < r.today,
+    // Late on the final date, or behind on a part of the payment plan whose date has passed.
+    overdue: due > 0 && ((r.due_date !== null && r.due_date < r.today) || Number(r.plan_due_by_today) > received + 0.5),
     clientId: r.client_id,
     clientName: r.client_name,
     eventId: r.event_id,
@@ -184,10 +192,22 @@ function taxRows(items: BillItem[]): BillTaxRow[] {
   return [...rows.values()].sort((a, b) => a.rate - b.rate);
 }
 
+async function loadPlan(db: Queryable, billId: string): Promise<{ label: string; percent: number | null; amount: number; dueDate: string | null }[]> {
+  const { rows } = await db.query<{ label: string; percent: string | null; amount: string; due_date: string | null }>(
+    `SELECT label, percent, amount, due_date::text AS due_date FROM bill_instalments WHERE bill_id = $1 ORDER BY position`,
+    [billId],
+  );
+  return rows.map((p) => ({ label: p.label, percent: p.percent === null ? null : Number(p.percent), amount: Number(p.amount), dueDate: p.due_date }));
+}
+
 async function toBill(db: Queryable, ctx: MemberContext | null, r: BillRow): Promise<Bill> {
   const items = await loadItems(db, r.id);
+  const summary = toBillSummary(r);
+  const cancelled = r.status === "cancelled";
   return {
-    ...toBillSummary(r),
+    ...summary,
+    plan: planStatus(await loadPlan(db, r.id), cancelled ? 0 : summary.received, r.today),
+    dueNow: cancelled ? 0 : Math.min(summary.due, Math.max(0, round2(Number(r.plan_due_by_today) - summary.received))),
     billTo: { name: r.bill_to_name, phone: r.bill_to_phone, address: r.bill_to_address, gstin: r.bill_to_gstin },
     subject: r.subject,
     pricesIncludeGst: r.prices_include_gst,
@@ -460,6 +480,37 @@ interface BillFields {
   notes?: string | null;
   terms?: string | null;
   bankAccountId?: string | null;
+  instalments?: PlanPartInput[];
+}
+
+/**
+ * Saves the payment plan for an invoice of this total. Percent parts are worked out from the
+ * total; the parts must add up to it. With dates, the invoice is due on the last one.
+ * Left out on an edit, a plan already there follows a new total when it's in percentages.
+ */
+async function savePlan(tx: Queryable, workspaceId: string, billId: string, parts: PlanPartInput[] | undefined, total: number) {
+  let plan = parts;
+  if (plan === undefined) {
+    const existing = await loadPlan(tx, billId);
+    if (!existing.length) return;
+    plan = existing.map((p) => (p.percent !== null ? { ...p, amount: null } : { ...p, percent: null }));
+  }
+  await tx.query(`DELETE FROM bill_instalments WHERE bill_id = $1`, [billId]);
+  if (!plan.length) return;
+  const amounts = instalmentAmounts(plan, total);
+  const planned = round2(amounts.reduce((a, b) => a + b, 0));
+  if (Math.abs(planned - total) > 0.5 || amounts.some((a) => a <= 0)) {
+    const message = `The parts add up to ${formatMoney(planned)}, but the invoice total is ${formatMoney(total)}`;
+    throw new AppError(400, "VALIDATION_ERROR", message, { instalments: message });
+  }
+  for (const [i, p] of plan.entries()) {
+    await tx.query(
+      `INSERT INTO bill_instalments (bill_id, workspace_id, position, label, percent, amount, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [billId, workspaceId, i, p.label, p.percent ?? null, amounts[i], p.dueDate || null],
+    );
+  }
+  const last = plan.map((p) => p.dueDate).filter((d): d is string => !!d).sort().at(-1);
+  if (last) await tx.query(`UPDATE bills SET due_date = $2 WHERE id = $1`, [billId, last]);
 }
 
 function checkDates(issueDate: string, dueDate: string | null | undefined) {
@@ -632,6 +683,7 @@ export async function createBill(
     );
     const id = rows[0]!.id;
     const totals = await writeLines(tx, ctx.workspaceId, id, input.items, input.discount, { chargesGst, interState, pricesIncludeGst, discountPercent });
+    await savePlan(tx, ctx.workspaceId, id, input.instalments, totals.total);
     await attachAdvances(tx, { id, eventId, clientId, total: totals.total });
     // Money received with the invoice: full, an advance or a token amount, in the same save.
     if (input.payment) {
@@ -738,6 +790,7 @@ export async function updateBill(db: Db, ctx: MemberContext, billId: string, inp
       pricesIncludeGst: typedInclusive,
       discountPercent,
     });
+    await savePlan(tx, ctx.workspaceId, billId, input.instalments, totals.total);
     await logActivity(tx, {
       workspaceId: ctx.workspaceId,
       actorUserId: ctx.userId,

@@ -269,8 +269,117 @@ export function reminderMessage(o: {
   dueDate: string | null;
   link: string | null;
   payOnline: boolean;
+  /** Paid in parts: the part being asked for, e.g. "Before the event" */
+  part?: string | null;
 }): string {
   const when = o.dueDate ? `, due by ${formatDate(o.dueDate, { year: false })}` : "";
+  if (o.part) {
+    const see = o.link ? ` ${o.payOnline ? "See the invoice and pay by UPI" : "See the invoice and the full plan"} here: ${o.link}` : "";
+    return `Hi ${first(o.clientName)}, a gentle reminder from ${o.business}: the "${o.part}" payment of ${formatMoney(o.due)} for ${o.forWhat} is due${when ? when.replace(", due", "") : ""}.${see} Thank you!`;
+  }
   const see = o.link ? ` ${o.payOnline ? "See the invoice and pay by UPI" : "See the invoice"} here: ${o.link}` : "";
   return `Hi ${first(o.clientName)}, a gentle reminder from ${o.business}: ${formatMoney(o.due)} is due for ${o.forWhat}${when}.${see} Thank you!`;
 }
+
+// ---------------------------------------------------------------------------
+// Payment plans: an invoice paid in parts ("30% to book, 40% a week before, 30% on the day")
+// ---------------------------------------------------------------------------
+
+export interface PlanPartInput {
+  label: string;
+  /** A share of the invoice total; or give an amount instead */
+  percent?: number | null;
+  amount?: number | null;
+  dueDate?: string | null;
+}
+
+/**
+ * Rupees for each part. When every part is a percentage and they add up to 100, the last
+ * part takes the rounding, so the parts always add up to the total exactly.
+ */
+export function instalmentAmounts(parts: readonly PlanPartInput[], total: number): number[] {
+  const amounts = parts.map((p) => (p.percent != null ? round2((total * p.percent) / 100) : round2(p.amount ?? 0)));
+  const allPercent = parts.length > 0 && parts.every((p) => p.percent != null);
+  const pct = parts.reduce((a, p) => a + (p.percent ?? 0), 0);
+  if (allPercent && Math.abs(pct - 100) < 0.001) {
+    const others = sum(amounts.slice(0, -1));
+    amounts[amounts.length - 1] = round2(total - others);
+  }
+  return amounts;
+}
+
+export type InstalmentState = "paid" | "part_paid" | "overdue" | "due" | "upcoming";
+export const INSTALMENT_STATE_LABELS: Record<InstalmentState, string> = {
+  paid: "Paid",
+  part_paid: "Part paid",
+  overdue: "Overdue",
+  due: "Due next",
+  upcoming: "Later",
+};
+
+export interface InstalmentStatus {
+  label: string;
+  percent: number | null;
+  amount: number;
+  dueDate: string | null;
+  received: number;
+  remaining: number;
+  state: InstalmentState;
+}
+
+/**
+ * Where each part stands. Money received pays the parts in order, the first rupee going to
+ * the first part, the way a business talks about it ("the advance is in, the second part
+ * is half paid"). Only one part is "due next": the first one not fully paid.
+ */
+export function planStatus(
+  parts: readonly { label: string; percent: number | null; amount: number; dueDate: string | null }[],
+  received: number,
+  today: string,
+): InstalmentStatus[] {
+  let cash = Math.max(0, received);
+  let nextMarked = false;
+  return parts.map((p) => {
+    const got = round2(Math.min(cash, p.amount));
+    cash = round2(cash - got);
+    const remaining = round2(p.amount - got);
+    let state: InstalmentState;
+    if (remaining <= 0.5) state = "paid";
+    else if (p.dueDate && p.dueDate < today) state = "overdue";
+    else if (got > 0) state = "part_paid";
+    else if (!nextMarked) state = "due";
+    else state = "upcoming";
+    if (state !== "paid" && !nextMarked) nextMarked = true;
+    return { label: p.label, percent: p.percent, amount: p.amount, dueDate: p.dueDate, received: got, remaining: Math.max(0, remaining), state };
+  });
+}
+
+/** The part to ask for now: the first one not fully paid. */
+export function nextInstalment<T extends { state: InstalmentState }>(plan: readonly T[]): T | null {
+  return plan.find((p) => p.state !== "paid") ?? null;
+}
+
+/** Common ways wedding businesses split a booking. Labels are only a start; each can be changed. */
+export const PLAN_PRESETS: { key: string; name: string; parts: { label: string; percent: number }[] }[] = [
+  { key: "half", name: "50 / 50", parts: [{ label: "Advance to book", percent: 50 }, { label: "Balance", percent: 50 }] },
+  {
+    key: "thirds",
+    name: "30 / 40 / 30",
+    parts: [
+      { label: "Advance to book", percent: 30 },
+      { label: "Before the event", percent: 40 },
+      { label: "On the day", percent: 30 },
+    ],
+  },
+  {
+    key: "delivery",
+    name: "30 / 30 / 30 / 10",
+    parts: [
+      { label: "Advance to book", percent: 30 },
+      { label: "Before the event", percent: 30 },
+      { label: "On the day", percent: 30 },
+      { label: "On delivery", percent: 10 },
+    ],
+  },
+  { key: "token", name: "25% + balance", parts: [{ label: "Token advance", percent: 25 }, { label: "Balance", percent: 75 }] },
+];

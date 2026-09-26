@@ -1,6 +1,6 @@
 "use client";
 
-import { can, localISODate } from "@wedding-yantra/core";
+import { can, localISODate, planStatus } from "@wedding-yantra/core";
 import {
   useAddBankAccount,
   useAddSavedText,
@@ -281,6 +281,15 @@ function sampleBill(workspace: Workspace, bank: BankAccount | null, terms: strin
     byRate: gst ? [{ rate: 18, taxable: subtotal, cgst: tax / 2, sgst: tax / 2, igst: 0 }] : [],
     notes: "Thank you for choosing us!",
     terms,
+    plan: planStatus(
+      [
+        { label: "Advance to book", percent: 50, amount: total / 2, dueDate: today },
+        { label: "Balance, before the event", percent: 50, amount: total / 2, dueDate: null },
+      ],
+      20000,
+      today,
+    ),
+    dueNow: 0,
     bankAccountId: bank?.id ?? null,
     bank,
     cancelledAt: null,

@@ -1,4 +1,4 @@
-import { formatDate, formatMoney, formatPhone, rupeesInWords, stateName } from "@wedding-yantra/core";
+import { formatDate, formatMoney, formatPhone, INSTALMENT_STATE_LABELS, rupeesInWords, stateName, type InstalmentStatus } from "@wedding-yantra/core";
 import { UNIT_LABELS, type BankDetails, type Bill, type InvoiceDesign, type Payment } from "@wedding-yantra/types";
 import type { CSSProperties } from "react";
 import { BusinessMark } from "@/components/app/business-mark";
@@ -286,6 +286,8 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
         )}
       </div>
 
+      {bill.plan.length > 0 && !cancelled && <PlanTable plan={bill.plan} className={look.line} />}
+
       {bill.bank && !cancelled && bill.due > 0 && <PayTo bank={bill.bank} className={look.line} />}
 
       {payments.length > 0 && !cancelled && (
@@ -362,6 +364,45 @@ function PayTo({ bank, className }: { bank: BankDetails; className?: string }) {
             </div>
           ))}
       </dl>
+    </div>
+  );
+}
+
+const STATE_TONES: Record<InstalmentStatus["state"], string> = {
+  paid: "bg-success-soft text-success",
+  part_paid: "bg-sun-50 text-brand-strong",
+  overdue: "bg-danger-soft text-danger",
+  due: "bg-sun-50 text-brand-strong",
+  upcoming: "bg-cream text-ink-muted",
+};
+
+/** The invoice paid in parts: each part, its date, and where it stands. */
+function PlanTable({ plan, className }: { plan: InstalmentStatus[]; className?: string }) {
+  return (
+    <div className={cn("break-inside-avoid border-t p-6 text-sm @lg:p-8", className)}>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">Payment plan</p>
+      <ol className="divide-y divide-line">
+        {plan.map((p, i) => (
+          <li key={i} className="flex items-start gap-4 py-2.5">
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">
+                {p.label}
+                {p.percent !== null && <span className="font-normal text-ink-muted"> · {Number(p.percent.toFixed(2))}%</span>}
+              </span>
+              <span className="block text-ink-muted">
+                {p.dueDate ? `By ${formatDate(p.dueDate)}` : "No date set"}
+                {p.state === "part_paid" || (p.state === "overdue" && p.received > 0) ? ` · ${money(p.received)} received, ${money(p.remaining)} to go` : ""}
+              </span>
+            </span>
+            <span className="flex shrink-0 flex-col items-end gap-1 @lg:flex-row @lg:items-center @lg:gap-4">
+              <span className="font-semibold tabular">{money(p.amount)}</span>
+              <span className={cn("w-24 rounded-full px-2.5 py-1 text-center text-xs font-semibold", STATE_TONES[p.state])}>
+                {INSTALMENT_STATE_LABELS[p.state]}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

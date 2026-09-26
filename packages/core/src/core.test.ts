@@ -568,3 +568,34 @@ describe("messages to clients", () => {
   });
 });
 
+
+import { instalmentAmounts, nextInstalment, planStatus, reminderMessage } from "./index.js";
+
+describe("payment plans", () => {
+  it("turns percentages into rupees that add up exactly", () => {
+    const parts = [{ label: "A", percent: 33.33 }, { label: "B", percent: 33.33 }, { label: "C", percent: 33.34 }];
+    const amounts = instalmentAmounts(parts, 100001);
+    expect(amounts.reduce((a, b) => a + b, 0)).toBeCloseTo(100001, 2);
+    expect(instalmentAmounts([{ label: "A", amount: 5000 }, { label: "B", percent: 50 }], 20000)).toEqual([5000, 10000]);
+  });
+
+  it("pays the parts in order and marks what's next and what's late", () => {
+    const plan = [
+      { label: "Advance", percent: 30, amount: 30000, dueDate: "2026-10-01" },
+      { label: "Before", percent: 40, amount: 40000, dueDate: "2026-11-10" },
+      { label: "Day", percent: 30, amount: 30000, dueDate: "2026-11-22" },
+    ];
+    const s = planStatus(plan, 45000, "2026-11-01");
+    expect(s.map((p) => p.state)).toEqual(["paid", "part_paid", "upcoming"]);
+    expect(s[1]).toMatchObject({ received: 15000, remaining: 25000 });
+    expect(nextInstalment(s)?.label).toBe("Before");
+    expect(planStatus(plan, 10000, "2026-10-05").map((p) => p.state)).toEqual(["overdue", "upcoming", "upcoming"]);
+    expect(planStatus(plan, 0, "2026-09-01").map((p) => p.state)).toEqual(["due", "upcoming", "upcoming"]);
+    expect(planStatus(plan, 100000, "2027-01-01").every((p) => p.state === "paid")).toBe(true);
+  });
+
+  it("reminds about the part that's due", () => {
+    const text = reminderMessage({ clientName: "Neha Kapoor", business: "Riya Studio", due: 40000, forWhat: "the wedding", dueDate: "2026-11-10", link: null, payOnline: false, part: "Before the event" });
+    expect(text).toBe('Hi Neha, a gentle reminder from Riya Studio: the "Before the event" payment of ₹40,000 for the wedding is due by 10 Nov. Thank you!');
+  });
+});

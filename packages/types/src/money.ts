@@ -8,6 +8,7 @@ import type { PersonRef } from "./sales.js";
 import { GSTIN_PATTERN } from "./workspaces.js";
 import type { BankDetails } from "./invoicing.js";
 import type { InvoiceDesign } from "./invoice-look.js";
+import type { InstalmentStatus } from "@wedding-yantra/core";
 import { optionKey } from "./lists.js";
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,10 @@ export interface Bill extends BillSummary {
   byRate: BillTaxRow[];
   notes: string | null;
   terms: string | null;
+  /** The invoice paid in parts, with where each part stands. Empty when it's one payment. */
+  plan: InstalmentStatus[];
+  /** What should have come in by today under the plan and hasn't */
+  dueNow: number;
   /** The account the client pays into, as it was when the invoice was saved */
   bankAccountId: string | null;
   bank: BankDetails | null;
@@ -161,6 +166,17 @@ export const billToInput = z.object({
   gstin,
 });
 
+/** One part of a payment plan: a percentage of the total or an amount, and when it's due. */
+export const instalmentInput = z
+  .object({
+    label: z.string().trim().min(1, "Name this part").max(60),
+    percent: z.coerce.number().positive("More than zero").max(100).nullable().optional(),
+    amount: z.coerce.number().positive("More than zero").max(1_000_000_000).nullable().optional(),
+    dueDate: optionalDateInput,
+  })
+  .refine((p) => (p.percent != null) !== (p.amount != null), { message: "Give a percentage or an amount", path: ["amount"] });
+export type InstalmentInput = z.input<typeof instalmentInput>;
+
 /** Money already received, recorded in the same save as the invoice */
 export const paymentOnBillInput = z.object({
   amount: z.coerce.number().positive("Enter the amount received").max(1_000_000_000),
@@ -184,6 +200,12 @@ const billFields = {
   discount: moneyInput,
   notes: optionalText(2000),
   terms: optionalText(4000),
+  /** Paid in parts. The parts must add up to the invoice total; an empty list means one payment. */
+  instalments: z
+    .array(instalmentInput)
+    .max(12, "Up to 12 parts")
+    .refine((l) => l.length !== 1, "A plan needs at least two parts")
+    .optional(),
   /** One of the business's bank accounts; null prints none. Left out on a new invoice, the default is used. */
   bankAccountId: z.uuid().nullable().optional(),
 };
@@ -309,6 +331,8 @@ export interface DueItem {
   overdue: boolean;
   /** For the bill link in reminders */
   shareToken: string | null;
+  /** Paid in parts: the part to ask for now, and how much of it is left */
+  part: { label: string; amount: number; dueDate: string | null } | null;
 }
 
 export interface MoneyOverview {

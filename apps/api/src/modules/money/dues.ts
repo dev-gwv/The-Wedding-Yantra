@@ -1,4 +1,4 @@
-import { can, round2 } from "@wedding-yantra/core";
+import { can, nextInstalment, planStatus, round2 } from "@wedding-yantra/core";
 import type { DueItem, EventMoney, HomeSummary, MoneyOverview } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { notFound } from "../../lib/http.js";
@@ -18,8 +18,24 @@ async function dues(db: Queryable, workspaceId: string): Promise<DueItem[]> {
     `SELECT * FROM (${BILL_SELECT} WHERE b.workspace_id = $1 AND b.status = 'issued') x WHERE x.total > x.received`,
     [workspaceId],
   );
+  // Invoices paid in parts: ask for the part that's due, not the whole balance.
+  const parts = new Map<string, { label: string; percent: number | null; amount: number; dueDate: string | null }[]>();
+  if (bills.rows.length) {
+    const { rows } = await db.query<{ bill_id: string; label: string; percent: string | null; amount: string; due_date: string | null }>(
+      `SELECT bill_id, label, percent, amount, due_date::text AS due_date FROM bill_instalments WHERE bill_id = ANY($1::uuid[]) ORDER BY bill_id, position`,
+      [bills.rows.map((r) => r.id)],
+    );
+    for (const p of rows) {
+      const list = parts.get(p.bill_id) ?? [];
+      list.push({ label: p.label, percent: p.percent === null ? null : Number(p.percent), amount: Number(p.amount), dueDate: p.due_date });
+      parts.set(p.bill_id, list);
+    }
+  }
   const fromBills: DueItem[] = bills.rows.map((r) => {
     const s = toBillSummary(r);
+    const plan = parts.get(r.id);
+    const next = plan ? nextInstalment(planStatus(plan, s.received, r.today)) : null;
+    const dueNow = Math.max(0, round2(Number(r.plan_due_by_today) - s.received));
     return {
       kind: "bill",
       billId: s.id,
@@ -35,6 +51,7 @@ async function dues(db: Queryable, workspaceId: string): Promise<DueItem[]> {
       dueDate: s.dueDate,
       overdue: s.overdue,
       shareToken: r.share_token,
+      part: next ? { label: next.label, amount: Math.min(s.due, dueNow > 0 ? dueNow : next.remaining), dueDate: next.dueDate } : null,
     };
   });
 
@@ -81,6 +98,7 @@ async function dues(db: Queryable, workspaceId: string): Promise<DueItem[]> {
       dueDate: r.start_date,
       overdue: r.start_date !== null && r.start_date < r.today,
       shareToken: null,
+      part: null,
     };
   });
 

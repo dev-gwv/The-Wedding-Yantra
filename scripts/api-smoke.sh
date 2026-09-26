@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -158,6 +158,8 @@ expect "saved terms fill new invoices" '.success and .data.isDefault == true' \
   "$(api POST "/api/v1/workspaces/$WS_ID/saved-texts" '{"kind":"terms","title":"Usual","body":"Smoke terms"}' "$TOKEN")"
 expect "a new invoice carries the default account and terms" '.success and .data.bank.ifsc == "HDFC0001234" and .data.terms == "Smoke terms"' \
   "$(api POST "/api/v1/workspaces/$WS_ID/bills" '{"billTo":{"name":"Smoke Bank"},"issueDate":"2026-09-20","items":[{"name":"Trial","unit":"event","quantity":1,"rate":1000}]}' "$TOKEN")"
+expect "an invoice can be paid in parts" '.success and (.data.plan | length) == 2 and .data.plan[0].amount == 500' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/bills" '{"billTo":{"name":"Smoke Plan"},"issueDate":"2026-09-20","items":[{"name":"Trial","unit":"event","quantity":1,"rate":1000}],"chargesGst":false,"instalments":[{"label":"Advance","percent":50},{"label":"Balance","percent":50}]}' "$TOKEN")"
 expect "an invoice design can be picked" '.success and .data.invoiceDesign == "modern"' \
   "$(api PATCH "/api/v1/workspaces/$WS_ID" '{"invoiceDesign":"modern"}' "$TOKEN")"
 expect "an expense keeps the GST inside it" '.success and .data.gstAmount == 180 and .data.vendorInvoiceNo == "SMK/1"' \
