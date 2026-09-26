@@ -1,4 +1,3 @@
-import type { PaymentMethod } from "@wedding-yantra/core";
 import type { EventStatus, EventType } from "./bookings.js";
 import type { DeliverableStatus } from "./deliverables.js";
 
@@ -72,7 +71,7 @@ export interface ClientPortal {
   events: PortalEvent[];
   quotes: PortalQuote[];
   bills: PortalBill[];
-  payments: { number: string; amount: number; paidOn: string; method: PaymentMethod }[];
+  payments: { number: string; amount: number; paidOn: string; method: string; methodLabel: string }[];
   totals: { billed: number; paid: number; due: number };
   /** An event is over, so the page asks for a review */
   eventOver: boolean;

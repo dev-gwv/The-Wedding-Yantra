@@ -66,6 +66,8 @@ export function Providers({ children }: { children: ReactNode }) {
         buster: BUILD,
         dehydrateOptions: { shouldDehydrateQuery: (q) => q.state.status === "success" && !String(q.queryKey[0]).startsWith("public") },
       }}
+      // The saved copy shows at once; everything is then checked again in the background.
+      onSuccess={() => void queryClient.invalidateQueries()}
     >
       <ApiClientProvider client={api}>
         <ToastProvider>{children}</ToastProvider>

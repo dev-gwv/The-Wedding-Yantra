@@ -21,13 +21,11 @@ function NewBill() {
   };
   const { workspace } = useCurrentWorkspace();
   const allowed = can(workspace.role, "bills.manage");
-  const hasTarget = !!(query.eventId || query.clientId || query.quoteId);
-  const draft = useBillDraft(workspace.id, query, allowed && hasTarget);
+  const draft = useBillDraft(workspace.id, query, allowed);
   const router = useRouter();
   const toast = useToast();
 
-  if (!allowed) return <Notice>Only the owner or a manager can make bills.</Notice>;
-  if (!hasTarget) return <Notice tone="danger">Open an event or a client first, then make the bill from there.</Notice>;
+  if (!allowed) return <Notice>Only the owner or a manager can make invoices.</Notice>;
   if (draft.isPending) return <Splash />;
   if (draft.isError) return <Notice tone="danger">{errorMessage(draft.error)}</Notice>;
 
@@ -35,12 +33,15 @@ function NewBill() {
   const back = d.eventId ? `/app/events/${d.eventId}` : d.clientId ? `/app/clients/${d.clientId}` : "/app/money";
   return (
     <>
-      <BackLink href={back} label={d.billTo.name || "Back"} />
-      <PageHeader title="New bill" subtitle={d.quoteId ? "From the accepted quote. Check it and make the bill." : undefined} />
+      <BackLink href={back} label={d.billTo.name || "Money"} />
+      <PageHeader
+        title="New invoice"
+        subtitle={d.quoteId ? "From the accepted quote. Check it and make the invoice." : d.clientId ? undefined : "For anyone: a client, or someone new."}
+      />
       <BillEditor
         draft={d}
         onSaved={(bill) => {
-          toast(`Bill ${bill.number} made`);
+          toast(`Invoice ${bill.number} made`);
           router.replace(`/app/bills/${bill.id}`);
         }}
       />

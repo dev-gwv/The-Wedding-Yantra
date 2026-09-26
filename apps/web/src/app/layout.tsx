@@ -8,7 +8,7 @@ const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-br
 
 export const metadata: Metadata = {
   title: { default: "Wedding Yantra", template: "%s · Wedding Yantra" },
-  description: "Run your wedding business from one place: enquiries, bookings, bills, payments and your team.",
+  description: "Run your wedding business from one place: enquiries, bookings, invoices, payments and your team.",
   applicationName: "Wedding Yantra",
   appleWebApp: { capable: true, title: "Wedding Yantra", statusBarStyle: "default" },
   formatDetection: { telephone: false },

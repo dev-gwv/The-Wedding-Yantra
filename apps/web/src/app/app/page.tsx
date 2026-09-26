@@ -17,6 +17,7 @@ import {
   MessageSquareText,
   Package,
   PartyPopper,
+  ReceiptIndianRupee,
   ReceiptText,
   Sparkles,
   UserPlus,
@@ -204,7 +205,11 @@ function QuickActions({ role }: { role: Role }) {
   const actions: { label: string; icon: LucideIcon; onClick?: () => void; href?: string }[] = [
     ...(can(role, "leads.work") ? [{ label: "Add enquiry", icon: UserPlus, onClick: () => setAdding("lead") }] : []),
     ...(can(role, "quotes.manage") ? [{ label: "Make a quote", icon: FileText, href: "/app/quotes/new" }] : []),
-    ...(can(role, "events.manage") ? [{ label: "Add event", icon: CalendarPlus, href: "/app/events/new" }] : []),
+    ...(can(role, "bills.manage")
+      ? [{ label: "New invoice", icon: ReceiptIndianRupee, href: "/app/bills/new" }]
+      : can(role, "events.manage")
+        ? [{ label: "Add event", icon: CalendarPlus, href: "/app/events/new" }]
+        : []),
     ...(can(role, "expenses.submit") ? [{ label: "Add expense", icon: ReceiptText, onClick: () => setAdding("expense") }] : []),
   ];
   if (!actions.length) return null;

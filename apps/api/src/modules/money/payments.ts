@@ -1,4 +1,4 @@
-import { receiptNumber, type PaymentMethod } from "@wedding-yantra/core";
+import { receiptNumber } from "@wedding-yantra/core";
 import type { Payment } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
@@ -6,13 +6,15 @@ import { AppError, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { nextNumber } from "../bookings/quotes.js";
 import { requireMoneyView, requirePaymentsRecord } from "./access.js";
+import { assertOption, optionJoin } from "../options/service.js";
 
 interface PaymentRow {
   id: string;
   number: number;
   amount: string;
   paid_on: string;
-  method: PaymentMethod;
+  method: string;
+  method_label: string;
   reference: string | null;
   note: string | null;
   bill_id: string | null;
@@ -26,13 +28,14 @@ interface PaymentRow {
 }
 
 const PAYMENT_SELECT = `
-  SELECT p.id, p.number, p.amount, p.paid_on::text AS paid_on, p.method, p.reference, p.note,
+  SELECT p.id, p.number, p.amount, p.paid_on::text AS paid_on, p.method, coalesce(pm.label, p.method) AS method_label, p.reference, p.note,
          p.bill_id, b.number AS bill_number, p.event_id, p.client_id, coalesce(c.name, b.bill_to_name) AS client_name,
          p.created_by, u.name AS created_by_name, p.created_at
     FROM payments p
     LEFT JOIN bills b ON b.id = p.bill_id
     LEFT JOIN clients c ON c.id = p.client_id
-    LEFT JOIN users u ON u.id = p.created_by`;
+    LEFT JOIN users u ON u.id = p.created_by
+    ${optionJoin("pm", "payment_method", "p.workspace_id", "p.method")}`;
 
 const toPayment = (r: PaymentRow): Payment => ({
   id: r.id,
@@ -40,6 +43,7 @@ const toPayment = (r: PaymentRow): Payment => ({
   amount: Number(r.amount),
   paidOn: r.paid_on,
   method: r.method,
+  methodLabel: r.method_label,
   reference: r.reference,
   note: r.note,
   billId: r.bill_id,
@@ -63,7 +67,7 @@ async function loadPayment(db: Queryable, workspaceId: string, id: string): Prom
 export async function listPayments(
   db: Queryable,
   ctx: MemberContext,
-  filters: { billId?: string; eventId?: string; clientId?: string; month?: string } = {},
+  filters: { billId?: string; eventId?: string; clientId?: string; month?: string; from?: string; to?: string; method?: string; q?: string } = {},
 ): Promise<Payment[]> {
   requireMoneyView(ctx);
   const params: unknown[] = [ctx.workspaceId];
@@ -76,6 +80,18 @@ export async function listPayments(
   if (filters.eventId) add("p.event_id = ?", filters.eventId);
   if (filters.clientId) add("p.client_id = ?", filters.clientId);
   if (filters.month) add("to_char(p.paid_on, 'YYYY-MM') = ?", filters.month);
+  if (filters.from) add("p.paid_on >= ?", filters.from);
+  if (filters.to) add("p.paid_on <= ?", filters.to);
+  if (filters.method) add("p.method = ?", filters.method);
+  if (filters.q) {
+    const receipt = /^r-?0*(\d+)$/i.exec(filters.q.trim());
+    if (receipt) add("p.number = ?", Number(receipt[1]));
+    else {
+      params.push(`%${filters.q.replace(/[%_]/g, "")}%`);
+      const n = `$${params.length}`;
+      where.push(`(coalesce(c.name, b.bill_to_name) ILIKE ${n} OR p.reference ILIKE ${n} OR b.number ILIKE ${n})`);
+    }
+  }
   const { rows } = await db.query<PaymentRow>(
     `${PAYMENT_SELECT} WHERE ${where.join(" AND ")} ORDER BY p.paid_on DESC, p.number DESC LIMIT 1000`,
     params,
@@ -86,7 +102,7 @@ export async function listPayments(
 interface PaymentFields {
   amount: number;
   paidOn: string;
-  method: PaymentMethod;
+  method: string;
   reference?: string | null;
   note?: string | null;
 }
@@ -137,35 +153,46 @@ export async function recordPayment(
       if (!c.rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose a client from your list", { clientId: "Choose a client" });
     }
 
-    const number = await nextNumber(tx, ctx.workspaceId, "receipt");
-    const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO payments (workspace_id, number, client_id, event_id, bill_id, amount, paid_on, method, reference, note, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [
-        ctx.workspaceId,
-        number,
-        clientId,
-        eventId,
-        billId,
-        input.amount,
-        input.paidOn,
-        input.method,
-        input.reference ?? null,
-        input.note ?? null,
-        ctx.userId,
-      ],
-    );
-    const id = rows[0]!.id;
-    await logActivity(tx, {
-      workspaceId: ctx.workspaceId,
-      actorUserId: ctx.userId,
-      action: "payment.recorded",
-      entityType: "payment",
-      entityId: id,
-      meta: { amount: input.amount, method: input.method, billId, eventId },
-    });
+    const id = await insertPayment(tx, ctx, { ...input, billId, eventId, clientId });
     return loadPayment(tx, ctx.workspaceId, id);
   });
+}
+
+/** Writes one payment with the next receipt number. Checks the payment mode; the caller checks the rest. */
+export async function insertPayment(
+  tx: Queryable,
+  ctx: MemberContext,
+  input: PaymentFields & { billId: string | null; eventId: string | null; clientId: string | null },
+): Promise<string> {
+  await assertOption(tx, ctx.workspaceId, "payment_method", input.method, "method");
+  const number = await nextNumber(tx, ctx.workspaceId, "receipt");
+  const { rows } = await tx.query<{ id: string }>(
+    `INSERT INTO payments (workspace_id, number, client_id, event_id, bill_id, amount, paid_on, method, reference, note, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+    [
+      ctx.workspaceId,
+      number,
+      input.clientId,
+      input.eventId,
+      input.billId,
+      input.amount,
+      input.paidOn,
+      input.method,
+      input.reference ?? null,
+      input.note ?? null,
+      ctx.userId,
+    ],
+  );
+  const id = rows[0]!.id;
+  await logActivity(tx, {
+    workspaceId: ctx.workspaceId,
+    actorUserId: ctx.userId,
+    action: "payment.recorded",
+    entityType: "payment",
+    entityId: id,
+    meta: { amount: input.amount, method: input.method, billId: input.billId, eventId: input.eventId },
+  });
+  return id;
 }
 
 export async function updatePayment(db: Db, ctx: MemberContext, id: string, input: Partial<PaymentFields>): Promise<Payment> {
@@ -183,6 +210,10 @@ export async function updatePayment(db: Db, ctx: MemberContext, id: string, inpu
     if (input[key] === undefined) continue;
     values.push(input[key]);
     sets.push(`${column} = $${values.length}`);
+  }
+  if (input.method !== undefined) {
+    const current = await db.query<{ method: string }>(`SELECT method FROM payments WHERE id = $1 AND workspace_id = $2`, [id, ctx.workspaceId]);
+    await assertOption(db, ctx.workspaceId, "payment_method", input.method, "method", current.rows[0]?.method);
   }
   if (sets.length) {
     const { rowCount } = await db.query(

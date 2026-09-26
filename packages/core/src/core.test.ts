@@ -314,10 +314,10 @@ describe("bills", () => {
         payOnline: true,
       }),
     ).toBe(
-      "Hi Neha, here is your bill INV/26-27/0001 from Riya Makeup Studio for ₹46,829. Balance due: ₹26,829 by 4 Oct. See it and pay by UPI here: https://x.in/b/abc",
+      "Hi Neha, here is your invoice INV/26-27/0001 from Riya Makeup Studio for ₹46,829. Balance due: ₹26,829 by 4 Oct. See it and pay by UPI here: https://x.in/b/abc",
     );
     expect(
-      receiptMessage({ clientName: "Neha", business: "Riya Makeup Studio", amount: 20000, method: "upi", paidOn: "2026-09-25", due: 0, link: null }),
+      receiptMessage({ clientName: "Neha", business: "Riya Makeup Studio", amount: 20000, method: "UPI", paidOn: "2026-09-25", due: 0, link: null }),
     ).toBe("Hi Neha, Riya Makeup Studio received ₹20,000 by UPI on 25 Sep. Everything is paid. Thank you!");
   });
 
@@ -447,7 +447,7 @@ describe("reviews and referrals", () => {
   });
   it("writes the messages in the business's voice, by first name", () => {
     expect(portalMessage({ clientName: "Kavya Rao", business: "Riya Studio", link: "https://x/c/t" })).toBe(
-      "Hi Kavya, here is your page with Riya Studio. It has your event dates, quotes, bills and payments, always up to date: https://x/c/t",
+      "Hi Kavya, here is your page with Riya Studio. It has your event dates, quotes, invoices and payments, always up to date: https://x/c/t",
     );
     const review = reviewMessage({ clientName: " Kavya Rao ", business: "Riya Studio", link: "https://g.page/r/abc/review" });
     expect(review.startsWith("Hi Kavya, thank you for choosing Riya Studio!")).toBe(true);

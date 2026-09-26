@@ -2,7 +2,7 @@
 
 import { can, formatMoney, formatMoneyShort } from "@wedding-yantra/core";
 import { useExpenseMonth, useExpenses } from "@wedding-yantra/api-client/react";
-import { EXPENSE_CATEGORY_LABELS, type Expense } from "@wedding-yantra/types";
+import type { Expense } from "@wedding-yantra/types";
 import { ChevronLeft, ChevronRight, Plus, ReceiptText } from "lucide-react";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -21,14 +21,18 @@ const shift = (m: string, by: number) => monthOf(new Date(Number(m.slice(0, 4)),
  * Money spent, month by month. Owners, managers and the accountant see everyone's with
  * totals by category; the team sees their own and adds new ones for approval.
  */
-export function ExpensesView() {
+export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { adding?: boolean; onAddingChange?: (adding: boolean) => void } = {}) {
   const { workspace } = useCurrentWorkspace();
   const seesAll = can(workspace.role, "finance.view");
   const canAdd = can(workspace.role, "expenses.submit");
   const [month, setMonth] = useState(() => monthOf(new Date()));
   const expenses = useExpenses(workspace.id, { month });
   const summary = useExpenseMonth(workspace.id, month, seesAll);
-  const [adding, setAdding] = useState(false);
+  const [addingHere, setAddingHere] = useState(false);
+  // The Money screen's header button can open the sheet; otherwise this view's own button does.
+  const controlled = onAddingChange !== undefined;
+  const adding = controlled ? !!addingFromHeader : addingHere;
+  const setAdding = controlled ? onAddingChange : setAddingHere;
   const [open, setOpen] = useState<Expense | null>(null);
   const top = summary.data?.byCategory ?? [];
   const biggest = top[0]?.total ?? 0;
@@ -45,7 +49,7 @@ export function ExpensesView() {
             <ChevronRight className="size-5" />
           </button>
         </div>
-        {canAdd && (
+        {canAdd && !controlled && (
           <Button variant="secondary" onClick={() => setAdding(true)} className="w-full sm:w-auto">
             <Plus className="size-4" strokeWidth={2.5} /> Add expense
           </Button>
@@ -70,7 +74,7 @@ export function ExpensesView() {
               {top.slice(0, 6).map((c) => (
                 <li key={c.category} className="text-sm">
                   <div className="flex justify-between gap-3">
-                    <span className="font-semibold">{EXPENSE_CATEGORY_LABELS[c.category]}</span>
+                    <span className="font-semibold">{c.label}</span>
                     <span className="tabular text-ink-muted">{formatMoney(c.total)}</span>
                   </div>
                   <div className="mt-1 h-2 overflow-hidden rounded-full bg-cream">

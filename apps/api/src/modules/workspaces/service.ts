@@ -13,6 +13,7 @@ import { homeDeliverables } from "../deliverables/service.js";
 import { homeBilling } from "../billing/service.js";
 import type { Config } from "../../config.js";
 import { logoPath } from "../files/logo.js";
+import { installOptions } from "../options/service.js";
 
 interface WorkspaceRow {
   id: string;
@@ -100,6 +101,7 @@ export async function createWorkspace(
     ]);
     await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack });
     await installChecklist(tx, workspaceId, type.rows[0].starter_pack);
+    await installOptions(tx, workspaceId, input.businessTypeId);
     await logActivity(tx, {
       workspaceId,
       actorUserId: userId,

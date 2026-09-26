@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate, formatMoney, formatPhone, normalizePhone, PAYMENT_METHOD_LABELS, referralMessage, whatsappLink } from "@wedding-yantra/core";
+import { formatDate, formatMoney, formatPhone, normalizePhone, referralMessage, whatsappLink } from "@wedding-yantra/core";
 import { usePortal } from "@wedding-yantra/api-client/react";
 import { EVENT_LABELS, type ClientPortal, type PortalEvent } from "@wedding-yantra/types";
 import { CalendarHeart, ChevronRight, Clock, Copy, ExternalLink, Heart, MapPin, MessageCircle, Phone, Star, UserX } from "lucide-react";
@@ -90,7 +90,7 @@ function Portal({ data }: { data: ClientPortal }) {
                 See the bill and pay
               </Link>
             ) : (
-              <p className="mt-2 text-sm text-ink-muted">Open a bill below to see it and pay by UPI.</p>
+              <p className="mt-2 text-sm text-ink-muted">Open an invoice below to see it and pay by UPI.</p>
             )}
           </NextStepCard>
         )}
@@ -119,7 +119,7 @@ function Portal({ data }: { data: ClientPortal }) {
         )}
 
         {bills.length > 0 && (
-          <Section title="Bills">
+          <Section title="Invoices">
             <Card className="divide-y divide-line overflow-hidden">
               {bills.map((b) => (
                 <Row
@@ -168,7 +168,7 @@ function Portal({ data }: { data: ClientPortal }) {
                   <div className="min-w-0">
                     <p className="font-semibold tabular">{formatDate(p.paidOn)}</p>
                     <p className="text-sm text-ink-muted">
-                      {PAYMENT_METHOD_LABELS[p.method]} · Receipt {p.number}
+                      {p.methodLabel} · Receipt {p.number}
                     </p>
                   </div>
                   <p className="font-bold tabular">{formatMoney(p.amount, { paise: p.amount % 1 !== 0 })}</p>

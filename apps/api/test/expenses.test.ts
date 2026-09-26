@@ -162,8 +162,8 @@ describe("expenses and profit", () => {
     );
     expect(month.body.data).toMatchObject({ spent: 13500, pending: 900, pendingCount: 1 });
     expect(month.body.data.byCategory).toEqual([
-      { category: "materials", total: 12000 },
-      { category: "travel", total: 1500 },
+      { category: "materials", label: "Materials", total: 12000 },
+      { category: "travel", label: "Travel", total: 1500 },
     ]);
     expect((await call(t.app, "GET", `/workspaces/${ws}/expense-month?month=2099-11`, { token: staff })).status).toBe(403);
   });

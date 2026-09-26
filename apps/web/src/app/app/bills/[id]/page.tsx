@@ -68,7 +68,7 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
   async function cancelIt() {
     try {
       await cancel.mutateAsync(reason.trim() || undefined);
-      toast("Bill cancelled");
+      toast("Invoice cancelled");
       setCancelling(false);
     } catch (err) {
       toast(errorMessage(err), "error");
@@ -108,7 +108,7 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
       {!business.upiId && !cancelled && bill.due > 0 && manage && (
         <div className="print:hidden">
           <Notice>
-            Add your UPI ID in Business profile, and clients get a Pay button on this bill&apos;s link.
+            Add your UPI ID in Business profile, and clients get a Pay button on this invoice&apos;s link.
           </Notice>
         </div>
       )}
@@ -141,7 +141,7 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
       {manage && !cancelled && (
         <div className="border-t border-line pt-5 print:hidden">
           <Button variant="danger" size="sm" onClick={() => setCancelling(true)}>
-            Cancel this bill
+            Cancel this invoice
           </Button>
         </div>
       )}
@@ -152,12 +152,12 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
         open={cancelling}
         onClose={() => setCancelling(false)}
         title={`Cancel ${bill.number}?`}
-        description="The number stays used, as GST rules need. Money received on it moves to the next bill for this event."
+        description="The number stays used, as GST rules need. Money received on it moves to the next invoice for this event."
       >
         <div className="space-y-4">
           <TextField label="Why? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Wrong amount" />
           <Button variant="destructive" size="lg" onClick={cancelIt} loading={cancel.isPending}>
-            Cancel bill
+            Cancel invoice
           </Button>
         </div>
       </Sheet>

@@ -22,7 +22,7 @@ import { Card, IconSquare } from "@/components/ui/misc";
 export const metadata: Metadata = {
   title: { absolute: "Wedding Yantra: run your wedding business from one app" },
   description:
-    "Enquiries, quotes, GST bills, payments, your team and your profit, in one app for makeup artists, decorators, photographers, caterers and every wedding business in India.",
+    "Enquiries, quotes, GST invoices, payments, your team and your profit, in one app for makeup artists, decorators, photographers, caterers and every wedding business in India.",
 };
 
 const TRADES: [string, string][] = [
@@ -55,8 +55,8 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   },
   {
     icon: IndianRupee,
-    title: "GST bills and payments",
-    body: "Bills numbered for the financial year, with CGST, SGST or IGST worked out, a UPI QR on every bill, and polite reminders for what's due.",
+    title: "GST invoices and payments",
+    body: "Invoices numbered for the financial year, with CGST, SGST or IGST worked out, a UPI QR on every invoice, and polite reminders for what's due.",
   },
   {
     icon: CalendarCheck,
@@ -78,7 +78,7 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
 const FAQ: [string, string][] = [
   [
     "Do I need a GST number?",
-    "No. Without one, your bills simply don't charge GST. Add your GSTIN later and the next bills show CGST and SGST, or IGST for other states.",
+    "No. Without one, your invoices simply don't charge GST. Add your GSTIN later and the next invoices show CGST and SGST, or IGST for other states.",
   ],
   ["Does it work on my phone?", "Yes. It's made for the phone first. Add it to your home screen and it opens like any other app."],
   ["Can my team use it?", "Yes. Staff see their own day and tasks, freelancers see only the events they're booked on, and your accountant sees the money, read-only."],
@@ -104,7 +104,7 @@ export default function HomePage() {
             Run your wedding business from <span className="sm:text-gradient">one app</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-ink-muted">
-            Enquiries, quotes, GST bills, payments, your team and your profit. Made for the way makeup artists, decorators, photographers, caterers and
+            Enquiries, quotes, GST invoices, payments, your team and your profit. Made for the way makeup artists, decorators, photographers, caterers and
             planners really work.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

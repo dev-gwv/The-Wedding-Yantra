@@ -11,7 +11,8 @@ import type { TeamMember } from "./tasks.js";
 // Service catalogue (price list)
 // ---------------------------------------------------------------------------
 
-export const GST_RATES = [0, 5, 12, 18, 28] as const;
+/** Every rate a line may carry: today's (0, 5, 18, 40) and the older 12 and 28 on earlier records, plus 3 for jewellery. */
+export const GST_RATES = [0, 3, 5, 12, 18, 28, 40] as const;
 
 export interface CatalogueItem {
   id: string;

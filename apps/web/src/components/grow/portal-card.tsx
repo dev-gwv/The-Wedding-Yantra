@@ -61,8 +61,8 @@ export function PortalCard({ client, business }: { client: Client; business: str
           <h2 className="font-bold">Their page</h2>
           <p className="mt-0.5 text-sm text-ink-muted">
             {url
-              ? "Shared. They see their event dates, quotes, bills and what they've paid, always up to date."
-              : "One link for everything with you: event dates, quotes, bills with Pay by UPI, and payments. No sign-in."}
+              ? "Shared. They see their event dates, quotes, invoices and what they've paid, always up to date."
+              : "One link for everything with you: event dates, quotes, invoices with Pay by UPI, and payments. No sign-in."}
           </p>
         </div>
       </div>

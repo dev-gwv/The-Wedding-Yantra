@@ -94,7 +94,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
       )}
       {editable && (!workspace.phone || !workspace.address) && (
         <div className="mb-4">
-          <Notice>Add your business phone and address, then save. They go on every quote and bill.</Notice>
+          <Notice>Add your business phone and address, then save. They go on every quote and invoice.</Notice>
         </div>
       )}
       <fieldset disabled={!editable} className="space-y-6">
@@ -162,25 +162,25 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             error={errors.upiId}
             placeholder="riya@okhdfc"
             autoCapitalize="none"
-            hint="Clients get a Pay by UPI button on every bill link. Money goes straight to you."
+            hint="Clients get a Pay by UPI button on every invoice link. Money goes straight to you."
           />
           <TextField
-            label="Bill numbers start with"
+            label="Invoice numbers start with"
             value={values.billPrefix}
             onChange={set("billPrefix")}
             error={errors.billPrefix}
             autoCapitalize="characters"
             className="[&_input]:uppercase"
-            hint={`New bills look like ${(values.billPrefix || "INV").toUpperCase()}/26-27/0001, counted afresh each financial year.`}
+            hint={`New invoices look like ${(values.billPrefix || "INV").toUpperCase()}/26-27/0001, counted afresh each financial year.`}
           />
           <TextAreaField
-            label="Bank details and terms on bills"
+            label="Bank details and terms on invoices"
             rows={4}
             value={values.billTerms}
             onChange={set("billTerms")}
             error={errors.billTerms}
             placeholder={"Bank: HDFC Bank, A/c 50100123456789, IFSC HDFC0001234\nBalance due before the event."}
-            hint="Printed at the bottom of every new bill."
+            hint="Printed at the bottom of every new invoice."
           />
         </Card>
 
@@ -247,7 +247,7 @@ function LogoCard({ workspace, editable }: { workspace: Workspace; editable: boo
       <div className="min-w-0 flex-1 space-y-3">
         <div>
           <h2 className="font-display text-lg font-extrabold">Logo</h2>
-          <p className="text-sm text-ink-muted">Shown on your quotes, bills, your clients&apos; page and your enquiry form.</p>
+          <p className="text-sm text-ink-muted">Shown on your quotes, invoices, your clients&apos; page and your enquiry form.</p>
         </div>
         {editable && (
           <div className="flex flex-wrap gap-2">

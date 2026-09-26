@@ -45,6 +45,10 @@ export function moneyRoutes(app: FastifyInstance, deps: { db: Db; files: Files }
     const ctx = await member(request, request.params.workspaceId);
     return ok(await bills.listBills(db, ctx, parse(billListQuery, request.query)));
   });
+  app.get<Ws>("/workspaces/:workspaceId/bills/summary", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await bills.billsSummary(db, ctx, parse(billListQuery, request.query)));
+  });
   app.get<Ws>("/workspaces/:workspaceId/bill-draft", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     return ok(await bills.billDraft(db, ctx, parse(billDraftQuery, request.query)));

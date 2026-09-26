@@ -1,4 +1,4 @@
-import { PAYMENT_METHODS, STATE_CODES, type BillTaxRow, type PaymentMethod } from "@wedding-yantra/core";
+import { STATE_CODES, type BillTaxRow } from "@wedding-yantra/core";
 import { z } from "zod";
 import { personName, phone } from "./auth.js";
 import { SERVICE_UNITS, type ServiceUnit } from "./business-types.js";
@@ -6,6 +6,7 @@ import { gstRateInput, moneyInput, optionalDateInput } from "./bookings.js";
 import { optionalText } from "./common.js";
 import type { PersonRef } from "./sales.js";
 import { GSTIN_PATTERN } from "./workspaces.js";
+import { optionKey } from "./lists.js";
 
 // ---------------------------------------------------------------------------
 // Bills (GST tax invoices)
@@ -67,7 +68,10 @@ export interface Payment {
   number: string;
   amount: number;
   paidOn: string;
-  method: PaymentMethod;
+  /** A key from the business's payment modes */
+  method: string;
+  /** Its name, e.g. "UPI" or the business's own "Google Pay" */
+  methodLabel: string;
   reference: string | null;
   note: string | null;
   billId: string | null;
@@ -81,6 +85,12 @@ export interface Payment {
 
 export interface Bill extends BillSummary {
   billTo: { name: string; phone: string | null; address: string | null; gstin: string | null };
+  /** One line on what it's for: "Bridal makeup, 12 Dec" */
+  subject: string | null;
+  /** Rates were typed including GST; the bill shows them before GST */
+  pricesIncludeGst: boolean;
+  /** When the discount was given as a percentage */
+  discountPercent: number | null;
   /** The business's GST number when the bill was made. Null means no GST was charged. */
   sellerGstin: string | null;
   chargesGst: boolean;
@@ -146,8 +156,21 @@ export const billToInput = z.object({
   gstin,
 });
 
+/** Money already received, recorded in the same save as the invoice */
+export const paymentOnBillInput = z.object({
+  amount: z.coerce.number().positive("Enter the amount received").max(1_000_000_000),
+  paidOn: z.iso.date("Pick the date"),
+  method: optionKey,
+  reference: optionalText(60),
+});
+
 const billFields = {
   billTo: billToInput,
+  subject: optionalText(120),
+  /** GST on this invoice. Only a business with a GST number can charge it. */
+  chargesGst: z.boolean().optional(),
+  pricesIncludeGst: z.boolean().optional(),
+  discountPercent: z.coerce.number().positive().max(100).nullable().optional(),
   /** GST state code. Leave empty for the business's own state. */
   placeOfSupply: z.enum(STATE_CODES).nullable().optional(),
   issueDate: z.iso.date("Pick the bill date"),
@@ -158,16 +181,16 @@ const billFields = {
   terms: optionalText(4000),
 };
 
-export const billInput = z
-  .object({
-    eventId: z.uuid().nullable().optional(),
-    clientId: z.uuid().nullable().optional(),
-    /** The accepted quote this bill was made from */
-    quoteId: z.uuid().nullable().optional(),
-    ...billFields,
-    discount: moneyInput.default(0),
-  })
-  .refine((b) => !!b.eventId || !!b.clientId, { message: "Choose who the bill is for", path: ["clientId"] });
+/** For an event, a client, or just a name and number: a new customer becomes a client. */
+export const billInput = z.object({
+  eventId: z.uuid().nullable().optional(),
+  clientId: z.uuid().nullable().optional(),
+  /** The accepted quote this bill was made from */
+  quoteId: z.uuid().nullable().optional(),
+  ...billFields,
+  discount: moneyInput.default(0),
+  payment: paymentOnBillInput.nullable().optional(),
+});
 export type BillInput = z.input<typeof billInput>;
 
 /** Only the fields sent are changed. No defaults here, so a missing field never resets one. */
@@ -179,8 +202,22 @@ export const cancelBillInput = z.object({ reason: optionalText(300) });
 export const billListQuery = z.object({
   clientId: z.uuid().optional(),
   eventId: z.uuid().optional(),
-  status: z.enum(["open", "paid", "cancelled"]).optional(),
+  status: z.enum(["open", "overdue", "paid", "cancelled"]).optional(),
+  /** Invoice number or customer name */
+  q: z.string().trim().max(80).optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
 });
+export type BillListQuery = z.input<typeof billListQuery>;
+
+/** Totals for exactly the invoices a list shows (cancelled ones count only when asked for). */
+export interface BillListSummary {
+  count: number;
+  total: number;
+  received: number;
+  due: number;
+  overdue: number;
+}
 
 /** What the client sees at /b/<token>. */
 export interface PublicBill {
@@ -197,7 +234,7 @@ export interface PublicBill {
     logoUrl: string | null;
   };
   bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
-    payments: Pick<Payment, "number" | "amount" | "paidOn" | "method">[];
+    payments: Pick<Payment, "number" | "amount" | "paidOn" | "method" | "methodLabel">[];
   };
 }
 
@@ -208,7 +245,7 @@ export interface PublicBill {
 const paymentFields = {
   amount: z.coerce.number().positive("Enter the amount received").max(1_000_000_000),
   paidOn: z.iso.date("Pick the date"),
-  method: z.enum(PAYMENT_METHODS),
+  method: optionKey,
   reference: optionalText(60),
   note: optionalText(300),
 };
@@ -234,7 +271,13 @@ export const paymentListQuery = z.object({
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-11")
     .optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  method: optionKey.optional(),
+  /** Receipt number, reference or client */
+  q: z.string().trim().max(80).optional(),
 });
+export type PaymentListQuery = z.input<typeof paymentListQuery>;
 
 // ---------------------------------------------------------------------------
 // Dues: money still to collect

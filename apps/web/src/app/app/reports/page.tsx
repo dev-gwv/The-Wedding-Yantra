@@ -1,8 +1,8 @@
 "use client";
 
-import { can, formatMoney, PAYMENT_METHOD_LABELS } from "@wedding-yantra/core";
+import { can, formatMoney } from "@wedding-yantra/core";
 import { useApi, useMonthReport } from "@wedding-yantra/api-client/react";
-import { EXPENSE_CATEGORY_LABELS, SOURCE_LABELS, type ExportKind, type MonthReport } from "@wedding-yantra/types";
+import { SOURCE_LABELS, type ExportKind, type MonthReport } from "@wedding-yantra/types";
 import { ChevronLeft, ChevronRight, Download, Lock } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -86,7 +86,7 @@ function Report({ r }: { r: MonthReport }) {
 
       <Card className="p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink-muted">Bills and GST</h3>
+          <h3 className="text-sm font-bold text-ink-muted">Invoices and GST</h3>
           <span className="text-sm text-ink-muted">
             {r.sales.bills} bill{r.sales.bills === 1 ? "" : "s"}
           </span>
@@ -109,21 +109,21 @@ function Report({ r }: { r: MonthReport }) {
         <Breakdown
           title="Where the work came from"
           rows={r.bySource.map((s) => ({ label: s.source === "direct" ? "Booked directly" : SOURCE_LABELS[s.source], value: s.taxable, note: `${s.bills} bill${s.bills === 1 ? "" : "s"}` }))}
-          empty="Bills made this month show where each booking came from."
+          empty="Invoices made this month show where each booking came from."
         />
         <Breakdown
           title="What sold"
           rows={r.byService.map((s) => ({ label: s.name, value: s.taxable, note: `× ${s.quantity}` }))}
-          empty="The services on this month's bills show here."
+          empty="The services on this month's invoices show here."
         />
         <Breakdown
           title="Bookings by team member"
           rows={r.byMember.map((m) => ({ label: m.name, value: m.taxable, note: `${m.bills} bill${m.bills === 1 ? "" : "s"}` }))}
-          empty="Whose enquiries turned into bills this month."
+          empty="Whose enquiries turned into invoices this month."
         />
         <Breakdown
           title="Spending"
-          rows={r.byCategory.map((c) => ({ label: EXPENSE_CATEGORY_LABELS[c.category], value: c.total }))}
+          rows={r.byCategory.map((c) => ({ label: c.label, value: c.total }))}
           empty="Approved expenses this month show here."
         />
       </div>
@@ -133,7 +133,7 @@ function Report({ r }: { r: MonthReport }) {
           <h3 className="text-sm font-bold text-ink-muted">Money came in by</h3>
           <dl className="mt-3 grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
             {r.receivedByMethod.map((m) => (
-              <Line key={m.method} label={PAYMENT_METHOD_LABELS[m.method]} value={money(m.total)} />
+              <Line key={m.method} label={m.label} value={money(m.total)} />
             ))}
           </dl>
         </Card>

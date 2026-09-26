@@ -159,7 +159,7 @@ function ServiceForm({ item, onDone }: { item?: CatalogueItem; onDone: () => voi
           placeholder="Optional"
         />
       </div>
-      <p className="-mt-2 text-sm text-ink-muted">Leave GST as No GST if you don&apos;t charge it. The SAC code is printed on GST bills; your CA can tell you yours.</p>
+      <p className="-mt-2 text-sm text-ink-muted">Leave GST as No GST if you don&apos;t charge it. The SAC code is printed on GST invoices; your CA can tell you yours.</p>
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
         Save

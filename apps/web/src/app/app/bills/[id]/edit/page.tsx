@@ -20,7 +20,7 @@ export default function EditBillPage() {
   if (bill.isPending) return <Splash />;
   if (bill.isError) return <Notice tone="danger">{errorMessage(bill.error)}</Notice>;
   const b = bill.data;
-  if (b.status === "cancelled") return <Notice>This bill was cancelled. Make a new one instead.</Notice>;
+  if (b.status === "cancelled") return <Notice>This invoice was cancelled. Make a new one instead.</Notice>;
   return (
     <>
       <BackLink href={`/app/bills/${b.id}`} label={b.number} />
@@ -29,7 +29,7 @@ export default function EditBillPage() {
         key={b.id}
         bill={b}
         onSaved={() => {
-          toast("Bill saved");
+          toast("Invoice saved");
           router.replace(`/app/bills/${b.id}`);
         }}
       />

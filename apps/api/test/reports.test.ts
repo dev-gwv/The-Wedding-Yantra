@@ -93,10 +93,10 @@ describe("monthly report and exports", () => {
       { name: "Owner Person", taxable: 10000, bills: 1 },
       { name: "Not from an enquiry", taxable: 5000, bills: 1 },
     ]);
-    expect(r.byCategory).toEqual([{ category: "materials", total: 3000 }]);
+    expect(r.byCategory).toEqual([{ category: "materials", label: "Materials", total: 3000 }]);
     expect(r.receivedByMethod).toEqual([
-      { method: "upi", total: 11800 },
-      { method: "cash", total: 2000 },
+      { method: "upi", label: "UPI", total: 11800 },
+      { method: "cash", label: "Cash", total: 2000 },
     ]);
 
     // Spreadsheets for the CA.

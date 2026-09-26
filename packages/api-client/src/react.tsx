@@ -12,6 +12,11 @@ import { createContext, useContext, type ReactNode } from "react";
 import type {
   TaskRepeatInput,
   SaveCustomFieldsInput,
+  BillListQuery,
+  PaymentListQuery,
+  CustomOption,
+  OptionInput,
+  UpdateOptionInput,
   BroadcastInput,
   BroadcastRecipientInput,
   BroadcastDetail,
@@ -117,6 +122,8 @@ export const queryKeys = {
   moneyOverview: (id: string) => ["workspace", id, "bookings", "money"] as const,
   eventMoney: (id: string, eventId: string) => ["workspace", id, "bookings", "event-money", eventId] as const,
   bills: (id: string, query: object) => ["workspace", id, "bookings", "bills", query] as const,
+  billsSummary: (id: string, query: object) => ["workspace", id, "bookings", "bills-summary", query] as const,
+  options: (id: string) => ["workspace", id, "options"] as const,
   bill: (id: string, billId: string) => ["workspace", id, "bookings", "bill", billId] as const,
   billDraft: (id: string, query: object) => ["workspace", id, "bookings", "bill-draft", query] as const,
   payments: (id: string, query: object) => ["workspace", id, "bookings", "payments", query] as const,
@@ -599,13 +606,25 @@ export function useEventMoney(workspaceId: string, eventId: string, enabled = tr
   });
 }
 
-export function useBills(
-  workspaceId: string,
-  query: { clientId?: string; eventId?: string; status?: "open" | "paid" | "cancelled" } = {},
-  enabled = true,
-) {
+export function useBills(workspaceId: string, query: BillListQuery = {}, enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.bills(workspaceId, query), queryFn: () => api.bills.list(workspaceId, query), enabled });
+  return useQuery({
+    queryKey: queryKeys.bills(workspaceId, query),
+    queryFn: () => api.bills.list(workspaceId, query),
+    enabled,
+    // Filters change often; keep showing the last list while the next loads.
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useBillsSummary(workspaceId: string, query: BillListQuery = {}, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.billsSummary(workspaceId, query),
+    queryFn: () => api.bills.summary(workspaceId, query),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
 }
 
 export function useBill(workspaceId: string, billId: string) {
@@ -645,13 +664,14 @@ export function usePublicBill(token: string) {
   return useQuery({ queryKey: queryKeys.publicBill(token), queryFn: () => api.bills.publicGet(token), retry: false });
 }
 
-export function usePayments(
-  workspaceId: string,
-  query: { billId?: string; eventId?: string; clientId?: string; month?: string } = {},
-  enabled = true,
-) {
+export function usePayments(workspaceId: string, query: PaymentListQuery = {}, enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.payments(workspaceId, query), queryFn: () => api.payments.list(workspaceId, query), enabled });
+  return useQuery({
+    queryKey: queryKeys.payments(workspaceId, query),
+    queryFn: () => api.payments.list(workspaceId, query),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
 }
 
 export function useRecordPayment(workspaceId: string) {
@@ -1141,5 +1161,47 @@ export function useMarkBroadcastRecipient(workspaceId: string, broadcastId: stri
       void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "broadcasts", "audience"] });
     },
   });
+}
+
+/** The business's own lists (payment modes, expense categories). Rarely change, so kept a while. */
+export function useOptions(workspaceId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.options(workspaceId), queryFn: () => api.options.list(workspaceId), staleTime: 5 * 60_000 });
+}
+
+function useOptionMutation<TInput>(workspaceId: string, fn: (input: TInput) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.options(workspaceId) });
+      // Names show on payments and expenses, so those lists refresh too.
+      void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "bookings"] });
+    },
+  });
+}
+
+export function useAddOption(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OptionInput) => api.options.add(workspaceId, input),
+    onSuccess: (option) => {
+      qc.setQueryData<CustomOption[]>(queryKeys.options(workspaceId), (old) =>
+        old ? [...old.filter((o) => o.id !== option.id), option] : old,
+      );
+      void qc.invalidateQueries({ queryKey: queryKeys.options(workspaceId) });
+    },
+  });
+}
+
+export function useUpdateOption(workspaceId: string) {
+  const api = useApi();
+  return useOptionMutation(workspaceId, ({ id, ...input }: UpdateOptionInput & { id: string }) => api.options.update(workspaceId, id, input));
+}
+
+export function useReorderOptions(workspaceId: string) {
+  const api = useApi();
+  return useOptionMutation(workspaceId, (input: { list: CustomOption["list"]; ids: string[] }) => api.options.reorder(workspaceId, input));
 }
 

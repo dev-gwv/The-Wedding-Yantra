@@ -50,6 +50,46 @@ export interface BillTotals {
 
 const sum = (list: number[]) => round2(list.reduce((a, b) => a + b, 0));
 
+/**
+ * Gets typed lines ready for the bill maths:
+ * - Prices that include GST are turned into prices before GST (₹50,000 with 18% is
+ *   ₹42,372.88 + ₹7,627.12 GST), so the bill shows the taxable value, as GST requires.
+ * - A discount given as a percentage becomes rupees on the price before GST.
+ * - A rupee discount on prices that include GST is taken off the price with GST, so
+ *   "₹5,000 off" means the client pays ₹5,000 less.
+ */
+export function prepareBillLines<L extends QuoteLineInput>(
+  lines: L[],
+  options: { chargesGst: boolean; pricesIncludeGst: boolean; discount: number; discountPercent?: number | null },
+): { lines: L[]; discount: number } {
+  const inclusive = options.chargesGst && options.pricesIncludeGst;
+  const prepared = inclusive
+    ? lines.map((l) => (l.taxRate > 0 ? { ...l, rate: round2(l.rate / (1 + l.taxRate / 100)) } : l))
+    : lines;
+  const before = sum(prepared.map((l) => l.quantity * l.rate));
+  if (options.discountPercent) return { lines: prepared, discount: Math.min(before, round2((before * options.discountPercent) / 100)) };
+  if (inclusive && options.discount > 0) {
+    const withGst = sum(lines.map((l) => l.quantity * l.rate));
+    const ratio = before > 0 ? withGst / before : 1;
+    return { lines: prepared, discount: Math.min(before, round2(options.discount / ratio)) };
+  }
+  return { lines: prepared, discount: options.discount };
+}
+
+/** "Net 15" and friends: how many days after the invoice date it's due. Null: pick a date. */
+export const PAYMENT_TERMS = [
+  { key: "receipt", label: "Due on receipt", days: 0 },
+  { key: "net7", label: "Within 7 days", days: 7 },
+  { key: "net15", label: "Within 15 days", days: 15 },
+  { key: "net30", label: "Within 30 days", days: 30 },
+  { key: "event", label: "Before the event", days: null },
+  { key: "custom", label: "Pick a date", days: null },
+] as const;
+export type PaymentTermKey = (typeof PAYMENT_TERMS)[number]["key"];
+
+/** The GST rates on offer today (GST 2.0, from 22 Sep 2025). Older rates stay readable on old records. */
+export const GST_RATE_CHOICES = [0, 5, 18, 40] as const;
+
 export function computeBillTotals(
   lines: QuoteLineInput[],
   discount: number,
@@ -211,13 +251,14 @@ export function billMessage(o: {
   const due =
     o.due <= 0 ? "It is fully paid. Thank you!" : `Balance due: ${formatMoney(o.due)}${o.dueDate ? ` by ${formatDate(o.dueDate, { year: false })}` : ""}.`;
   const see = o.due > 0 && o.payOnline ? "See it and pay by UPI here" : "See it here";
-  return `Hi ${first(o.clientName)}, here is your bill ${o.number} from ${o.business} for ${formatMoney(o.total)}. ${due} ${see}: ${o.link}`;
+  return `Hi ${first(o.clientName)}, here is your invoice ${o.number} from ${o.business} for ${formatMoney(o.total)}. ${due} ${see}: ${o.link}`;
 }
 
-export function receiptMessage(o: { clientName: string; business: string; amount: number; method: PaymentMethod; paidOn: string; due: number; link: string | null }): string {
-  const how = o.method === "other" ? "" : ` by ${PAYMENT_METHOD_LABELS[o.method]}`;
+export function receiptMessage(o: { clientName: string; business: string; amount: number; method: string | null; paidOn: string; due: number; link: string | null }): string {
+  // `method` is the payment mode's name ("UPI", "Google Pay"); "Other" says nothing useful.
+  const how = !o.method || o.method.toLowerCase() === "other" ? "" : ` by ${o.method}`;
   const rest = o.due > 0 ? `Balance due: ${formatMoney(o.due)}.` : "Everything is paid. Thank you!";
-  return `Hi ${first(o.clientName)}, ${o.business} received ${formatMoney(o.amount)}${how} on ${formatDate(o.paidOn, { year: false })}. ${rest}${o.link ? ` Your bill: ${o.link}` : ""}`;
+  return `Hi ${first(o.clientName)}, ${o.business} received ${formatMoney(o.amount)}${how} on ${formatDate(o.paidOn, { year: false })}. ${rest}${o.link ? ` Your invoice: ${o.link}` : ""}`;
 }
 
 export function reminderMessage(o: {
@@ -230,6 +271,6 @@ export function reminderMessage(o: {
   payOnline: boolean;
 }): string {
   const when = o.dueDate ? `, due by ${formatDate(o.dueDate, { year: false })}` : "";
-  const see = o.link ? ` ${o.payOnline ? "See the bill and pay by UPI" : "See the bill"} here: ${o.link}` : "";
+  const see = o.link ? ` ${o.payOnline ? "See the invoice and pay by UPI" : "See the invoice"} here: ${o.link}` : "";
   return `Hi ${first(o.clientName)}, a gentle reminder from ${o.business}: ${formatMoney(o.due)} is due for ${o.forWhat}${when}.${see} Thank you!`;
 }

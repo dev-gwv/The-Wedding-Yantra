@@ -10,31 +10,9 @@ import {
   useUpdateExpense,
   useUploadFile,
 } from "@wedding-yantra/api-client/react";
-import {
-  EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_LABELS,
-  EXPENSE_STATUS_LABELS,
-  expenseInput,
-  updateExpenseInput,
-  type Expense,
-  type ExpenseCategory,
-  type UploadedFile,
-} from "@wedding-yantra/types";
-import {
-  Camera,
-  Car,
-  FileText,
-  Hammer,
-  Home,
-  Megaphone,
-  Package,
-  UserRound,
-  Users,
-  UtensilsCrossed,
-  Wallet,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { EXPENSE_STATUS_LABELS, expenseInput, updateExpenseInput, type Expense, type UploadedFile } from "@wedding-yantra/types";
+import { Camera, FileText, X } from "lucide-react";
+import { OptionPills, OptionIcon } from "@/components/app/option-picker";
 import { useRef, useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -46,17 +24,6 @@ import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { prepareUpload } from "@/lib/images";
 
-export const CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
-  materials: Package,
-  vendor: Users,
-  staff: UserRound,
-  travel: Car,
-  food: UtensilsCrossed,
-  equipment: Hammer,
-  rent: Home,
-  marketing: Megaphone,
-  other: Wallet,
-};
 
 /** Add money spent, or open one to change, approve or reject it. */
 export function ExpenseSheet({
@@ -95,7 +62,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
-  const [category, setCategory] = useState<ExpenseCategory | "">(expense?.category ?? "");
+  const [category, setCategory] = useState<string>(expense?.category ?? "");
   const [spentOn, setSpentOn] = useState(() => expense?.spentOn ?? localISODate());
   const [paidTo, setPaidTo] = useState(expense?.paidTo ?? "");
   const [forEvent, setForEvent] = useState(expense?.eventId ?? eventId ?? "");
@@ -205,30 +172,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
           error={errors.amount}
           className="[&_input]:font-display [&_input]:text-2xl [&_input]:font-extrabold"
         />
-        <fieldset>
-          <legend className="mb-2 text-sm font-semibold">What for?</legend>
-          <div className="flex flex-wrap gap-2">
-            {EXPENSE_CATEGORIES.map((c) => {
-              const Icon = CATEGORY_ICONS[c];
-              const selected = category === c;
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setCategory(c)}
-                  className={cn(
-                    "inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold transition",
-                    selected ? "bg-gradient-primary text-on-brand shadow-soft" : "border border-line bg-surface text-ink hover:bg-cream",
-                  )}
-                >
-                  <Icon className="size-4" /> {EXPENSE_CATEGORY_LABELS[c]}
-                </button>
-              );
-            })}
-          </div>
-          {errors.category && <p className="mt-1 text-sm text-danger">{errors.category}</p>}
-        </fieldset>
+        <OptionPills list="expense_category" label="What for?" value={category || null} onChange={(k) => setCategory(k ?? "")} error={errors.category} />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Date" type="date" value={spentOn} onChange={(e) => setSpentOn(e.target.value)} error={errors.spentOn} />
           <TextField label="Paid to (optional)" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} error={errors.paidTo} placeholder="Flower market" />
@@ -305,15 +249,14 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
 
 /** One expense in a list. */
 export function ExpenseRow({ expense, onClick, showEvent = true }: { expense: Expense; onClick: () => void; showEvent?: boolean }) {
-  const Icon = CATEGORY_ICONS[expense.category];
   return (
     <button type="button" onClick={onClick} className="flex w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-cream">
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cream text-brand-strong">
-        <Icon className="size-4" />
+        <OptionIcon optionKey={expense.category} className="size-4" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold tabular">
-          {formatMoney(expense.amount, { paise: expense.amount % 1 !== 0 })} · {EXPENSE_CATEGORY_LABELS[expense.category]}
+          {formatMoney(expense.amount, { paise: expense.amount % 1 !== 0 })} · {expense.categoryLabel}
         </span>
         <span className="block truncate text-sm text-ink-muted">
           {[formatDate(expense.spentOn, { year: false }), expense.paidTo, showEvent ? expense.eventTitle : null, expense.submittedBy?.name]

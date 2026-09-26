@@ -1,4 +1,11 @@
 import type {
+  BillListQuery,
+  BillListSummary,
+  CustomOption,
+  OptionInput,
+  PaymentListQuery,
+  ReorderOptionsInput,
+  UpdateOptionInput,
   Broadcast,
   BroadcastAudiencePreview,
   BroadcastDetail,
@@ -315,8 +322,9 @@ export function createApiClient(options: ApiClientOptions) {
         request<EventMoney>("GET", `${ws(workspaceId)}/events/${encodeURIComponent(eventId)}/money`),
     },
     bills: {
-      list: (workspaceId: string, query: { clientId?: string; eventId?: string; status?: "open" | "paid" | "cancelled" } = {}) =>
-        request<BillSummary[]>("GET", `${ws(workspaceId)}/bills${qs(query)}`),
+      list: (workspaceId: string, query: BillListQuery = {}) => request<BillSummary[]>("GET", `${ws(workspaceId)}/bills${qs(query)}`),
+      /** Totals for exactly the invoices the same filters list */
+      summary: (workspaceId: string, query: BillListQuery = {}) => request<BillListSummary>("GET", `${ws(workspaceId)}/bills/summary${qs(query)}`),
       /** Starting values for a new bill, from an event, an accepted quote or a client */
       draft: (workspaceId: string, query: { eventId?: string; clientId?: string; quoteId?: string }) =>
         request<BillDraft>("GET", `${ws(workspaceId)}/bill-draft${qs(query)}`),
@@ -329,8 +337,7 @@ export function createApiClient(options: ApiClientOptions) {
       publicGet: (token: string) => request<PublicBill>("GET", `/public/bills/${encodeURIComponent(token)}`),
     },
     payments: {
-      list: (workspaceId: string, query: { billId?: string; eventId?: string; clientId?: string; month?: string } = {}) =>
-        request<Payment[]>("GET", `${ws(workspaceId)}/payments${qs(query)}`),
+      list: (workspaceId: string, query: PaymentListQuery = {}) => request<Payment[]>("GET", `${ws(workspaceId)}/payments${qs(query)}`),
       create: (workspaceId: string, input: PaymentInput) => request<Payment>("POST", `${ws(workspaceId)}/payments`, input),
       update: (workspaceId: string, id: string, input: UpdatePaymentInput) =>
         request<Payment>("PATCH", `${ws(workspaceId)}/payments/${encodeURIComponent(id)}`, input),
@@ -431,6 +438,14 @@ export function createApiClient(options: ApiClientOptions) {
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/broadcasts/${encodeURIComponent(id)}`),
       mark: (workspaceId: string, id: string, recipientId: string, input: BroadcastRecipientInput) =>
         request<BroadcastRecipient>("PATCH", `${ws(workspaceId)}/broadcasts/${encodeURIComponent(id)}/recipients/${encodeURIComponent(recipientId)}`, input),
+    },
+    options: {
+      /** The business's own lists; hidden options included (records may still use them) */
+      list: (workspaceId: string, list?: CustomOption["list"]) => request<CustomOption[]>("GET", `${ws(workspaceId)}/options${qs({ list })}`),
+      add: (workspaceId: string, input: OptionInput) => request<CustomOption>("POST", `${ws(workspaceId)}/options`, input),
+      update: (workspaceId: string, id: string, input: UpdateOptionInput) =>
+        request<CustomOption>("PATCH", `${ws(workspaceId)}/options/${encodeURIComponent(id)}`, input),
+      reorder: (workspaceId: string, input: ReorderOptionsInput) => request<CustomOption[]>("PUT", `${ws(workspaceId)}/options/order`, input),
     },
     customFields: {
       /** The business's own fields on enquiries, clients and events */

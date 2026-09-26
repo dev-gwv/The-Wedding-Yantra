@@ -22,7 +22,7 @@ export default function PublicBillPage() {
     return (
       <main className="grid min-h-dvh place-items-center bg-hero px-4">
         <div className="w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-soft">
-          <EmptyState icon={FileX} title="This bill isn't available" className="py-6">
+          <EmptyState icon={FileX} title="This invoice isn't available" className="py-6">
             The link may be old. Please ask the business to send it again.
           </EmptyState>
         </div>

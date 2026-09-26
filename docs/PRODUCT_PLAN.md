@@ -967,3 +967,31 @@ Happy clients book again and send their friends; a Diwali wish keeps the busines
   from the send screen or their edit form.
 - Later, with the WhatsApp Business API connected, the same lists can be sent in one go.
 
+
+## 33. Built: invoices and payments in depth (after IPC Studios' invoicing)
+
+From the first real use ("the invoice button isn't there, categories can't be customised")
+and a study of IPC Studios' invoicing, generalised for every wedding trade:
+- **Your own lists.** Payment modes and expense categories are the business's own: add one
+  from any form ("+ Add"), rename, reorder or hide it in More, Your lists. Records keep a fixed
+  key, so a rename shows everywhere at once and a hidden option still names old records.
+  Each trade starts with its usual expense categories (flowers and rentals for decorators,
+  groceries and gas for caterers).
+- **Money has four sections:** Invoices, Payments, Expenses and Quotes, each with its own
+  main button (New invoice, Record payment, Add expense, New quote).
+- **Invoices list:** period (this month, last month, this or last financial year, all),
+  totals that double as filters (invoiced, received, to collect, overdue), a "waiting to be
+  paid" strip with Remind on WhatsApp and Money received, status chips, search by name,
+  number or event, and a spreadsheet export.
+- **New invoice, for anyone:** type a name to pick a client or add a new customer (they join
+  the client list, matched by number). Subject line; payment terms set the due date (due on
+  receipt, 7/15/30 days, before the event, or a date). GST on or off per invoice; prices can
+  include GST (the invoice shows the taxable value); discount in rupees or percent; a
+  description and HSN/SAC per line; today's GST rates (0, 5, 18, 40); one-off lines can be
+  saved to the price list; live CGST/SGST or IGST and the total in words; money already
+  received (full, half or any amount, in any payment mode) is recorded in the same save.
+- **Payments list:** period, totals by mode, filter by mode, search by name, receipt or
+  reference, export; "Record payment" starts from who owes money.
+- Messages and screens say "invoice".
+- Next: expenses in depth (who paid and paying staff back, GST on purchases, vendors), then
+  notes and terms templates, bank accounts and invoice designs.

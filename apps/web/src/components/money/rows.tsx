@@ -42,7 +42,7 @@ export function BillRow({ bill, showClient = true }: { bill: BillSummary; showCl
 export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item: DueItem) => void }) {
   const { workspace } = useCurrentWorkspace();
   const href = item.billId ? `/app/bills/${item.billId}` : `/app/events/${item.eventId}`;
-  const forWhat = item.eventTitle ?? (item.billNumber ? `bill ${item.billNumber}` : "your booking");
+  const forWhat = item.eventTitle ?? (item.billNumber ? `invoice ${item.billNumber}` : "your booking");
   const reminder = whatsappLink(
     reminderMessage({
       clientName: item.clientName,
@@ -61,8 +61,8 @@ export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item
         <span className="min-w-0 flex-1">
           <span className="block truncate font-bold">{item.clientName}</span>
           <span className="block truncate text-sm text-ink-muted">
-            {item.billNumber ? `${item.billNumber} · ` : "No bill yet · "}
-            {withoutName(item.eventTitle, item.clientName) ?? "Bill"}
+            {item.billNumber ? `${item.billNumber} · ` : "No invoice yet · "}
+            {withoutName(item.eventTitle, item.clientName) ?? "Invoice"}
           </span>
           {item.dueDate && (
             <span className={cn("mt-0.5 block text-sm font-semibold", item.overdue ? "text-danger" : "text-ink-muted")}>

@@ -71,7 +71,7 @@ export default function ClientPage() {
               )}
               {can(workspace.role, "bills.manage") && (
                 <ButtonLink href={`/app/bills/new?clientId=${c.id}`} variant="secondary">
-                  <FilePlus2 className="size-4" /> Make bill
+                  <FilePlus2 className="size-4" /> Make invoice
                 </ButtonLink>
               )}
               {can(workspace.role, "clients.manage") && (
@@ -99,7 +99,7 @@ export default function ClientPage() {
 
           {bills.data && bills.data.length > 0 && (
             <section>
-              <h2 className="mb-3 font-display text-lg font-extrabold">Bills</h2>
+              <h2 className="mb-3 font-display text-lg font-extrabold">Invoices</h2>
               <Card className="divide-y divide-line overflow-hidden">
                 {bills.data.map((b) => (
                   <BillRow key={b.id} bill={b} showClient={false} />

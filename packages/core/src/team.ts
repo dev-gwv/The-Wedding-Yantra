@@ -107,11 +107,11 @@ export function activityText(a: ActivityFacts): string {
     case "client.portal_stopped":
       return `stopped sharing ${subject ? `${subject}'s` : "a client's"} page`;
     case "bill.created":
-      return `made bill ${subject}${a.other ? ` for ${a.other}` : ""}${money ? ` (${money})` : ""}`;
+      return `made invoice ${subject}${a.other ? ` for ${a.other}` : ""}${money ? ` (${money})` : ""}`;
     case "bill.updated":
-      return `changed bill ${subject}${money ? ` (now ${money})` : ""}`;
+      return `changed invoice ${subject}${money ? ` (now ${money})` : ""}`;
     case "bill.cancelled":
-      return `cancelled bill ${subject}${a.detail ? `: ${a.detail}` : ""}`;
+      return `cancelled invoice ${subject}${a.detail ? `: ${a.detail}` : ""}`;
     case "payment.recorded":
       return `recorded ${money ?? "a payment"}${a.other ? ` from ${a.other}` : ""}`;
     case "payment.updated":

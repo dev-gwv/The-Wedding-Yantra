@@ -1,8 +1,6 @@
-import { PAYMENT_METHOD_LABELS, receiptNumber, round2, stateName, type PaymentMethod } from "@wedding-yantra/core";
+import { receiptNumber, round2, stateName } from "@wedding-yantra/core";
 import {
-  EXPENSE_CATEGORY_LABELS,
   EXPENSE_STATUS_LABELS,
-  type ExpenseCategory,
   type ExpenseStatus,
   type ExportFile,
   type ExportKind,
@@ -13,6 +11,7 @@ import type { Queryable } from "../../db.js";
 import type { MemberContext } from "../auth/guard.js";
 import { requireMoneyView } from "../money/access.js";
 import { moneyOverview } from "../money/dues.js";
+import { optionJoin } from "../options/service.js";
 
 const n = (v: string | null | undefined) => Number(v ?? 0);
 
@@ -65,16 +64,18 @@ export async function monthReport(db: Queryable, ctx: MemberContext, month: stri
         GROUP BY u.name, l.id IS NOT NULL ORDER BY 3 DESC`,
       [ws, month],
     ),
-    db.query<{ category: ExpenseCategory; total: string }>(
-      `SELECT category, sum(amount) AS total FROM expenses
-        WHERE workspace_id = $1 AND deleted_at IS NULL AND status = 'approved' AND ${inMonth("spent_on")}
-        GROUP BY category ORDER BY 2 DESC`,
+    db.query<{ category: string; label: string; total: string }>(
+      `SELECT x.category, coalesce(xc.label, x.category) AS label, sum(x.amount) AS total FROM expenses x
+         ${optionJoin("xc", "expense_category", "x.workspace_id", "x.category")}
+        WHERE x.workspace_id = $1 AND x.deleted_at IS NULL AND x.status = 'approved' AND ${inMonth("x.spent_on")}
+        GROUP BY x.category, xc.label ORDER BY 3 DESC`,
       [ws, month],
     ),
-    db.query<{ method: PaymentMethod; total: string }>(
-      `SELECT method, sum(amount) AS total FROM payments
-        WHERE workspace_id = $1 AND deleted_at IS NULL AND ${inMonth("paid_on")}
-        GROUP BY method ORDER BY 2 DESC`,
+    db.query<{ method: string; label: string; total: string }>(
+      `SELECT p.method, coalesce(pm.label, p.method) AS label, sum(p.amount) AS total FROM payments p
+         ${optionJoin("pm", "payment_method", "p.workspace_id", "p.method")}
+        WHERE p.workspace_id = $1 AND p.deleted_at IS NULL AND ${inMonth("p.paid_on")}
+        GROUP BY p.method, pm.label ORDER BY 3 DESC`,
       [ws, month],
     ),
     moneyOverview(db, ctx),
@@ -111,8 +112,8 @@ export async function monthReport(db: Queryable, ctx: MemberContext, month: stri
     bySource: bySource.rows.map((r) => ({ source: r.source, taxable: n(r.taxable), bills: Number(r.bills) })),
     byService: byService.rows.map((r) => ({ name: r.name, quantity: n(r.quantity), taxable: n(r.taxable) })),
     byMember: [...members.values()].sort((a, b) => b.taxable - a.taxable),
-    byCategory: byCategory.rows.map((r) => ({ category: r.category, total: n(r.total) })),
-    receivedByMethod: byMethod.rows.map((r) => ({ method: r.method, total: n(r.total) })),
+    byCategory: byCategory.rows.map((r) => ({ category: r.category, label: r.label, total: n(r.total) })),
+    receivedByMethod: byMethod.rows.map((r) => ({ method: r.method, label: r.label, total: n(r.total) })),
   };
 }
 
@@ -217,14 +218,15 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
       number: number;
       client: string | null;
       bill_number: string | null;
-      method: PaymentMethod;
+      method: string;
       reference: string | null;
       amount: string;
       recorded_by: string | null;
     }>(
       `SELECT p.paid_on::text AS paid_on, p.number, coalesce(c.name, b.bill_to_name) AS client, b.number AS bill_number,
-              p.method, p.reference, p.amount, u.name AS recorded_by
+              coalesce(pm.label, p.method) AS method, p.reference, p.amount, u.name AS recorded_by
          FROM payments p
+         ${optionJoin("pm", "payment_method", "p.workspace_id", "p.method")}
          LEFT JOIN bills b ON b.id = p.bill_id
          LEFT JOIN clients c ON c.id = p.client_id
          LEFT JOIN users u ON u.id = p.created_by
@@ -238,7 +240,7 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
       receiptNumber(r.number),
       r.client,
       r.bill_number,
-      PAYMENT_METHOD_LABELS[r.method],
+      r.method,
       r.reference,
       n(r.amount),
       r.recorded_by,
@@ -248,10 +250,10 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
 
   const { rows } = await db.query<{
     spent_on: string;
-    category: ExpenseCategory;
+    category: string;
     paid_to: string | null;
     event_title: string | null;
-    method: PaymentMethod | null;
+    method: string | null;
     amount: string;
     status: ExpenseStatus;
     added_by: string | null;
@@ -259,9 +261,12 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
     note: string | null;
     has_photo: boolean;
   }>(
-    `SELECT x.spent_on::text AS spent_on, x.category, x.paid_to, e.title AS event_title, x.method, x.amount, x.status,
+    `SELECT x.spent_on::text AS spent_on, coalesce(xc.label, x.category) AS category, x.paid_to, e.title AS event_title,
+            CASE WHEN x.method IS NULL THEN NULL ELSE coalesce(xm.label, x.method) END AS method, x.amount, x.status,
             su.name AS added_by, ru.name AS approved_by, x.note, x.receipt_file_id IS NOT NULL AS has_photo
        FROM expenses x
+       ${optionJoin("xc", "expense_category", "x.workspace_id", "x.category")}
+       ${optionJoin("xm", "payment_method", "x.workspace_id", "x.method")}
        LEFT JOIN events e ON e.id = x.event_id
        LEFT JOIN users su ON su.id = x.submitted_by
        LEFT JOIN users ru ON ru.id = x.reviewed_by
@@ -272,10 +277,10 @@ export async function exportMonth(db: Queryable, ctx: MemberContext, kind: Expor
   const header = ["Date", "Category", "Paid to", "For event", "Paid by", "Amount", "Status", "Added by", "Approved by", "Note", "Bill photo"];
   const data = rows.map((r) => [
     indianDate(r.spent_on),
-    EXPENSE_CATEGORY_LABELS[r.category],
+    r.category,
     r.paid_to,
     r.event_title,
-    r.method ? PAYMENT_METHOD_LABELS[r.method] : null,
+    r.method,
     n(r.amount),
     EXPENSE_STATUS_LABELS[r.status],
     r.added_by,

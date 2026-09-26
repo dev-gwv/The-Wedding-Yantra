@@ -6,7 +6,7 @@ import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Help",
-  description: "How to use Wedding Yantra: enquiries, quotes, GST bills, payments, events, your team and your reports.",
+  description: "How to use Wedding Yantra: enquiries, quotes, GST invoices, payments, events, your team and your reports.",
 };
 
 interface Guide {
@@ -49,13 +49,13 @@ const GUIDES: Guide[] = [
   },
   {
     id: "bills",
-    title: "Bills, GST and payments",
+    title: "Invoices, GST and payments",
     steps: [
-      "Add your GST number in More, Business profile, to charge GST. Clients in your state get CGST and SGST; clients elsewhere get IGST. Without a GST number, bills don't charge GST.",
-      "Make a bill from an event: it starts from the accepted quote. Bills are numbered for the financial year, like INV/26-27/0001.",
-      "Add your UPI ID in Business profile. Every bill then carries a QR code, so clients pay in one scan.",
-      "Record money when it comes in: UPI, cash, bank, cheque or card. Each gets a receipt number, and the bill shows what's still due.",
-      "Money taken before there's a bill is kept as an advance and counted in the event's next bill.",
+      "Add your GST number in More, Business profile, to charge GST. Clients in your state get CGST and SGST; clients elsewhere get IGST. Without a GST number, invoices don't charge GST. With one, each invoice can still be with or without GST.",
+      "Make an invoice from Money, New invoice, for anyone: a booked event (it starts from the accepted quote), a client, or someone new. Invoices are numbered for the financial year, like INV/26-27/0001. Prices can include GST, the discount can be in rupees or percent, and money already received is recorded in the same save.",
+      "Add your UPI ID in Business profile. Every invoice then carries a QR code, so clients pay in one scan.",
+      "Record money when it comes in, in your own payment modes (add Google Pay or anything else as you go). Each gets a receipt number, and the invoice shows what's still due. Money, Payments lists it all by period and mode, with a spreadsheet for your CA.",
+      "Money taken before there's an invoice is kept as an advance and counted in the event's next invoice.",
       "Money, To collect lists everything still due. One tap sends the client a polite reminder on WhatsApp.",
     ],
   },
@@ -63,7 +63,7 @@ const GUIDES: Guide[] = [
     id: "clients",
     title: "Clients, reviews and referrals",
     steps: [
-      "Give each client their own page: on the client, tap “Make their page” and send it on WhatsApp. It shows their event dates, quotes, bills with Pay by UPI, and what they've paid, always up to date. No sign-in needed.",
+      "Give each client their own page: on the client, tap “Make their page” and send it on WhatsApp. It shows their event dates, quotes, invoices with Pay by UPI, and what they've paid, always up to date. No sign-in needed.",
       "Stop sharing whenever you like. The old link stops working at once.",
       "Add your Google review link in Business profile. Once an event is over, the event shows “Ask for a review”: one tap sends a polite WhatsApp message with the link.",
       "More, Reviews and referrals lists every finished event you haven't asked about yet, and the clients who send you the most work.",
@@ -130,7 +130,7 @@ const GUIDES: Guide[] = [
     steps: [
       "Each business's data is kept apart. Nobody outside your team can see it.",
       "Everything is backed up every night, bill photos included.",
-      "Your data is yours: the monthly spreadsheets take your bills, payments and expenses anywhere.",
+      "Your data is yours: the monthly spreadsheets take your invoices, payments and expenses anywhere.",
     ],
   },
 ];

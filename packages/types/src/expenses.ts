@@ -1,4 +1,4 @@
-import { PAYMENT_METHODS, type PaymentMethod } from "@wedding-yantra/core";
+import { optionKey } from "./lists.js";
 import { z } from "zod";
 import { optionalText } from "./common.js";
 import type { PersonRef } from "./sales.js";
@@ -58,9 +58,13 @@ export interface Expense {
   id: string;
   amount: number;
   spentOn: string;
-  category: ExpenseCategory;
+  /** A key from the business's expense categories */
+  category: string;
+  categoryLabel: string;
   paidTo: string | null;
-  method: PaymentMethod | null;
+  /** A key from the business's payment modes */
+  method: string | null;
+  methodLabel: string | null;
   note: string | null;
   eventId: string | null;
   eventTitle: string | null;
@@ -77,11 +81,11 @@ const amount = z.coerce.number().positive("Enter the amount spent").max(1_000_00
 
 const expenseFields = {
   eventId: z.uuid().nullable().optional(),
-  category: z.enum(EXPENSE_CATEGORIES, "Pick what it was for"),
+  category: optionKey,
   amount,
   spentOn: z.iso.date("Pick the date"),
   paidTo: optionalText(80),
-  method: z.enum(PAYMENT_METHODS).nullable().optional(),
+  method: optionKey.nullable().optional(),
   note: optionalText(300),
   receiptFileId: z.uuid().nullable().optional(),
 };
@@ -115,5 +119,5 @@ export interface ExpenseMonth {
   spent: number;
   pending: number;
   pendingCount: number;
-  byCategory: { category: ExpenseCategory; total: number }[];
+  byCategory: { category: string; label: string; total: number }[];
 }

@@ -1,6 +1,4 @@
-import type { PaymentMethod } from "@wedding-yantra/core";
 import { z } from "zod";
-import type { ExpenseCategory } from "./expenses.js";
 import type { LeadSource } from "./sales.js";
 
 export const monthQuery = z.object({
@@ -25,8 +23,8 @@ export interface MonthReport {
   byService: { name: string; quantity: number; taxable: number }[];
   /** Whose enquiries turned into this month's bills */
   byMember: { name: string; taxable: number; bills: number }[];
-  byCategory: { category: ExpenseCategory; total: number }[];
-  receivedByMethod: { method: PaymentMethod; total: number }[];
+  byCategory: { category: string; label: string; total: number }[];
+  receivedByMethod: { method: string; label: string; total: number }[];
 }
 
 export const EXPORT_KINDS = ["bills", "payments", "expenses"] as const;

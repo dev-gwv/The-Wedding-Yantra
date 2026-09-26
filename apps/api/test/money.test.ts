@@ -192,8 +192,8 @@ describe("GST bills and payments", () => {
     expect(pub.body.data.bill).not.toHaveProperty("shareToken");
     expect(pub.body.data.bill).not.toHaveProperty("eventId");
     expect(pub.body.data.bill.payments).toEqual([
-      { number: "R-0001", amount: 20000, paidOn: "2026-09-25", method: "upi" },
-      { number: "R-0002", amount: 26829, paidOn: "2026-10-01", method: "cash" },
+      { number: "R-0001", amount: 20000, paidOn: "2026-09-25", method: "upi", methodLabel: "UPI" },
+      { number: "R-0002", amount: 26829, paidOn: "2026-10-01", method: "cash", methodLabel: "Cash" },
     ]);
 
     const overview = await call<{ toCollect: number; receivedThisMonth: number }>(t.app, "GET", `/workspaces/${ws}/money`, { token: owner });

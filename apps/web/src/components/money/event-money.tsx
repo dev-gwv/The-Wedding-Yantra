@@ -78,7 +78,7 @@ export function EventMoneyCard({ event }: { event: WeddingEvent }) {
             </div>
           </>
         ) : (
-          <p className="text-ink-muted">No booking value yet. Make a bill, or add the value to the event.</p>
+          <p className="text-ink-muted">No booking value yet. Make an invoice, or add the value to the event.</p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
           {can(workspace.role, "payments.record") && (
@@ -88,7 +88,7 @@ export function EventMoneyCard({ event }: { event: WeddingEvent }) {
           )}
           {can(workspace.role, "bills.manage") && (
             <ButtonLink href={`/app/bills/new?eventId=${event.id}`} variant="secondary">
-              <FilePlus2 className="size-4" /> {billed ? "Another bill" : "Make bill"}
+              <FilePlus2 className="size-4" /> {billed ? "Another invoice" : "Make invoice"}
             </ButtonLink>
           )}
         </div>

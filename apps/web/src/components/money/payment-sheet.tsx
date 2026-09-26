@@ -1,19 +1,10 @@
 "use client";
 
-import {
-  can,
-  formatDate,
-  formatMoney,
-  localISODate,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_METHODS,
-  receiptMessage,
-  whatsappLink,
-  type PaymentMethod,
-} from "@wedding-yantra/core";
+import { can, formatDate, formatMoney, localISODate, receiptMessage, whatsappLink } from "@wedding-yantra/core";
 import { useDeletePayment, useRecordPayment, useUpdatePayment } from "@wedding-yantra/api-client/react";
 import { paymentInput, updatePaymentInput, type Payment } from "@wedding-yantra/types";
-import { Banknote, CircleCheck, CreditCard, FileText, Landmark, MessageCircle, Smartphone, Wallet, type LucideIcon } from "lucide-react";
+import { CircleCheck, MessageCircle } from "lucide-react";
+import { OptionPills, OptionIcon, useOptionList } from "@/components/app/option-picker";
 import { useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -21,19 +12,10 @@ import { TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
-import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
-export const METHOD_ICONS: Record<PaymentMethod, LucideIcon> = {
-  upi: Smartphone,
-  cash: Banknote,
-  bank: Landmark,
-  cheque: FileText,
-  card: CreditCard,
-  other: Wallet,
-};
-
-const REFERENCE_LABELS: Partial<Record<PaymentMethod, string>> = {
+/** Built-in modes that usually have a reference; the business's own modes get a plain "Reference". */
+const REFERENCE_LABELS: Record<string, string> = {
   upi: "UPI reference (optional)",
   bank: "Transfer reference (optional)",
   cheque: "Cheque number (optional)",
@@ -99,7 +81,8 @@ function PaymentForm({
   const canEdit = can(workspace.role, "payments.record");
   const [amount, setAmount] = useState(payment ? String(payment.amount) : due > 0 ? String(due) : "");
   const [paidOn, setPaidOn] = useState(() => payment?.paidOn ?? localISODate());
-  const [method, setMethod] = useState<PaymentMethod>(payment?.method ?? "upi");
+  const [method, setMethod] = useState<string>(payment?.method ?? "upi");
+  const { labelOf } = useOptionList("payment_method");
   const [reference, setReference] = useState(payment?.reference ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   // The balance is worked out when saving: the list refreshes right after, and `due` changes with it.
@@ -112,7 +95,7 @@ function PaymentForm({
         clientName: who.clientName,
         business,
         amount: p.amount,
-        method: p.method,
+        method: p.methodLabel,
         paidOn: p.paidOn,
         due: balance,
         link: who.billLink,
@@ -122,7 +105,7 @@ function PaymentForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const fields = { amount, paidOn, method, reference: REFERENCE_LABELS[method] ? reference : "" };
+    const fields = { amount, paidOn, method, reference: method === "cash" ? "" : reference };
     const check = payment ? validate(updatePaymentInput, fields) : validate(paymentInput, { ...fields, ...target });
     if (check.errors) return setErrors(check.errors);
     setErrors({});
@@ -175,7 +158,8 @@ function PaymentForm({
     );
   }
 
-  const Ref = REFERENCE_LABELS[method];
+  // Cash has nothing to note; other modes, the business's own included, can carry a reference.
+  const Ref = method === "cash" ? null : (REFERENCE_LABELS[method] ?? `Reference for ${labelOf(method)} (optional)`);
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
       <TextField
@@ -188,30 +172,7 @@ function PaymentForm({
         hint={!payment && due > 0 ? `${formatMoney(due)} is due` : undefined}
         className="[&_input]:font-display [&_input]:text-2xl [&_input]:font-extrabold"
       />
-      <fieldset>
-        <legend className="mb-2 text-sm font-semibold">How was it paid?</legend>
-        <div className="flex flex-wrap gap-2">
-          {PAYMENT_METHODS.map((m) => {
-            const Icon = METHOD_ICONS[m];
-            const selected = method === m;
-            return (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={selected}
-                disabled={!canEdit}
-                onClick={() => setMethod(m)}
-                className={cn(
-                  "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition",
-                  selected ? "bg-gradient-primary text-on-brand shadow-soft" : "border border-line bg-surface text-ink hover:bg-cream",
-                )}
-              >
-                <Icon className="size-4" /> {PAYMENT_METHOD_LABELS[m]}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <OptionPills list="payment_method" label="How was it paid?" value={method} onChange={(k) => setMethod(k ?? "upi")} disabled={!canEdit} error={errors.method} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Date" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} error={errors.paidOn} disabled={!canEdit} />
         {Ref && <TextField label={Ref} value={reference} onChange={(e) => setReference(e.target.value)} error={errors.reference} disabled={!canEdit} />}
@@ -220,7 +181,7 @@ function PaymentForm({
       {payment && (
         <p className="text-sm text-ink-muted">
           Recorded {payment.recordedBy?.name ? `by ${payment.recordedBy.name} ` : ""}on {formatDate(payment.createdAt)}
-          {payment.billNumber ? ` · on bill ${payment.billNumber}` : " · not on a bill yet"}
+          {payment.billNumber ? ` · on invoice ${payment.billNumber}` : " · not on an invoice yet"}
         </p>
       )}
       {canEdit && (
@@ -262,15 +223,14 @@ function PaymentForm({
 
 /** One payment in a list: how much, how and when. */
 export function PaymentRow({ payment, onClick }: { payment: Payment; onClick?: () => void }) {
-  const Icon = METHOD_ICONS[payment.method];
   return (
     <button type="button" onClick={onClick} className="flex w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-cream">
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-success-soft text-success">
-        <Icon className="size-4" />
+        <OptionIcon optionKey={payment.method} className="size-4" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold tabular">
-          {formatMoney(payment.amount, { paise: payment.amount % 1 !== 0 })} · {PAYMENT_METHOD_LABELS[payment.method]}
+          {formatMoney(payment.amount, { paise: payment.amount % 1 !== 0 })} · {payment.methodLabel}
         </span>
         <span className="block truncate text-sm text-ink-muted">
           {[formatDate(payment.paidOn), payment.number, payment.reference].filter(Boolean).join(" · ")}

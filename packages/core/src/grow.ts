@@ -16,7 +16,7 @@ export function eventIsOver(event: { status: string; endDate: string | null }, t
 
 /** Sends a client the link to their own page. */
 export function portalMessage(o: { clientName: string; business: string; link: string }): string {
-  return `Hi ${first(o.clientName)}, here is your page with ${o.business}. It has your event dates, quotes, bills and payments, always up to date: ${o.link}`;
+  return `Hi ${first(o.clientName)}, here is your page with ${o.business}. It has your event dates, quotes, invoices and payments, always up to date: ${o.link}`;
 }
 
 /** Asks a client for a review once their event is over. */

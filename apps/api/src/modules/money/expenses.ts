@@ -1,10 +1,11 @@
-import { can, round2, type PaymentMethod } from "@wedding-yantra/core";
-import type { Expense, ExpenseCategory, ExpenseMonth, ExpenseStatus } from "@wedding-yantra/types";
+import { can, round2 } from "@wedding-yantra/core";
+import type { Expense, ExpenseMonth, ExpenseStatus } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { assertWorkspaceFile, toUploaded } from "../files/service.js";
+import { assertOption, optionJoin } from "../options/service.js";
 
 /** Seeing money: everything. Everyone else who can add expenses sees only their own. */
 const seesAll = (ctx: MemberContext) => can(ctx.role, "finance.view") || can(ctx.role, "expenses.approve");
@@ -22,9 +23,11 @@ interface ExpenseRow {
   id: string;
   amount: string;
   spent_on: string;
-  category: ExpenseCategory;
+  category: string;
+  category_label: string;
   paid_to: string | null;
-  method: PaymentMethod | null;
+  method: string | null;
+  method_label: string | null;
   note: string | null;
   event_id: string | null;
   event_title: string | null;
@@ -41,7 +44,8 @@ interface ExpenseRow {
 }
 
 const EXPENSE_SELECT = `
-  SELECT x.id, x.amount, x.spent_on::text AS spent_on, x.category, x.paid_to, x.method, x.note,
+  SELECT x.id, x.amount, x.spent_on::text AS spent_on, x.category, coalesce(xc.label, x.category) AS category_label,
+         x.paid_to, x.method, CASE WHEN x.method IS NULL THEN NULL ELSE coalesce(xm.label, x.method) END AS method_label, x.note,
          x.event_id, e.title AS event_title, x.status, x.reject_reason,
          f.id AS file_id, f.content_type AS file_type, f.size_bytes AS file_size,
          x.submitted_by, su.name AS submitted_name, x.reviewed_by, ru.name AS reviewed_name, x.created_at
@@ -49,15 +53,19 @@ const EXPENSE_SELECT = `
     LEFT JOIN events e ON e.id = x.event_id
     LEFT JOIN files f ON f.id = x.receipt_file_id
     LEFT JOIN users su ON su.id = x.submitted_by
-    LEFT JOIN users ru ON ru.id = x.reviewed_by`;
+    LEFT JOIN users ru ON ru.id = x.reviewed_by
+    ${optionJoin("xc", "expense_category", "x.workspace_id", "x.category")}
+    ${optionJoin("xm", "payment_method", "x.workspace_id", "x.method")}`;
 
 const toExpense = (secret: Buffer, r: ExpenseRow): Expense => ({
   id: r.id,
   amount: Number(r.amount),
   spentOn: r.spent_on,
   category: r.category,
+  categoryLabel: r.category_label,
   paidTo: r.paid_to,
   method: r.method,
+  methodLabel: r.method_label,
   note: r.note,
   eventId: r.event_id,
   eventTitle: r.event_title,
@@ -112,11 +120,11 @@ export async function getExpense(db: Queryable, secret: Buffer, ctx: MemberConte
 
 interface ExpenseFields {
   eventId?: string | null;
-  category: ExpenseCategory;
+  category: string;
   amount: number;
   spentOn: string;
   paidTo?: string | null;
-  method?: PaymentMethod | null;
+  method?: string | null;
   note?: string | null;
   receiptFileId?: string | null;
 }
@@ -134,6 +142,8 @@ export async function createExpense(db: Db, secret: Buffer, ctx: MemberContext, 
   if (!can(ctx.role, "expenses.submit")) throw forbidden("Your role can't add expenses");
   return withTransaction(db, async (tx) => {
     await checkLinks(tx, ctx, input);
+    await assertOption(tx, ctx.workspaceId, "expense_category", input.category, "category");
+    if (input.method) await assertOption(tx, ctx.workspaceId, "payment_method", input.method, "method");
     const approver = can(ctx.role, "expenses.approve");
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO expenses (workspace_id, event_id, category, amount, spent_on, paid_to, method, note, receipt_file_id,
@@ -189,6 +199,8 @@ export async function updateExpense(db: Db, secret: Buffer, ctx: MemberContext, 
       throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to change it.");
     }
     await checkLinks(tx, ctx, input);
+    if (input.category !== undefined) await assertOption(tx, ctx.workspaceId, "expense_category", input.category, "category", current.category);
+    if (input.method) await assertOption(tx, ctx.workspaceId, "payment_method", input.method, "method", current.method);
     const map: [keyof ExpenseFields, string][] = [
       ["eventId", "event_id"],
       ["category", "category"],
@@ -258,22 +270,26 @@ export async function deleteExpense(db: Db, ctx: MemberContext, id: string): Pro
 /** A month of spending for the Money tab. Money roles only. */
 export async function expenseMonth(db: Queryable, ctx: MemberContext, month: string): Promise<ExpenseMonth> {
   if (!seesAll(ctx)) throw forbidden("Your role doesn't include money");
-  const { rows } = await db.query<{ category: ExpenseCategory; status: ExpenseStatus; total: string; count: string }>(
-    `SELECT category, status, sum(amount) AS total, count(*) AS count FROM expenses
-      WHERE workspace_id = $1 AND deleted_at IS NULL AND to_char(spent_on, 'YYYY-MM') = $2 AND status <> 'rejected'
-      GROUP BY category, status`,
+  const { rows } = await db.query<{ category: string; label: string; status: ExpenseStatus; total: string; count: string }>(
+    `SELECT x.category, coalesce(xc.label, x.category) AS label, x.status, sum(x.amount) AS total, count(*) AS count FROM expenses x
+       ${optionJoin("xc", "expense_category", "x.workspace_id", "x.category")}
+      WHERE x.workspace_id = $1 AND x.deleted_at IS NULL AND to_char(x.spent_on, 'YYYY-MM') = $2 AND x.status <> 'rejected'
+      GROUP BY x.category, xc.label, x.status`,
     [ctx.workspaceId, month],
   );
   const approved = rows.filter((r) => r.status === "approved");
   const pending = rows.filter((r) => r.status === "pending");
-  const byCategory = new Map<ExpenseCategory, number>();
-  for (const r of approved) byCategory.set(r.category, round2((byCategory.get(r.category) ?? 0) + Number(r.total)));
+  const byCategory = new Map<string, { label: string; total: number }>();
+  for (const r of approved) {
+    const had = byCategory.get(r.category);
+    byCategory.set(r.category, { label: r.label, total: round2((had?.total ?? 0) + Number(r.total)) });
+  }
   return {
     month,
     spent: round2(approved.reduce((a, r) => a + Number(r.total), 0)),
     pending: round2(pending.reduce((a, r) => a + Number(r.total), 0)),
     pendingCount: pending.reduce((a, r) => a + Number(r.count), 0),
-    byCategory: [...byCategory.entries()].map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total),
+    byCategory: [...byCategory.entries()].map(([category, v]) => ({ category, label: v.label, total: v.total })).sort((a, b) => b.total - a.total),
   };
 }
 

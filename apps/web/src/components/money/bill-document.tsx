@@ -1,4 +1,4 @@
-import { formatDate, formatMoney, formatPhone, PAYMENT_METHOD_LABELS, rupeesInWords, stateName } from "@wedding-yantra/core";
+import { formatDate, formatMoney, formatPhone, rupeesInWords, stateName } from "@wedding-yantra/core";
 import { UNIT_LABELS, type Bill, type Payment } from "@wedding-yantra/types";
 import { BusinessMark } from "@/components/app/business-mark";
 import { cn } from "@/lib/cn";
@@ -16,7 +16,7 @@ export interface BillDocumentProps {
   logoUrl?: string | null;
   };
   bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
-    payments: Pick<Payment, "number" | "amount" | "paidOn" | "method">[];
+    payments: Pick<Payment, "number" | "amount" | "paidOn" | "method" | "methodLabel">[];
   };
   className?: string;
 }
@@ -64,13 +64,20 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
         </div>
         {/* Sits under the business on a phone, so it lines up left there */}
         <div className="sm:text-right">
-          <p className="text-xs font-extrabold uppercase tracking-wider text-brand-strong">{gst ? "Tax invoice" : "Bill"}</p>
+          <p className="text-xs font-extrabold uppercase tracking-wider text-brand-strong">{gst ? "Tax invoice" : "Invoice"}</p>
           <p className="font-display text-xl font-extrabold tabular">{bill.number}</p>
           <div className="mt-2 flex sm:justify-end print:hidden">
             <BillStatusPill bill={bill} />
           </div>
         </div>
       </header>
+
+      {bill.subject && (
+        <p className="border-b border-line px-6 py-3 text-[15px] font-semibold sm:px-8">
+          <span className="font-normal text-ink-muted">For: </span>
+          {bill.subject}
+        </p>
+      )}
 
       <div className="grid gap-5 border-b border-line p-6 sm:grid-cols-3 sm:p-8">
         <div>
@@ -82,7 +89,7 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
         </div>
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Bill date</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Invoice date</p>
             <p className="mt-0.5 font-bold">{formatDate(bill.issueDate)}</p>
           </div>
           {bill.dueDate && (
@@ -214,7 +221,7 @@ export function BillDocument({ business, bill, className }: BillDocumentProps) {
             {payments.map((p) => (
               <li key={p.number} className="flex items-baseline justify-between gap-4">
                 <span>
-                  {formatDate(p.paidOn)} · {PAYMENT_METHOD_LABELS[p.method]} <span className="text-ink-muted">({p.number})</span>
+                  {formatDate(p.paidOn)} · {p.methodLabel} <span className="text-ink-muted">({p.number})</span>
                 </span>
                 <span className="font-semibold tabular">{money(p.amount)}</span>
               </li>

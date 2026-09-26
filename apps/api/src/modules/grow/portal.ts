@@ -1,11 +1,12 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { can, eventIsOver, quoteNumber, receiptNumber, round2, type PaymentMethod } from "@wedding-yantra/core";
+import { can, eventIsOver, quoteNumber, receiptNumber, round2 } from "@wedding-yantra/core";
 import type { ClientPortal, ClientPortalLink, DeliverableStatus, EventType, PortalEvent } from "@wedding-yantra/types";
 import { withTransaction, type Db } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { logoPath } from "../files/logo.js";
+import { optionJoin } from "../options/service.js";
 
 const requireShare = (ctx: MemberContext) => {
   if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can share a client's page");
@@ -148,9 +149,10 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
         ORDER BY b.issue_date DESC, b.seq DESC`,
       ids,
     ),
-    db.query<{ number: number; amount: string; paid_on: string; method: PaymentMethod }>(
-      `SELECT p.number, p.amount, p.paid_on::text AS paid_on, p.method
+    db.query<{ number: number; amount: string; paid_on: string; method: string; method_label: string }>(
+      `SELECT p.number, p.amount, p.paid_on::text AS paid_on, p.method, coalesce(pm.label, p.method) AS method_label
          FROM payments p
+         ${optionJoin("pm", "payment_method", "p.workspace_id", "p.method")}
         WHERE p.workspace_id = $1 AND p.deleted_at IS NULL
           AND (p.client_id = $2
                OR p.event_id IN (SELECT id FROM events WHERE client_id = $2 AND deleted_at IS NULL)
@@ -197,6 +199,7 @@ export async function getPortal(db: Db, token: string): Promise<ClientPortal> {
     amount: Number(p.amount),
     paidOn: p.paid_on,
     method: p.method,
+    methodLabel: p.method_label,
   }));
 
   return {
