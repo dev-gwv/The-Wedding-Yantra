@@ -102,7 +102,7 @@ export default function MorePage() {
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
             {(can(workspace.role, "catalogue.manage") || can(workspace.role, "quotes.view")) && (
-              <Row href="/app/settings/services" icon={Package} label="Services and prices" />
+              <Row href="/app/services" icon={Package} label="Services and packages" />
             )}
           </Card>
         </>

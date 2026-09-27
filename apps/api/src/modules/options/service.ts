@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { BUILTIN_OPTIONS, can, OPTION_LISTS, TRADE_EXPENSE_CATEGORIES, type OptionList, type Permission } from "@wedding-yantra/core";
+import { BUILTIN_OPTIONS, can, GENERAL_SERVICE_CATEGORIES, OPTION_LISTS, TRADE_EXPENSE_CATEGORIES, tradeSeed, type OptionList, type Permission } from "@wedding-yantra/core";
 import type { CustomOption } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
@@ -35,15 +35,24 @@ const ADD_RIGHT: Record<OptionList, Permission[]> = {
   vendor_category: ["expenses.approve"],
   designation: ["members.hr"],
   venue_type: ["events.manage"],
+  service_category: ["catalogue.manage"],
 };
 
-/** A new business starts with the built-in options, plus the categories its trade usually needs. */
+/**
+ * A new business starts with the built-in options, plus what its trade usually needs:
+ * expense and service categories, designations and vendor categories of its own.
+ */
 export async function installOptions(db: Queryable, workspaceId: string, businessTypeId: string): Promise<void> {
+  const trade = tradeSeed(businessTypeId);
   for (const list of OPTION_LISTS) {
     const seeds = [...BUILTIN_OPTIONS[list]];
     if (list === "expense_category") {
       for (const label of TRADE_EXPENSE_CATEGORIES[businessTypeId] ?? []) seeds.push({ key: newKey(), label });
     }
+    if (list === "service_category") seeds.push(...(trade?.serviceCategories ?? GENERAL_SERVICE_CATEGORIES));
+    // A trade's own come first: they're what it picks most.
+    if (list === "designation") seeds.unshift(...(trade?.designations ?? []));
+    if (list === "vendor_category") seeds.unshift(...(trade?.vendorCategories ?? []));
     for (const [position, o] of seeds.entries()) {
       await db.query(
         `INSERT INTO custom_options (workspace_id, list, key, label, position) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,

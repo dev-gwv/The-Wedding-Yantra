@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master 0034_services_and_packages; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -84,6 +84,10 @@ expect "the pipeline counts it" '.success and .data.stages[0].leadCount == 1' \
 LEAD_ID="$(echo "$LEAD" | jq -r '.data.id')"
 expect "the trade's starter price list is installed" '.success and (.data | length) >= 3' \
   "$(api GET "/api/v1/workspaces/$WS_ID/catalogue" "" "$TOKEN")"
+expect "a makeup artist's services come in its own categories" '.success and ([.data[] | select(.name == "Bridal HD makeup")][0].categoryLabel == "Bridal")' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/catalogue" "" "$TOKEN")"
+expect "and it starts with example packages for its trade" '.success and ([.data[] | select(.name == "Bridal package")][0].worth == 28500)' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/packages" "" "$TOKEN")"
 QUOTE="$(api POST "/api/v1/workspaces/$WS_ID/quotes" \
   "{\"leadId\":\"$LEAD_ID\",\"title\":\"Bridal package\",\"items\":[{\"name\":\"Bridal makeup\",\"unit\":\"event\",\"quantity\":1,\"rate\":25000,\"taxRate\":18}]}" \
   "$TOKEN")"

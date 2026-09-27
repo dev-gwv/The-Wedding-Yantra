@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SERVICE_UNITS = ["event", "day", "hour", "plate", "piece", "set", "person"] as const;
+export const SERVICE_UNITS = ["event", "day", "hour", "plate", "piece", "set", "person", "look", "session", "song", "kg", "sqft"] as const;
 export type ServiceUnit = (typeof SERVICE_UNITS)[number];
 
 export const UNIT_LABELS: Record<ServiceUnit, string> = {
@@ -11,6 +11,11 @@ export const UNIT_LABELS: Record<ServiceUnit, string> = {
   piece: "per piece",
   set: "per set",
   person: "per person",
+  look: "per look",
+  session: "per session",
+  song: "per song",
+  kg: "per kg",
+  sqft: "per sq ft",
 };
 
 /** Ready-made setup installed for a new business of this type. Every item can be edited. */

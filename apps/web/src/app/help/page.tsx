@@ -43,6 +43,8 @@ const GUIDES: Guide[] = [
     title: "Quotes",
     steps: [
       "Make a quote from an enquiry or a client. Pick services from your price list; change the quantity or price for this client if you need to.",
+      "Keep what you sell in Master data, Services and packages. Services are grouped your way: a makeup artist starts with Bridal, Party and family, Hair and draping; a photographer with Photography, Films, Albums; a caterer with Menus and Live counters. Charge per event, day, hour, look, session, song, plate, person, piece, kg or sq ft.",
+      "A package sells several things at one price: your services with how many of each, plus plain lines like \"Trial session\" or \"3 starters\". Price it per event, or per plate or per person for menus and bars. It shows what the client saves. On a quote or invoice, tap From price list and pick the package: it goes on as one line with everything in it listed underneath.",
       "Share the quote's link on WhatsApp. The client opens it without signing in and accepts with a tap.",
       "When they accept, the enquiry is marked booked and the event is made for you, with the date.",
     ],

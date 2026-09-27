@@ -149,7 +149,8 @@ const gstin = z
 export const billItemInput = z.object({
   catalogueItemId: z.uuid().nullable().optional(),
   name: z.string().trim().min(1, "Name this line").max(100),
-  description: optionalText(300),
+  /** What's included: a package lists everything in it here */
+  description: optionalText(1000),
   sac: sacCode,
   unit: z.enum(SERVICE_UNITS),
   quantity: z.coerce.number().positive("More than zero").max(100_000),

@@ -1,9 +1,9 @@
 "use client";
 
 import { formatMoney, GST_RATE_CHOICES } from "@wedding-yantra/core";
-import { useCatalogue, useCreateCatalogueItem } from "@wedding-yantra/api-client/react";
-import { SERVICE_UNITS, UNIT_LABELS, type CatalogueItem, type ServiceUnit } from "@wedding-yantra/types";
-import { BookmarkPlus, Check, Plus, Search, Trash2 } from "lucide-react";
+import { useCatalogue, useCreateCatalogueItem, usePackages } from "@wedding-yantra/api-client/react";
+import { packageLineDescription, SERVICE_UNITS, UNIT_LABELS, type CatalogueItem, type ServicePackage, type ServiceUnit } from "@wedding-yantra/types";
+import { BookmarkPlus, Check, Package, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,9 @@ export function LineItemsEditor({
 }) {
   const { workspace } = useCurrentWorkspace();
   const saveItem = useCreateCatalogueItem(workspace.id);
+  const packages = usePackages(workspace.id, true);
+  // A package's line is already saved, as the package.
+  const isPackage = (line: EditableLine) => (packages.data ?? []).some((p) => p.name.toLowerCase() === line.name.trim().toLowerCase());
   const toast = useToast();
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
@@ -122,6 +125,25 @@ export function LineItemsEditor({
         rate: String(item.price),
         // On a GST invoice, a service saved without a rate starts at 18%, the usual rate for services.
         taxRate: allowGst ? item.taxRate || 18 : 0,
+      },
+    ]);
+    setPicking(false);
+  }
+
+  /** A package goes on as one line: its name, one price, and everything in it underneath. */
+  function addPackage(p: ServicePackage) {
+    onChange([
+      ...lines,
+      {
+        key: nextKey(),
+        catalogueItemId: null,
+        name: p.name,
+        description: packageLineDescription(p),
+        sac: p.sac,
+        unit: p.unit,
+        quantity: "1",
+        rate: String(p.price),
+        taxRate: allowGst ? p.taxRate || 18 : 0,
       },
     ]);
     setPicking(false);
@@ -178,12 +200,13 @@ export function LineItemsEditor({
                     value={line.description}
                     onChange={(e) => setLine(line.key, { description: e.target.value })}
                     rows={1}
-                    maxLength={300}
+                    maxLength={1000}
                     placeholder="Add a description: what's included, dates, hours"
                     aria-label={`Line ${i + 1} description`}
                     className="block min-h-10 w-full resize-y rounded-xl border border-dashed border-line px-3 py-2 text-sm text-ink-muted focus:border-sun-300 focus:text-ink focus:outline-none"
                   />
                 )}
+                {!detailed && line.description && <p className="whitespace-pre-line px-1 text-sm text-ink-muted">{line.description}</p>}
               </div>
               <button
                 type="button"
@@ -255,7 +278,7 @@ export function LineItemsEditor({
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <span className="flex items-center gap-3">
                 {lineError(i) && <span className="text-sm text-danger">{lineError(i)}</span>}
-                {!lineError(i) && line.catalogueItemId === null && line.name.trim().length >= 2 && Number(line.rate) > 0 && (
+                {!lineError(i) && line.catalogueItemId === null && line.name.trim().length >= 2 && Number(line.rate) > 0 && !isPackage(line) && (
                   <button
                     type="button"
                     onClick={() => void saveToPriceList(line)}
@@ -264,6 +287,11 @@ export function LineItemsEditor({
                   >
                     <BookmarkPlus className="size-3.5" /> {saving === line.key ? "Saving…" : "Save to price list"}
                   </button>
+                )}
+                {!line.catalogueItemId && isPackage(line) && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-subtle">
+                    <Package className="size-3.5" /> A package
+                  </span>
                 )}
                 {line.catalogueItemId && detailed && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-subtle">
@@ -285,7 +313,7 @@ export function LineItemsEditor({
           <Plus className="size-4" strokeWidth={2.5} /> A one-off line
         </Button>
       </div>
-      <CataloguePicker open={picking} onClose={() => setPicking(false)} onPick={addFromCatalogue} onCustom={addCustom} />
+      <CataloguePicker open={picking} onClose={() => setPicking(false)} onPick={addFromCatalogue} onPickPackage={addPackage} onCustom={addCustom} />
     </section>
   );
 }
@@ -294,20 +322,25 @@ function CataloguePicker({
   open,
   onClose,
   onPick,
+  onPickPackage,
   onCustom,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (item: CatalogueItem) => void;
+  onPickPackage: (p: ServicePackage) => void;
   onCustom: () => void;
 }) {
   const { workspace } = useCurrentWorkspace();
   const items = useCatalogue(workspace.id);
+  const packages = usePackages(workspace.id, false, open);
   const [q, setQ] = useState("");
-  const shown = (items.data ?? []).filter((i) => !q || i.name.toLowerCase().includes(q.toLowerCase()));
+  const match = (name: string) => !q || name.toLowerCase().includes(q.toLowerCase());
+  const shown = (items.data ?? []).filter((i) => match(i.name));
+  const shownPackages = (packages.data ?? []).filter((p) => match(p.name));
   return (
-    <Sheet open={open} onClose={onClose} title="Add from your price list">
-      {(items.data?.length ?? 0) > 6 && (
+    <Sheet open={open} onClose={onClose} title="Add a service or package">
+      {(items.data?.length ?? 0) + (packages.data?.length ?? 0) > 6 && (
         <label className="relative mb-3 block">
           <span className="sr-only">Find a service</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-subtle" />
@@ -324,7 +357,24 @@ function CataloguePicker({
           <Spinner />
         </div>
       )}
-      <ul className="-mx-2 max-h-[50dvh] space-y-1 overflow-y-auto">
+      <ul className="-mx-2 max-h-[55dvh] space-y-1 overflow-y-auto">
+        {shownPackages.length > 0 && <li className="px-3 pt-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Packages</li>}
+        {shownPackages.map((p) => (
+          <li key={p.id}>
+            <button type="button" onClick={() => onPickPackage(p)} className="flex w-full items-baseline justify-between gap-3 rounded-2xl px-3 py-3 text-left hover:bg-cream">
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Package className="size-4 shrink-0 text-brand-strong" /> {p.name}
+                </span>
+                <span className="block truncate text-sm text-ink-muted">{p.items.map((i) => i.name).join(", ")}</span>
+              </span>
+              <span className="shrink-0 text-sm text-ink-muted tabular">
+                <span className="font-bold text-ink">{formatMoney(p.price)}</span> {UNIT_LABELS[p.unit]}
+              </span>
+            </button>
+          </li>
+        ))}
+        {shownPackages.length > 0 && shown.length > 0 && <li className="px-3 pt-3 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Services</li>}
         {shown.map((item) => (
           <li key={item.id}>
             <button

@@ -6,10 +6,12 @@ import {
   declineQuoteInput,
   eventInput,
   eventListQuery,
+  packageInput,
   QUOTE_STATUSES,
   quoteInput,
   updateCatalogueItemInput,
   updateEventInput,
+  updatePackageInput,
   updateQuoteInput,
 } from "@wedding-yantra/types";
 import { z } from "zod";
@@ -18,6 +20,7 @@ import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as catalogue from "./catalogue.js";
 import * as events from "./events.js";
+import * as packages from "./packages.js";
 import * as quotes from "./quotes.js";
 
 type Ws = { Params: { workspaceId: string } };
@@ -46,6 +49,29 @@ export function bookingRoutes(app: FastifyInstance, deps: { db: Db }) {
     const ctx = await member(request, request.params.workspaceId);
     const id = assertId(request.params.id, "This service");
     return ok(await catalogue.updateCatalogueItem(db, ctx, id, parse(updateCatalogueItemInput, request.body)));
+  });
+
+  // ---- Packages: services sold together at one price -------------------------
+  app.get<Ws & { Querystring: { all?: string } }>("/workspaces/:workspaceId/packages", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await packages.listPackages(db, ctx, request.query.all === "true"));
+  });
+  app.post<Ws>("/workspaces/:workspaceId/packages", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return reply.status(201).send(ok(await packages.createPackage(db, ctx, parse(packageInput, request.body))));
+  });
+  app.post<Ws>("/workspaces/:workspaceId/packages/starter", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await packages.addStarterPackages(db, ctx));
+  });
+  app.patch<WsId>("/workspaces/:workspaceId/packages/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await packages.updatePackage(db, ctx, assertId(request.params.id, "This package"), parse(updatePackageInput, request.body)));
+  });
+  app.delete<WsId>("/workspaces/:workspaceId/packages/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    await packages.deletePackage(db, ctx, assertId(request.params.id, "This package"));
+    return ok({ deleted: true as const });
   });
 
   // ---- Quotes ---------------------------------------------------------------

@@ -144,6 +144,9 @@ import type {
   OtpRequestResult,
   OtpVerifyInput,
   Team,
+  ServicePackage,
+  PackageInput,
+  UpdatePackageInput,
   Venue,
   VenueInput,
   VenueSummary,
@@ -501,6 +504,15 @@ export function createApiClient(options: ApiClientOptions) {
       update: (workspaceId: string, id: string, input: UpdateVendorInput) =>
         request<Vendor>("PATCH", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`, input),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`),
+    },
+    packages: {
+      list: (workspaceId: string, all = false) => request<ServicePackage[]>("GET", `${ws(workspaceId)}/packages${qs({ all: all ? "true" : undefined })}`),
+      create: (workspaceId: string, input: PackageInput) => request<ServicePackage>("POST", `${ws(workspaceId)}/packages`, input),
+      update: (workspaceId: string, id: string, input: UpdatePackageInput) =>
+        request<ServicePackage>("PATCH", `${ws(workspaceId)}/packages/${encodeURIComponent(id)}`, input),
+      remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/packages/${encodeURIComponent(id)}`),
+      /** Add the example packages for the business's trade */
+      addStarter: (workspaceId: string) => request<ServicePackage[]>("POST", `${ws(workspaceId)}/packages/starter`),
     },
     venues: {
       list: (workspaceId: string, archived = false) =>

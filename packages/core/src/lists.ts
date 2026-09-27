@@ -5,7 +5,7 @@
  * hidden option still shows its name on the records that use it.
  */
 
-export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category", "designation", "venue_type"] as const;
+export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category", "designation", "venue_type", "service_category"] as const;
 export type OptionList = (typeof OPTION_LISTS)[number];
 
 export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; about: string }> = {
@@ -14,6 +14,7 @@ export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; 
   task_tag: { title: "Task tags", one: "tag", about: "Group tasks by kind of work, and filter the task board by them." },
   vendor_category: { title: "Vendor categories", one: "category", about: "What your vendors do: florist, tent and décor, lights, DJ, caterer." },
   relation: { title: "Relationships", one: "relationship", about: "Who the client and their emergency contacts are to the wedding: bride, groom, bride's father…" },
+  service_category: { title: "Service categories", one: "category", about: "How your price list is grouped: bridal, party, films, menus, add-ons. Each trade starts with its own." },
   venue_type: { title: "Venue types", one: "venue type", about: "Kinds of places your events happen: banquet hall, hotel, lawn, farmhouse." },
   designation: { title: "Designations", one: "designation", about: "What each person in your team does: photographer, editor, coordinator, driver." },
 };
@@ -89,6 +90,8 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
     { key: "accounts", label: "Accounts" },
     { key: "other", label: "Other" },
   ],
+  // Each trade gets its own (see trades.ts); nothing is common to all.
+  service_category: [],
   venue_type: [
     { key: "banquet", label: "Banquet hall" },
     { key: "hotel", label: "Hotel" },

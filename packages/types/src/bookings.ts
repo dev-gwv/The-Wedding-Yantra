@@ -18,6 +18,11 @@ export const GST_RATES = [0, 3, 5, 12, 18, 28, 40] as const;
 export interface CatalogueItem {
   id: string;
   name: string;
+  /** A key from the business's "service_category" list */
+  category: string | null;
+  /** The category's name */
+  categoryLabel: string | null;
+  /** What's included */
   description: string | null;
   unit: ServiceUnit;
   price: number;
@@ -35,7 +40,14 @@ const gst = z.coerce
 
 const catalogueFields = {
   name: z.string().trim().min(2, "Name the service").max(100),
-  description: optionalText(300),
+  category: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v || null)),
+  description: optionalText(1000),
   unit: z.enum(SERVICE_UNITS),
   price: money,
   taxRate: gst,
@@ -53,6 +65,66 @@ export type CatalogueItemInput = z.input<typeof catalogueItemInput>;
 /** Only the fields sent change: no defaults, so hiding a service keeps its GST rate. */
 export const updateCatalogueItemInput = z.object(catalogueFields).partial().extend({ active: z.boolean().optional() });
 export type UpdateCatalogueItemInput = z.input<typeof updateCatalogueItemInput>;
+
+// ---------------------------------------------------------------------------
+// Packages: services sold together at one price, for any trade
+// ---------------------------------------------------------------------------
+
+/** One thing a package includes: a service from the price list, or a plain line. */
+export interface PackageItem {
+  id: string;
+  catalogueItemId: string | null;
+  /** The service's name, or the plain line */
+  name: string;
+  /** How many of the service; null for a plain line */
+  quantity: number | null;
+  unit: ServiceUnit | null;
+  /** The service at its own price times the quantity; null for a plain line */
+  value: number | null;
+}
+
+export interface ServicePackage {
+  id: string;
+  name: string;
+  description: string | null;
+  /** How the package is charged: per event, or per plate / person for food and bar */
+  unit: ServiceUnit;
+  price: number;
+  taxRate: number;
+  sac: string | null;
+  active: boolean;
+  items: PackageItem[];
+  /** Its services at their own prices; more than the price means the client saves */
+  worth: number;
+}
+
+export const packageItemInput = z
+  .object({
+    catalogueItemId: z.uuid().nullable().optional(),
+    text: optionalText(200),
+    quantity: z.coerce.number().positive("More than zero").max(100_000).nullable().optional(),
+  })
+  .refine((i) => !!i.catalogueItemId || !!i.text, { message: "Pick a service or type what's included", path: ["text"] });
+
+const packageFields = {
+  name: z.string().trim().min(2, "Name the package").max(100),
+  description: optionalText(500),
+  unit: z.enum(SERVICE_UNITS),
+  price: money,
+  taxRate: gst,
+  sac: catalogueFields.sac,
+  items: z.array(packageItemInput).min(1, "Add what the package includes").max(40),
+};
+export const packageInput = z.object({ ...packageFields, taxRate: gst.default(0) });
+export type PackageInput = z.input<typeof packageInput>;
+export const updatePackageInput = z.object(packageFields).partial().extend({ active: z.boolean().optional() });
+export type UpdatePackageInput = z.input<typeof updatePackageInput>;
+
+/** A package as one line on a quote or invoice: its name, and everything in it underneath. */
+export function packageLineDescription(p: Pick<ServicePackage, "description" | "items">): string {
+  const included = p.items.map((i) => (i.catalogueItemId && i.quantity && i.quantity !== 1 ? `${i.name} × ${i.quantity}` : i.name));
+  return [p.description, included.length ? `Includes: ${included.join("; ")}` : null].filter(Boolean).join("\n").slice(0, 1000);
+}
 
 // ---------------------------------------------------------------------------
 // Quotes
@@ -121,7 +193,8 @@ export interface Quote extends QuoteSummary {
 export const quoteItemInput = z.object({
   catalogueItemId: z.uuid().nullable().optional(),
   name: z.string().trim().min(1, "Name this line").max(100),
-  description: optionalText(300),
+  /** What's included: a package lists everything in it here */
+  description: optionalText(1000),
   unit: z.enum(SERVICE_UNITS),
   quantity: z.coerce.number().positive("More than zero").max(100_000),
   rate: money,

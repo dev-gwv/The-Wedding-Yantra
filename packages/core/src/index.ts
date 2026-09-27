@@ -15,3 +15,4 @@ export * from "./templates.js";
 export * from "./quotes.js";
 export * from "./repeats.js";
 export * from "./tasks.js";
+export * from "./trades.js";

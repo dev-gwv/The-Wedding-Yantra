@@ -106,7 +106,7 @@ export function QuoteDocument({ business, quote, className }: QuoteDocumentProps
               <tr key={item.id} className="align-top">
                 <td className="py-3 pr-3">
                   <p className="font-semibold">{item.name}</p>
-                  {item.description && <p className="text-sm text-ink-muted">{item.description}</p>}
+                  {item.description && <p className="whitespace-pre-line text-sm text-ink-muted">{item.description}</p>}
                   <p className="text-sm text-ink-muted tabular sm:hidden">
                     {item.quantity} × {formatMoney(item.rate)} {UNIT_LABELS[item.unit]}
                   </p>

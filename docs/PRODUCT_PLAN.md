@@ -1203,3 +1203,31 @@ list with search, a short form, and archive instead of delete.
 - Owners and managers edit; staff and the accountant see; freelancers see venues only on their
   events. Changes are in the activity log.
 
+## 45. Master data, step 5: Services and packages, for every trade
+
+The app serves every kind of wedding business, so the price list is built on what they share
+(things sold at a price per some unit) and each trade starts with its own examples.
+
+- **Services** (existing price list, now at `/app/services`) get a category from the business's
+  own list, `service_category`, seeded per trade (`packages/core/src/trades.ts`): makeup artist
+  Bridal / Party and family / Hair and draping / Add-ons and travel; photographer Photography /
+  Films / Pre-wedding / Albums and prints / Add-ons; caterer Menus / Live counters / Breakfast and
+  hi-tea / Service staff; and so on for all 13 trades, with "Main services / Add-ons" for Other.
+  Starter services land in their category. Each service has a "what's included" line.
+- **More ways to charge:** per look, per session, per song, per kg, per sq ft, besides event, day,
+  hour, plate, piece, set and person.
+- **Packages** (migration 0034, tables `service_packages`, `service_package_items`): a name, a
+  line about it, one price with its own unit (per event, or per plate / person so a caterer's menu
+  or a bar works), GST and SAC, and what's included: services from the price list with a
+  quantity, or plain lines. Shows what its services cost one by one and what the client saves.
+  Hide from new quotes, or delete (quotes and invoices keep their copy).
+- **On a quote or invoice** the picker lists packages first; a package goes on as one line, its
+  contents listed in the line's description (now up to 1,000 characters, shown with line breaks).
+- **Each trade starts with example packages** (bridal package, Wedding Gold 2 days, Silver veg
+  menu per plate, Sangeet night, Grand entry…); businesses made earlier add them with "Start from
+  examples".
+- **The other masters are trade-aware too:** each trade also gets its own designations (hair
+  stylist, draper; second shooter, drone operator; head chef, captain…) and vendor categories
+  (product supplier; album printer; grocery supplier, crockery rental…). The migration adds them
+  to existing businesses by their trade and files their starter services under categories.
+

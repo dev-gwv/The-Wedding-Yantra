@@ -103,7 +103,7 @@ export async function createWorkspace(
       workspaceId,
       userId,
     ]);
-    await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack });
+    await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack, businessTypeId: input.businessTypeId });
     await installChecklist(tx, workspaceId, type.rows[0].starter_pack);
     await installOptions(tx, workspaceId, input.businessTypeId);
     await logActivity(tx, {

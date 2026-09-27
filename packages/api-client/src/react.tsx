@@ -81,6 +81,8 @@ import type {
   EmployeeDetailsInput,
   VenueInput,
   UpdateVenueInput,
+  PackageInput,
+  UpdatePackageInput,
   CreateWorkspaceInput,
   OtpRequestInput,
   OtpVerifyInput,
@@ -128,6 +130,8 @@ export const queryKeys = {
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
   publicForm: (slug: string, ref: string) => ["public-form", slug, ref] as const,
   catalogue: (id: string, all: boolean) => ["workspace", id, "catalogue", all] as const,
+  /** Under the price list: a service's price change changes what a package is worth. */
+  packages: (id: string, all: boolean) => ["workspace", id, "catalogue", "packages", all] as const,
   /** Quotes, events and the calendar; invalidate this after any booking change. */
   bookings: (id: string) => ["workspace", id, "bookings"] as const,
   quotes: (id: string, query: object) => ["workspace", id, "bookings", "quotes", query] as const,
@@ -506,6 +510,31 @@ function useCatalogueMutation<TInput, TResult>(workspaceId: string, fn: (input: 
     mutationFn: fn,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "catalogue"] }),
   });
+}
+
+export function usePackages(workspaceId: string, all = false, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.packages(workspaceId, all), queryFn: () => api.packages.list(workspaceId, all), enabled });
+}
+
+export function useCreatePackage(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, (input: PackageInput) => api.packages.create(workspaceId, input));
+}
+
+export function useUpdatePackage(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, ({ id, ...input }: UpdatePackageInput & { id: string }) => api.packages.update(workspaceId, id, input));
+}
+
+export function useDeletePackage(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, (id: string) => api.packages.remove(workspaceId, id));
+}
+
+export function useAddStarterPackages(workspaceId: string) {
+  const api = useApi();
+  return useCatalogueMutation(workspaceId, () => api.packages.addStarter(workspaceId));
 }
 
 export function useCreateCatalogueItem(workspaceId: string) {

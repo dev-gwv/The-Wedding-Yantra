@@ -21,7 +21,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
@@ -82,10 +82,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <Link
             href="/app/masters"
-            aria-current={["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team"].some((p) => pathname.startsWith(p)) ? "page" : undefined}
+            aria-current={["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team", "/app/services"].some((p) => pathname.startsWith(p)) ? "page" : undefined}
             className={cn(
               "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-              ["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team"].some((p) => pathname.startsWith(p)) ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+              ["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team", "/app/services"].some((p) => pathname.startsWith(p)) ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
             )}
           >
             <Database className="size-[18px] shrink-0" strokeWidth={2} />
