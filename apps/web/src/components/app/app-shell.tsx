@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
+import { CalendarDays, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -21,7 +21,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
@@ -79,6 +79,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Sun className="size-[18px] shrink-0" strokeWidth={2} />
             My day
+          </Link>
+          <Link
+            href="/app/masters"
+            aria-current={pathname.startsWith("/app/masters") || pathname.startsWith("/app/clients") ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
+              pathname.startsWith("/app/masters") || pathname.startsWith("/app/clients") ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+            )}
+          >
+            <Database className="size-[18px] shrink-0" strokeWidth={2} />
+            Master data
           </Link>
           <AlertBell
             label

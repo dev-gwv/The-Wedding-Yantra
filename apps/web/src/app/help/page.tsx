@@ -67,6 +67,10 @@ const GUIDES: Guide[] = [
     id: "clients",
     title: "Clients, reviews and referrals",
     steps: [
+      "More, Master data holds the records everything else is built on. Start with Clients: a client is a family, a company, or a planner who sends you work.",
+      "Add everyone you deal with under Family and contacts (the bride, groom, parents, a planner), each with their relation and number. Note the bride's and groom's names and the number of guests; the wedding date comes from their event.",
+      "Under Billing, add the name on invoices, the address, the state and a GST number if they have one. New invoices for the client fill these in, and the state decides CGST + SGST or IGST.",
+      "Archive old clients instead of deleting them: their events and invoices stay, and you can bring them back. Search finds a family by any name or number in it. Change the relations in Master data, Lists.",
       "Give each client their own page: on the client, tap “Make their page” and send it on WhatsApp. It shows their event dates, quotes, invoices with Pay by UPI, and what they've paid, always up to date. No sign-in needed.",
       "Stop sharing whenever you like. The old link stops working at once.",
       "Add your Google review link in Business profile. Once an event is over, the event shows “Ask for a review”: one tap sends a polite WhatsApp message with the link.",

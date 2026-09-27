@@ -31,6 +31,7 @@ const ADD_RIGHT: Record<OptionList, Permission[]> = {
   payment_method: ["payments.record", "bills.manage"],
   expense_category: ["expenses.submit"],
   task_tag: ["tasks.manage"],
+  relation: ["clients.manage"],
 };
 
 /** A new business starts with the built-in options, plus the categories its trade usually needs. */

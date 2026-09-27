@@ -274,7 +274,8 @@ export function createApiClient(options: ApiClientOptions) {
         request<PipelineStage[]>("PUT", `${ws(workspaceId)}/pipeline-stages`, input),
     },
     clients: {
-      list: (workspaceId: string, q?: string) => request<ClientSummary[]>("GET", `${ws(workspaceId)}/clients${qs({ q })}`),
+      list: (workspaceId: string, q?: string, archived = false) =>
+        request<ClientSummary[]>("GET", `${ws(workspaceId)}/clients${qs({ q, archived: archived ? "true" : undefined })}`),
       get: (workspaceId: string, id: string) => request<Client>("GET", `${ws(workspaceId)}/clients/${encodeURIComponent(id)}`),
       create: (workspaceId: string, input: ClientInput) => request<Client>("POST", `${ws(workspaceId)}/clients`, input),
       update: (workspaceId: string, id: string, input: UpdateClientInput) =>

@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { optionalText } from "./common.js";
-import type { CustomValues } from "@wedding-yantra/core";
+import { STATE_CODES, type CustomValues } from "@wedding-yantra/core";
 import { personName, phone } from "./auth.js";
 import { customValuesInput } from "./custom.js";
+import { GSTIN_PATTERN } from "./workspaces.js";
 
 // ---------------------------------------------------------------------------
 // Fixed lists
@@ -262,18 +263,52 @@ export type SaveStagesInput = z.input<typeof saveStagesInput>;
 // Clients
 // ---------------------------------------------------------------------------
 
+export const CLIENT_KINDS = ["family", "company", "agency"] as const;
+export type ClientKind = (typeof CLIENT_KINDS)[number];
+export const CLIENT_KIND_LABELS: Record<ClientKind, string> = {
+  family: "Family",
+  company: "Company",
+  agency: "Planner or agency",
+};
+
 export interface ClientSummary {
   id: string;
   name: string;
   phone: string | null;
   email: string | null;
   city: string | null;
+  kind: ClientKind;
+  archived: boolean;
+  /** The next (or latest) function date of their events */
+  weddingDate: string | null;
   leadCount: number;
   createdAt: string;
 }
 
+export interface ClientContact {
+  id: string;
+  name: string;
+  /** A key from the business's "relation" list */
+  relation: string | null;
+  phone: string | null;
+}
+
 export interface Client extends ClientSummary {
   notes: string | null;
+  source: LeadSource | null;
+  contacts: ClientContact[];
+  wedding: {
+    brideName: string | null;
+    groomName: string | null;
+    guestCount: number | null;
+  };
+  billing: {
+    name: string | null;
+    address: string | null;
+    /** GST state code, e.g. "27" for Maharashtra */
+    stateCode: string | null;
+    gstin: string | null;
+  };
   leads: LeadSummary[];
   /** Enquiries this client sent your way */
   referredLeads: LeadSummary[];
@@ -284,6 +319,19 @@ export interface Client extends ClientSummary {
   noMessages: boolean;
 }
 
+export const clientContactInput = z.object({
+  name: personName,
+  relation: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v || null)),
+  phone: optionalPhone,
+});
+export type ClientContactInput = z.input<typeof clientContactInput>;
+
 export const clientInput = z.object({
   name: personName,
   phone: optionalPhone,
@@ -292,9 +340,46 @@ export const clientInput = z.object({
   notes: optionalText(2000),
   custom: customValuesInput,
   noMessages: z.boolean().optional(),
+  kind: z.enum(CLIENT_KINDS).optional(),
+  source: z.enum(LEAD_SOURCES).nullable().optional(),
+  /** The whole family, in order. Sent: replaces the list; left out: unchanged. */
+  contacts: z.array(clientContactInput).max(20, "Up to 20 contacts").optional(),
+  wedding: z
+    .object({
+      brideName: optionalText(80),
+      groomName: optionalText(80),
+      guestCount: z
+        .union([z.literal(""), z.coerce.number().int("Use a whole number").min(0).max(100000)])
+        .nullable()
+        .optional()
+        .transform((v) => (v === undefined ? undefined : v === "" || v === null ? null : v)),
+    })
+    .optional(),
+  billing: z
+    .object({
+      name: optionalText(120),
+      address: optionalText(300),
+      stateCode: z
+        .enum(STATE_CODES)
+        .nullable()
+        .optional()
+        .or(z.literal("").transform(() => null)),
+      gstin: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .refine((v) => v === "" || GSTIN_PATTERN.test(v), "GST number should look like 27ABCDE1234F1Z5")
+        .nullable()
+        .optional()
+        .transform((v) => (v === undefined ? undefined : v || null)),
+    })
+    .optional(),
 });
 export type ClientInput = z.input<typeof clientInput>;
-export const updateClientInput = clientInput.partial();
+export const updateClientInput = clientInput.partial().extend({
+  /** Archive (true) or bring back (false) */
+  archived: z.boolean().optional(),
+});
 export type UpdateClientInput = z.input<typeof updateClientInput>;
 
 // ---------------------------------------------------------------------------

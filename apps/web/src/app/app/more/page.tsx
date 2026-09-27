@@ -5,6 +5,7 @@ import { useApi, useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  Database,
   Award,
   Bell,
   Sun,
@@ -78,6 +79,17 @@ export default function MorePage() {
         </div>
       </Card>
 
+      <Link href="/app/masters" className="mb-6 flex items-center gap-4 rounded-3xl border border-line bg-surface p-4 shadow-soft transition hover:border-sun-300 sm:p-5">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand shadow-soft">
+          <Database className="size-6" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-lg font-extrabold">Master data</span>
+          <span className="block text-sm text-ink-muted">Clients, employees, vendors, venues, services and lists</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
+      </Link>
+
       {(leadScope(workspace.role) !== "none" || can(workspace.role, "clients.view")) && (
         <>
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
@@ -119,7 +131,7 @@ export default function MorePage() {
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
         {can(workspace.role, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
-        {can(workspace.role, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: payment modes, expense categories" />}
+        {can(workspace.role, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: relations, communities, payment modes and more" />}
         {can(workspace.role, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}

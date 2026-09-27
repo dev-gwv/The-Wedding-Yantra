@@ -1,14 +1,15 @@
 "use client";
 
-import { can, formatPhone, whatsappLink } from "@wedding-yantra/core";
-import { useBills, useClient, useEvents, useQuotes } from "@wedding-yantra/api-client/react";
-import type { Client } from "@wedding-yantra/types";
-import { FilePlus2, FileText, MessageCircle, Pencil, Phone } from "lucide-react";
+import { can, formatDate, formatPhone, stateName, whatsappLink } from "@wedding-yantra/core";
+import { useBills, useClient, useEvents, useQuotes, useUpdateClient } from "@wedding-yantra/api-client/react";
+import { CLIENT_KIND_LABELS, SOURCE_LABELS, type Client } from "@wedding-yantra/types";
+import { Archive, ArchiveRestore, FilePlus2, FileText, MessageCircle, Pencil, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { CustomFieldList } from "@/components/app/custom-fields";
+import { useOptionList } from "@/components/app/option-picker";
 import { EventCard } from "@/components/bookings/event-card";
 import { QuoteRow } from "@/components/bookings/quote-row";
 import { PortalCard } from "@/components/grow/portal-card";
@@ -51,6 +52,12 @@ export default function ClientPage() {
                 <p className="text-ink-muted tabular">
                   {[c.phone ? formatPhone(c.phone) : null, c.city, c.email].filter(Boolean).join(" · ")}
                 </p>
+                <p className="mt-1 flex flex-wrap gap-1.5 text-xs font-bold">
+                  <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-muted">{CLIENT_KIND_LABELS[c.kind]}</span>
+                  {c.weddingDate && <span className="rounded-full bg-sun-50 px-2.5 py-0.5 text-brand-strong">{formatDate(c.weddingDate)}</span>}
+                  {c.source && <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-muted">From {SOURCE_LABELS[c.source]}</span>}
+                  {c.archived && <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-subtle">Archived</span>}
+                </p>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
@@ -79,10 +86,13 @@ export default function ClientPage() {
                   <Pencil className="size-4" /> Edit
                 </Button>
               )}
+              {can(workspace.role, "clients.manage") && <ArchiveButton client={c} />}
             </div>
             <CustomFieldList entity="client" values={c.custom} className="mt-5" />
             {c.notes && <p className="mt-5 whitespace-pre-line rounded-2xl bg-cream p-4">{c.notes}</p>}
           </Card>
+
+          <MasterDetails client={c} />
 
           {can(workspace.role, "clients.manage") && <PortalCard client={c} business={workspace.name} />}
 
@@ -167,5 +177,103 @@ function Referred({ client }: { client: Client }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function ArchiveButton({ client }: { client: Client }) {
+  const { workspace } = useCurrentWorkspace();
+  const update = useUpdateClient(workspace.id, client.id);
+  const toast = useToast();
+  return (
+    <Button
+      variant="ghost"
+      loading={update.isPending}
+      onClick={() =>
+        update.mutate(
+          { archived: !client.archived },
+          { onSuccess: () => toast(client.archived ? "Brought back" : "Archived. Their events and invoices stay."), onError: (err) => toast(errorMessage(err), "error") },
+        )
+      }
+    >
+      {client.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />} {client.archived ? "Bring back" : "Archive"}
+    </Button>
+  );
+}
+
+/** A labelled value, left out when empty. */
+function Item({ label, children }: { label: string; children: React.ReactNode }) {
+  if (children === null || children === undefined || children === "") return null;
+  return (
+    <div>
+      <dt className="text-xs font-semibold text-ink-muted">{label}</dt>
+      <dd className="font-semibold">{children}</dd>
+    </div>
+  );
+}
+
+/** The family, the wedding and billing, from the client master. */
+function MasterDetails({ client: c }: { client: Client }) {
+  const relations = useOptionList("relation");
+  const w = c.wedding;
+  const b = c.billing;
+  const hasWedding = w.brideName || w.groomName || w.guestCount !== null;
+  const hasBilling = b.name || b.address || b.stateCode || b.gstin;
+  if (!c.contacts.length && !hasWedding && !hasBilling) return null;
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {c.contacts.length > 0 && (
+        <Card className="overflow-hidden lg:col-span-2">
+          <h2 className="px-5 pt-4 font-display text-lg font-extrabold">Family and contacts</h2>
+          <ul className="mt-2 divide-y divide-line">
+            {c.contacts.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <Avatar name={p.name} className="size-9 text-xs" />
+                <span className="min-w-[10rem] flex-1">
+                  <span className="block font-bold">
+                    {p.name}
+                    {p.relation && <span className="font-semibold text-ink-muted"> · {relations.labelOf(p.relation)}</span>}
+                  </span>
+                  {p.phone && <span className="block text-sm text-ink-muted tabular">{formatPhone(p.phone)}</span>}
+                </span>
+                {p.phone && (
+                  <span className="flex gap-1">
+                    <a href={whatsappLink(`Hi ${p.name.split(" ")[0]}, `, p.phone)} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "secondary", size: "sm" })}>
+                      <MessageCircle className="size-4" /> WhatsApp
+                    </a>
+                    <a href={`tel:${p.phone}`} className={buttonClass({ variant: "ghost", size: "sm" })} aria-label={`Call ${p.name}`}>
+                      <Phone className="size-4" />
+                    </a>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {hasWedding && (
+        <Card className="p-5">
+          <h2 className="mb-3 font-display text-lg font-extrabold">The wedding</h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px]">
+            <Item label="Bride">{w.brideName}</Item>
+            <Item label="Groom">{w.groomName}</Item>
+            <Item label="Guests">{w.guestCount !== null ? w.guestCount.toLocaleString("en-IN") : null}</Item>
+            <Item label="Wedding date">{c.weddingDate ? formatDate(c.weddingDate) : null}</Item>
+          </dl>
+        </Card>
+      )}
+      {hasBilling && (
+        <Card className="p-5">
+          <h2 className="mb-3 font-display text-lg font-extrabold">Billing</h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px]">
+            <Item label="Name on invoices">{b.name}</Item>
+            <Item label="State">{stateName(b.stateCode)}</Item>
+            <div className="col-span-2">
+              <Item label="Address">{b.address}</Item>
+            </div>
+            <Item label="GST number">{b.gstin}</Item>
+          </dl>
+        </Card>
+      )}
+    </div>
   );
 }

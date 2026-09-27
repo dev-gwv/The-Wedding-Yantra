@@ -102,6 +102,14 @@ export function activityText(a: ActivityFacts): string {
       return `paid ${a.other ?? "a vendor"}${money ? ` ${money}` : ""}${a.subject ? ` for ${a.subject}` : ""}`;
     case "deliverable.delivered":
       return `delivered ${q(a.subject)}${a.detail ? ` for ${a.detail}` : ""}${a.late ? ", late" : ""}`;
+    case "client.added":
+      return `added ${subject || "a client"} as a client`;
+    case "client.updated":
+      return `updated ${subject ? `${subject}'s` : "a client's"} details${a.detail ? `: ${a.detail}` : ""}`;
+    case "client.archived":
+      return `archived ${subject || "a client"}`;
+    case "client.restored":
+      return `brought back ${subject || "a client"}`;
     case "client.portal_shared":
       return `shared ${subject ? `${subject}'s` : "a client's"} page with them`;
     case "client.portal_stopped":

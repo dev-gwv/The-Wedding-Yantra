@@ -1133,3 +1133,23 @@ After studying IPC Studios' control center (task manager, accountability board, 
 - The team People board shows each person's points this month.
 - Next (part 4): task sets with default owners, workload warnings, and a task report.
 
+## 41. Master data, step 1: the Master data section and Clients
+
+**The plan** (agreed with the owner, kept simple, built one master at a time): a Master data
+section with Clients, Employees, Vendors, Venues, Services and packages, and Lists. Each is a
+list with search, a short form, and archive instead of delete.
+
+**Built now:**
+- **Master data page** (More, and the desktop side menu): tiles for all six. Clients and Lists
+  are live; the rest say "Coming next" and open today's screens where they exist.
+- **Client master:** a client is a family, a company or a planner/agency.
+  - **Family and contacts:** any number of people, each with a relation (the business's own
+    list) and a mobile.
+  - **The wedding:** bride's and groom's names and guests; the wedding date comes from their
+    events.
+  - **Billing:** name on invoices, address, state, GST number (checked; a second client with the
+    same GST number is refused). A new invoice for the client fills these in and takes the state
+    as the place of supply, so IGST or CGST+SGST follows.
+  - Where they came from (carried over from the enquiry when it's booked), notes, archive and
+    bring back. Search finds a client by family, bride, groom or any contact's name or number.
+    Every change is in the activity log.

@@ -205,8 +205,9 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.link = str(m.eventId) ? { kind: "event", id: str(m.eventId) } : null;
         break;
       case "client":
-        item.subject = (id && clients.get(id)?.name) ?? null;
+        item.subject = (id && clients.get(id)?.name) ?? str(m.name);
         item.link = id ? { kind: "client", id } : null;
+        if (r.action === "client.updated") item.detail = str(m.what);
         break;
       case "bill": {
         const bill = id ? bills.get(id) : undefined;

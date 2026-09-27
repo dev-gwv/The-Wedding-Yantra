@@ -118,7 +118,7 @@ export const queryKeys = {
   sales: (id: string) => ["workspace", id, "sales"] as const,
   leads: (id: string, query: LeadListQuery) => ["workspace", id, "sales", "leads", query] as const,
   lead: (id: string, leadId: string) => ["workspace", id, "sales", "lead", leadId] as const,
-  clients: (id: string, q: string) => ["workspace", id, "sales", "clients", q] as const,
+  clients: (id: string, q: string, archived = false) => ["workspace", id, "sales", "clients", q, archived] as const,
   client: (id: string, clientId: string) => ["workspace", id, "sales", "client", clientId] as const,
   templates: (id: string) => ["workspace", id, "templates"] as const,
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
@@ -397,9 +397,9 @@ export function useSaveStages(workspaceId: string) {
   return useSalesMutation(workspaceId, (input: SaveStagesInput) => api.leads.saveStages(workspaceId, input));
 }
 
-export function useClients(workspaceId: string, q = "") {
+export function useClients(workspaceId: string, q = "", archived = false, enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.clients(workspaceId, q), queryFn: () => api.clients.list(workspaceId, q || undefined) });
+  return useQuery({ queryKey: queryKeys.clients(workspaceId, q, archived), queryFn: () => api.clients.list(workspaceId, q || undefined, archived), enabled });
 }
 
 export function useClient(workspaceId: string, clientId: string) {

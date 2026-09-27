@@ -375,7 +375,7 @@ export async function createLead(db: Db, ctx: MemberContext, input: LeadFields):
 export async function upsertClientForLead(
   db: Queryable,
   ctx: { workspaceId: string; userId: string | null },
-  lead: { name: string; phone: string | null; email: string | null; city: string | null },
+  lead: { name: string; phone: string | null; email: string | null; city: string | null; source?: string | null; guestCount?: number | null },
 ): Promise<string> {
   if (lead.phone) {
     const existing = await db.query<{ id: string }>(
@@ -385,9 +385,9 @@ export async function upsertClientForLead(
     if (existing.rows[0]) return existing.rows[0].id;
   }
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO clients (workspace_id, name, phone, email, city, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [ctx.workspaceId, lead.name, lead.phone, lead.email, lead.city, ctx.userId],
+    `INSERT INTO clients (workspace_id, name, phone, email, city, created_by, source, guest_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [ctx.workspaceId, lead.name, lead.phone, lead.email, lead.city, ctx.userId, lead.source ?? null, lead.guestCount ?? null],
   );
   return rows[0]!.id;
 }
@@ -430,6 +430,9 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
           phone: input.phone !== undefined ? input.phone : current.phone,
           email: input.email !== undefined ? input.email : current.email,
           city: input.city !== undefined ? input.city : current.city,
+          // Where they came from and how big the wedding is carry over to the client.
+          source: input.source ?? current.source,
+          guestCount: input.guestCount !== undefined ? input.guestCount : current.guest_count,
         });
         set("client_id", clientId);
       }

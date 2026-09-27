@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatPhone } from "@wedding-yantra/core";
+import { can, formatDate, formatPhone } from "@wedding-yantra/core";
 import { useClients } from "@wedding-yantra/api-client/react";
 import { ChevronRight, Lock, Plus, Search, UsersRound } from "lucide-react";
 import Link from "next/link";
@@ -20,14 +20,15 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search.trim());
   const canView = can(workspace.role, "clients.view");
-  const clients = useClients(workspace.id, q);
+  const [archived, setArchived] = useState(false);
+  const clients = useClients(workspace.id, q, archived);
   const [adding, setAdding] = useState(false);
   const canManage = can(workspace.role, "clients.manage");
 
   if (!canView) {
     return (
       <>
-        <BackLink href="/app/more" label="More" />
+        <BackLink href="/app/masters" label="Master data" />
         <PageHeader title="Clients" />
         <Card>
           <EmptyState icon={Lock} title="Clients aren't part of your role">
@@ -38,14 +39,14 @@ export default function ClientsPage() {
     );
   }
 
-  const empty = clients.data && clients.data.length === 0 && !q;
+  const empty = clients.data && clients.data.length === 0 && !q && !archived;
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/masters" label="Master data" />
       <PageHeader
         title="Clients"
-        subtitle="People who booked with you. Booked leads are added automatically."
+        subtitle="Families and companies who book you: their contacts, the wedding and billing. Booked enquiries are added automatically."
         action={
           canManage && (
             <Button onClick={() => setAdding(true)}>
@@ -62,10 +63,34 @@ export default function ClientsPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or number"
+            placeholder="Search a name, the bride or groom, or a number"
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-4 text-[15px] placeholder:text-ink-subtle focus:border-sun-300 focus:shadow-glow focus:outline-none"
           />
         </label>
+      )}
+      {!empty && (
+        <div className="mb-4 flex gap-2">
+          {(
+            [
+              [false, "Clients"],
+              [true, "Archived"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={archived === value}
+              onClick={() => setArchived(value)}
+              className={
+                archived === value
+                  ? "h-9 rounded-full bg-ink px-4 text-sm font-bold text-surface"
+                  : "h-9 rounded-full border border-line bg-surface px-4 text-sm font-bold text-ink hover:bg-cream"
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       )}
       {clients.isPending && (
         <div className="flex justify-center py-16 text-brand">
@@ -88,7 +113,7 @@ export default function ClientsPage() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-bold">{c.name}</span>
                 <span className="block truncate text-sm text-ink-muted tabular">
-                  {[c.phone ? formatPhone(c.phone) : null, c.city].filter(Boolean).join(" · ") || "No contact details"}
+                  {[c.weddingDate ? formatDate(c.weddingDate) : null, c.phone ? formatPhone(c.phone) : null, c.city].filter(Boolean).join(" · ") || "No contact details"}
                 </span>
               </span>
               {c.leadCount > 0 && (
@@ -104,6 +129,7 @@ export default function ClientsPage() {
       {clients.data && clients.data.length === 0 && q && (
         <p className="py-12 text-center text-ink-muted">No clients match &ldquo;{q}&rdquo;.</p>
       )}
+      {clients.data && clients.data.length === 0 && !q && archived && <p className="py-12 text-center text-ink-muted">No archived clients.</p>}
       <ClientFormSheet
         open={adding}
         onClose={() => setAdding(false)}

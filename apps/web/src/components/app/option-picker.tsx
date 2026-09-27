@@ -27,6 +27,7 @@ import {
 import Link from "next/link";
 import { createElement, useState, type KeyboardEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
@@ -185,3 +186,37 @@ export function OptionPills({
   );
 }
 
+
+/** One option from a list as a dropdown: for longer lists (relations, communities, budgets). */
+export function OptionSelect({
+  list,
+  value,
+  onChange,
+  label,
+  error,
+  className,
+  none = "Not set",
+}: {
+  list: OptionList;
+  value: string | null;
+  onChange: (key: string | null) => void;
+  label: string;
+  error?: string;
+  className?: string;
+  none?: string;
+}) {
+  const { active, options } = useOptionList(list);
+  // A hidden option still shows while a record uses it.
+  const current = value ? options.find((o) => o.key === value && o.archived) : undefined;
+  const shown = current ? [...active, current] : active;
+  return (
+    <SelectField label={label} value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} error={error} className={className}>
+      <option value="">{none}</option>
+      {shown.map((o) => (
+        <option key={o.key} value={o.key}>
+          {o.label}
+        </option>
+      ))}
+    </SelectField>
+  );
+}

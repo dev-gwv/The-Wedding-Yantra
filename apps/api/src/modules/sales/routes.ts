@@ -72,10 +72,10 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
   });
 
   // ---- Clients --------------------------------------------------------------
-  app.get<Ws & { Querystring: { q?: string } }>("/workspaces/:workspaceId/clients", async (request) => {
+  app.get<Ws & { Querystring: { q?: string; archived?: string } }>("/workspaces/:workspaceId/clients", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     const q = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 80) : undefined;
-    return ok(await clients.listClients(db, ctx, q || undefined));
+    return ok(await clients.listClients(db, ctx, q || undefined, request.query.archived === "true"));
   });
 
   app.post<Ws>("/workspaces/:workspaceId/clients", async (request, reply) => {

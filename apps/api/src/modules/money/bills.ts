@@ -474,16 +474,22 @@ export async function billDraft(
   }
 
   let billTo: BillDraft["billTo"] = { name: "", phone: null, address: null, gstin: null };
+  let placeOfSupply: string | null = null;
   if (clientId) {
-    const c = await db.query<{ name: string; phone: string | null; address: string | null; gstin: string | null }>(
-      `SELECT c.name, c.phone,
-              (SELECT bill_to_address FROM bills WHERE client_id = c.id AND bill_to_address IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS address,
-              (SELECT bill_to_gstin FROM bills WHERE client_id = c.id AND bill_to_gstin IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS gstin
+    // The client master's billing details first; else what their last invoice said.
+    const c = await db.query<{ name: string; phone: string | null; address: string | null; gstin: string | null; state_code: string | null }>(
+      `SELECT coalesce(c.billing_name, c.name) AS name, c.phone,
+              coalesce(c.billing_address,
+                       (SELECT bill_to_address FROM bills WHERE client_id = c.id AND bill_to_address IS NOT NULL ORDER BY created_at DESC LIMIT 1)) AS address,
+              coalesce(c.gstin, (SELECT bill_to_gstin FROM bills WHERE client_id = c.id AND bill_to_gstin IS NOT NULL ORDER BY created_at DESC LIMIT 1)) AS gstin,
+              coalesce(c.state_code, substring(c.gstin from 1 for 2)) AS state_code
          FROM clients c WHERE c.id = $1 AND c.workspace_id = $2 AND c.deleted_at IS NULL`,
       [clientId, ctx.workspaceId],
     );
-    if (!c.rows[0]) throw notFound("This client");
-    billTo = c.rows[0];
+    const row = c.rows[0];
+    if (!row) throw notFound("This client");
+    billTo = { name: row.name, phone: row.phone, address: row.address, gstin: row.gstin };
+    placeOfSupply = row.state_code;
   }
 
   const advance = eventId
@@ -503,7 +509,8 @@ export async function billDraft(
     clientId,
     quoteId,
     billTo,
-    placeOfSupply: null,
+    // The client's state decides CGST+SGST or IGST.
+    placeOfSupply: chargesGst ? placeOfSupply : null,
     issueDate: ws.today,
     dueDate,
     items: chargesGst ? items : items.map((i) => ({ ...i, taxRate: 0 })),
