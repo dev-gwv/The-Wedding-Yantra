@@ -2,7 +2,7 @@
 
 import { formatDate, formatMoney, nextInstalment, upiLink, whatsappLink, type InstalmentStatus } from "@wedding-yantra/core";
 import { usePublicBill } from "@wedding-yantra/api-client/react";
-import { CircleCheck, Copy, FileX, MessageCircle, Printer, Smartphone } from "lucide-react";
+import { CircleCheck, Copy, Download, FileX, MessageCircle, Printer, Smartphone } from "lucide-react";
 import { useParams } from "next/navigation";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ import { LogoMark } from "@/components/app/logo";
 import { BillDocument } from "@/components/money/bill-document";
 import { Button, buttonClass } from "@/components/ui/button";
 import { EmptyState, NextStepCard, Notice } from "@/components/ui/misc";
+import { downloadQrPng } from "@/components/ui/qr-download";
 import { Splash } from "@/components/ui/spinner";
 
 /** The bill link a business sends its client: see the bill, pay the balance by UPI. */
@@ -181,7 +182,18 @@ function PayCard({
               aria-label="QR code to pay by UPI"
               dangerouslySetInnerHTML={qr ? { __html: qr } : undefined}
             />
-            <p className="max-w-40 text-xs text-ink-muted sm:text-center">On a computer? Scan with your phone&apos;s UPI app.</p>
+            <div className="flex flex-col gap-2 sm:items-center">
+              <p className="max-w-40 text-xs text-ink-muted sm:text-center">On a computer? Scan with your phone&apos;s UPI app.</p>
+              <button
+                type="button"
+                onClick={() =>
+                  void downloadQrPng(link, `${business} ${number} UPI QR`, `Pay ${formatMoney(amount)} to ${business}`, `Invoice ${number} · scan with any UPI app`).catch(() => undefined)
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-strong"
+              >
+                <Download className="size-3.5" /> Download QR
+              </button>
+            </div>
           </div>
         </div>
       ) : (

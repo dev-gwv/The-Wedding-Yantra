@@ -9,6 +9,7 @@ import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card, Notice, PageHeader } from "@/components/ui/misc";
+import { QrDownloadButtons } from "@/components/ui/qr-download";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
@@ -82,9 +83,12 @@ export default function EnquiryFormPage() {
             <div>
               <h2 className="font-display text-lg font-extrabold">QR code</h2>
               <p className="mt-1 text-[15px] text-ink-muted">
-                Print it for your studio, stall or wedding expo. People scan it and fill in their details. Take a screenshot
-                to save it.
+                Print it for your studio, stall or wedding expo. People scan it and fill in their details.
               </p>
+              <div className="mt-4">
+                <QrDownloadButtons text={url} filename={`${workspace.name} enquiry QR`} title={workspace.name} subtitle="Scan to send us your enquiry" />
+              </div>
+              <p className="mt-2 text-xs text-ink-muted">A sharp image for printing up to A4, with your business name under it. SVG is for designers and large prints.</p>
             </div>
           </Card>
 
