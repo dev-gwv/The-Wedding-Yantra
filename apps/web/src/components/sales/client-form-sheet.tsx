@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@wedding-yantra/core";
 import { useCreateClient, useUpdateClient } from "@wedding-yantra/api-client/react";
 import { clientInput, LEAD_SOURCES, SOURCE_LABELS, type Client, type LeadSource } from "@wedding-yantra/types";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
@@ -79,6 +80,7 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
   const [wedding, setWedding] = useState({
     brideName: client?.wedding.brideName ?? "",
     groomName: client?.wedding.groomName ?? "",
+    date: client?.wedding.date ?? "",
     guestCount: client?.wedding.guestCount != null ? String(client.wedding.guestCount) : "",
   });
   const [noMessages, setNoMessages] = useState(client?.noMessages ?? false);
@@ -113,9 +115,13 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
   }
 
   const weddingHint =
-    [wedding.brideName && wedding.groomName ? `${wedding.brideName} & ${wedding.groomName}` : wedding.brideName || wedding.groomName, wedding.guestCount && `${wedding.guestCount} guests`]
+    [
+      wedding.brideName && wedding.groomName ? `${wedding.brideName} & ${wedding.groomName}` : wedding.brideName || wedding.groomName,
+      wedding.date && formatDate(wedding.date),
+      wedding.guestCount && `${wedding.guestCount} guests`,
+    ]
       .filter(Boolean)
-      .join(" · ") || "Bride, groom, guests";
+      .join(" · ") || "Bride, groom, date, guests";
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
@@ -176,19 +182,28 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
         )}
       </Section>
 
-      <Section title="The wedding" hint={weddingHint} defaultOpen={!!(wedding.brideName || wedding.groomName || wedding.guestCount)} forceOpen={hasErrorIn("wedding")}>
+      <Section title="The wedding" hint={weddingHint} defaultOpen={!!(wedding.brideName || wedding.groomName || wedding.date || wedding.guestCount)} forceOpen={hasErrorIn("wedding")}>
         <div className="grid grid-cols-2 gap-3">
           <TextField label="Bride's name" value={wedding.brideName} onChange={(e) => setWedding((x) => ({ ...x, brideName: e.target.value }))} error={errors["wedding.brideName"]} />
           <TextField label="Groom's name" value={wedding.groomName} onChange={(e) => setWedding((x) => ({ ...x, groomName: e.target.value }))} error={errors["wedding.groomName"]} />
         </div>
-        <TextField
-          label="Number of guests"
-          inputMode="numeric"
-          value={wedding.guestCount}
-          onChange={(e) => setWedding((x) => ({ ...x, guestCount: e.target.value.replace(/\D/g, "") }))}
-          error={errors["wedding.guestCount"]}
-          hint="The wedding date comes from their event."
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <TextField
+            label="Wedding date"
+            type="date"
+            value={wedding.date}
+            onChange={(e) => setWedding((x) => ({ ...x, date: e.target.value }))}
+            error={errors["wedding.date"]}
+            hint={!wedding.date && client?.weddingDate ? "Empty: their event's date is used" : undefined}
+          />
+          <TextField
+            label="Number of guests"
+            inputMode="numeric"
+            value={wedding.guestCount}
+            onChange={(e) => setWedding((x) => ({ ...x, guestCount: e.target.value.replace(/\D/g, "") }))}
+            error={errors["wedding.guestCount"]}
+          />
+        </div>
       </Section>
 
       <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />

@@ -216,7 +216,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
 function MasterDetails({ client: c }: { client: Client }) {
   const relations = useOptionList("relation");
   const w = c.wedding;
-  const hasWedding = w.brideName || w.groomName || w.guestCount !== null;
+  const hasWedding = w.brideName || w.groomName || c.weddingDate || w.guestCount !== null;
   if (!c.contacts.length && !hasWedding) return null;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -257,7 +257,7 @@ function MasterDetails({ client: c }: { client: Client }) {
             <Item label="Bride">{w.brideName}</Item>
             <Item label="Groom">{w.groomName}</Item>
             <Item label="Guests">{w.guestCount !== null ? w.guestCount.toLocaleString("en-IN") : null}</Item>
-            <Item label="Wedding date">{c.weddingDate ? formatDate(c.weddingDate) : null}</Item>
+            <Item label={w.date ? "Wedding date" : "Wedding date (from their event)"}>{c.weddingDate ? formatDate(c.weddingDate) : null}</Item>
           </dl>
         </Card>
       )}

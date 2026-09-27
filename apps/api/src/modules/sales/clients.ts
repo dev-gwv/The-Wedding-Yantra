@@ -32,6 +32,7 @@ interface ClientRow {
   custom: Record<string, string | number | boolean | null>;
   no_messages: boolean;
   wedding_date: string | null;
+  own_wedding_date: string | null;
   lead_count: string;
   created_at: Date;
 }
@@ -53,10 +54,12 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
 // Their next function (or, once all are past, the last one) stands for "the wedding date".
 const SELECT = `
   SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.kind, c.archived_at, c.source,
-         c.bride_name, c.groom_name, c.guest_count,
+         c.bride_name, c.groom_name, c.guest_count, c.wedding_date::text AS own_wedding_date,
          c.relation,
          c.portal_token, c.custom, c.no_messages, c.created_at,
+         -- The date typed on the client; else their next function, or once all are past, the last one.
          coalesce(
+           c.wedding_date,
            (SELECT min(f.date) FROM events e JOIN event_functions f ON f.event_id = e.id
              WHERE e.client_id = c.id AND e.deleted_at IS NULL AND e.status <> 'cancelled'
                AND f.date >= (now() AT TIME ZONE w.timezone)::date),
@@ -133,7 +136,7 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     notes: row.notes,
     source: row.source,
     contacts,
-    wedding: { brideName: row.bride_name, groomName: row.groom_name, guestCount: row.guest_count },
+    wedding: { brideName: row.bride_name, groomName: row.groom_name, date: row.own_wedding_date, guestCount: row.guest_count },
     leads,
     referredLeads,
     custom: row.custom,
@@ -154,7 +157,7 @@ export interface ClientFields {
   kind?: ClientKind;
   source?: LeadSource | null;
   contacts?: ClientContactInput[];
-  wedding?: { brideName?: string | null; groomName?: string | null; guestCount?: number | null };
+  wedding?: { brideName?: string | null; groomName?: string | null; date?: string | null; guestCount?: number | null };
   relation?: string | null;
   archived?: boolean;
 }
@@ -175,6 +178,7 @@ function columnsOf(input: ClientFields): [string, unknown][] {
   put("source", input.source);
   put("bride_name", input.wedding?.brideName);
   put("groom_name", input.wedding?.groomName);
+  put("wedding_date", input.wedding?.date);
   put("guest_count", input.wedding?.guestCount);
   put("relation", input.relation);
   return out;
@@ -226,6 +230,7 @@ export async function createClient(db: Db, ctx: MemberContext, input: Required<P
 const SECTION_OF: Record<string, string> = {
   bride_name: "wedding",
   groom_name: "wedding",
+  wedding_date: "wedding",
   guest_count: "wedding",
   relation: "details",
 };

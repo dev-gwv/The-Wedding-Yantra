@@ -280,7 +280,7 @@ export interface ClientSummary {
   /** Who booked us, to the wedding: a key from the "relation" list (bride, groom, bride's father…) */
   relation: string | null;
   archived: boolean;
-  /** The next (or latest) function date of their events */
+  /** The wedding date typed on the client, or else the next (or latest) function date of their events */
   weddingDate: string | null;
   leadCount: number;
   createdAt: string;
@@ -302,6 +302,8 @@ export interface Client extends ClientSummary {
   wedding: {
     brideName: string | null;
     groomName: string | null;
+    /** The date typed on the client; `weddingDate` falls back to their event's date */
+    date: string | null;
     guestCount: number | null;
   };
   leads: LeadSummary[];
@@ -346,6 +348,7 @@ export const clientInput = z.object({
     .object({
       brideName: optionalText(80),
       groomName: optionalText(80),
+      date: optionalDate,
       guestCount: z
         .union([z.literal(""), z.coerce.number().int("Use a whole number").min(0).max(100000)])
         .nullable()

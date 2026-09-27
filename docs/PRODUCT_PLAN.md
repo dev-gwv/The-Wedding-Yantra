@@ -1148,8 +1148,8 @@ list with search, a short form, and archive instead of delete.
     mother, other).
   - **Emergency contacts:** who to call when the client can't be reached, each with a
     relationship and a mobile.
-  - **The wedding:** bride's and groom's names and guests; the wedding date comes from their
-    events.
+  - **The wedding:** bride's and groom's names, the wedding date (typed; left empty, their
+    event's date shows; booked enquiries bring their date along) and guests.
   - **No billing on the client:** it is filled in on each invoice, as before.
   - Where they came from (carried over from the enquiry when it's booked), notes, archive and
     bring back. Search finds a client by name, bride, groom or any contact's name or number.

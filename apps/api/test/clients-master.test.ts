@@ -10,7 +10,7 @@ type Client = {
   weddingDate: string | null;
   source: string | null;
   contacts: { name: string; relation: string | null; phone: string | null }[];
-  wedding: { brideName: string | null; groomName: string | null; guestCount: number | null };
+  wedding: { brideName: string | null; groomName: string | null; date: string | null; guestCount: number | null };
 };
 
 let t: TestContext;
@@ -59,7 +59,7 @@ describe("the client master", () => {
       ["Sunita Sharma", "brides_mother", "+919822200012"],
       ["Vikram Mehta", "grooms_father", "+919822200013"],
     ]);
-    expect(c.wedding).toEqual({ brideName: "Priya", groomName: "Arjun", guestCount: 450 });
+    expect(c.wedding).toEqual({ brideName: "Priya", groomName: "Arjun", date: null, guestCount: 450 });
 
     // Found by the groom's name and by a contact's number.
     const byGroom = await call<{ id: string }[]>(t.app, "GET", `/workspaces/${ws}/clients?q=Arjun`, { token: owner });
@@ -74,6 +74,14 @@ describe("the client master", () => {
     });
     const got = await call<Client>(t.app, "GET", `/workspaces/${ws}/clients/${c.id}`, { token: owner });
     expect(got.body.data.weddingDate).toBe("2099-12-01");
+
+    // A date typed on the client comes first; cleared, the event's date shows again.
+    const typed = await call<Client>(t.app, "PATCH", `/workspaces/${ws}/clients/${c.id}`, { token: owner, body: { wedding: { date: "2099-11-30" } } });
+    expect(typed.body.data).toMatchObject({ weddingDate: "2099-11-30", wedding: { date: "2099-11-30", brideName: "Priya" } });
+    const list = await call<{ id: string; weddingDate: string | null }[]>(t.app, "GET", `/workspaces/${ws}/clients`, { token: owner });
+    expect(list.body.data.find((x) => x.id === c.id)!.weddingDate).toBe("2099-11-30");
+    const cleared = await call<Client>(t.app, "PATCH", `/workspaces/${ws}/clients/${c.id}`, { token: owner, body: { wedding: { date: "" } } });
+    expect(cleared.body.data).toMatchObject({ weddingDate: "2099-12-01", wedding: { date: null } });
 
     // Contacts are replaced as a whole when sent, and left alone when not.
     const edited = await call<Client>(t.app, "PATCH", `/workspaces/${ws}/clients/${c.id}`, {
