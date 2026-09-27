@@ -11,11 +11,11 @@ import { Logo } from "./logo";
 import { useCurrentWorkspace } from "./workspace-context";
 
 /** Five places, never more. The same five will be the tabs of the mobile app. */
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+const NAV: { href: string; label: string; icon: LucideIcon; /** On the phone's tab bar, where space is short */ short?: string }[] = [
   { href: "/app", label: "Home", icon: House },
   { href: "/app/leads", label: "Leads", icon: Inbox },
   { href: "/app/events", label: "Events", icon: CalendarDays },
-  { href: "/app/money", label: "Money", icon: IndianRupee },
+  { href: "/app/money", label: "Payments and invoices", short: "Payments", icon: IndianRupee },
   { href: "/app/more", label: "More", icon: Menu },
 ];
 
@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden print:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5 pt-2">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, label, short, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
               <li key={href}>
@@ -147,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Icon className="size-5" strokeWidth={2} />
                   </span>
-                  {label}
+                  {short ?? label}
                 </Link>
               </li>
             );

@@ -42,9 +42,9 @@ function MoneyScreen() {
   if (!allowed) {
     return (
       <>
-        <PageHeader title="Money" />
+        <PageHeader title="Payments and invoices" />
         <Card>
-          <EmptyState icon={Lock} title="Money isn't part of your role">
+          <EmptyState icon={Lock} title="Payments and invoices aren't part of your role">
             The owner, managers and the accountant see invoices, payments and expenses.
           </EmptyState>
         </Card>
@@ -80,7 +80,7 @@ function MoneyScreen() {
   return (
     <>
       <PageHeader
-        title="Money"
+        title="Payments and invoices"
         subtitle={
           o ? (
             <span>

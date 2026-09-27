@@ -29,7 +29,7 @@ export default function ReportsPage() {
 
   return (
     <>
-      <BackLink href="/app/money" label="Money" />
+      <BackLink href="/app/money" label="Payments and invoices" />
       <PageHeader title="Monthly report" />
       {!allowed ? (
         <Card>

@@ -33,7 +33,7 @@ function NewBill() {
   const back = d.eventId ? `/app/events/${d.eventId}` : d.clientId ? `/app/clients/${d.clientId}` : "/app/money";
   return (
     <>
-      <BackLink href={back} label={d.billTo.name || "Money"} />
+      <BackLink href={back} label={d.billTo.name || "Payments and invoices"} />
       <PageHeader
         title="New invoice"
         subtitle={d.quoteId ? "From the accepted quote. Check it and make the invoice." : d.clientId ? undefined : "For anyone: a client, or someone new."}
