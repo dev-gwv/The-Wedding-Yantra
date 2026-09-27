@@ -23,6 +23,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
   team: () => "/app/team",
   expenses: () => "/app/money?view=expenses",
   tasks: (id) => (id ? `/app/tasks?open=${id}` : "/app/tasks?view=team"),
+  vendor: (id) => (id ? `/app/vendors/${id}` : "/app/vendors"),
 };
 
 /** Who did what, and when. For owners and managers. */

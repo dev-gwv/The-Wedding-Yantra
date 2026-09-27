@@ -13,9 +13,10 @@ import {
   useVendors,
 } from "@wedding-yantra/api-client/react";
 import { payoutInput, payPayoutInput, updatePayoutInput, vendorInput, type Payout, type Vendor } from "@wedding-yantra/types";
-import { Smartphone } from "lucide-react";
+import { Smartphone, Star } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { OptionSelect } from "@/components/app/option-picker";
 import { Button, buttonClass } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
@@ -43,21 +44,28 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (v: Vendor) =
   const toast = useToast();
   const [values, setValues] = useState({
     name: vendor?.name ?? "",
-    service: vendor?.service ?? "",
+    contactPerson: vendor?.contactPerson ?? "",
     phone: national(vendor?.phone ?? null),
+    city: vendor?.city ?? "",
     upiId: vendor?.upiId ?? "",
+    bankAccount: vendor?.bankAccount ?? "",
+    ifsc: vendor?.ifsc ?? "",
+    gstin: vendor?.gstin ?? "",
     notes: vendor?.notes ?? "",
   });
+  const [category, setCategory] = useState<string | null>(vendor?.category ?? null);
+  const [preferred, setPreferred] = useState(vendor?.preferred ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const check = validate(vendorInput, values);
+    const payload = { ...values, category, preferred };
+    const check = validate(vendorInput, payload);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
     try {
-      const saved = vendor ? await update.mutateAsync({ id: vendor.id, ...values }) : await create.mutateAsync(values);
+      const saved = vendor ? await update.mutateAsync({ id: vendor.id, ...payload }) : await create.mutateAsync(payload);
       toast(vendor ? "Vendor saved" : "Vendor added");
       onDone(saved);
     } catch (err) {
@@ -68,19 +76,45 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (v: Vendor) =
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
-      <TextField label="Name" value={values.name} onChange={set("name")} error={errors.name} placeholder="Ramesh Florist" autoFocus={!vendor} />
-      <TextField label="What they do" value={values.service} onChange={set("service")} error={errors.service} placeholder="Flowers, generator, helper, second shooter" />
+      <TextField label="Name" value={values.name} onChange={set("name")} error={errors.name} placeholder="Ramesh Flowers" autoFocus={!vendor} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <OptionSelect list="vendor_category" label="Category" value={category} onChange={setCategory} error={errors.category} />
+        <TextField label="Contact person" value={values.contactPerson} onChange={set("contactPerson")} error={errors.contactPerson} placeholder="Who you talk to" />
+      </div>
       <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
-      <TextField
-        label="UPI ID"
-        value={values.upiId}
-        onChange={set("upiId")}
-        error={errors.upiId}
-        placeholder="ramesh@okaxis"
-        autoCapitalize="none"
-        hint="Pay them from your UPI app in one tap, with the amount filled in."
-      />
-      <TextAreaField label="Notes" value={values.notes} onChange={set("notes")} error={errors.notes} placeholder="Rates, bank details, anything to remember" />
+      <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} />
+      <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line px-4 py-3 has-[:checked]:border-sun-300 has-[:checked]:bg-cream">
+        <input type="checkbox" checked={preferred} onChange={(e) => setPreferred(e.target.checked)} className="size-5 accent-brand" />
+        <Star className={preferred ? "size-4 fill-brand text-brand" : "size-4 text-ink-muted"} />
+        <span className="font-semibold">Preferred vendor</span>
+        <span className="text-sm text-ink-muted">Shown first</span>
+      </label>
+
+      <fieldset className="space-y-4 rounded-2xl border border-line p-4">
+        <legend className="px-1 text-sm font-bold">Payment details</legend>
+        <TextField
+          label="UPI ID"
+          value={values.upiId}
+          onChange={set("upiId")}
+          error={errors.upiId}
+          placeholder="ramesh@okaxis"
+          autoCapitalize="none"
+          hint="Pay them from your UPI app in one tap, with the amount filled in."
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Bank account number" inputMode="numeric" value={values.bankAccount} onChange={set("bankAccount")} error={errors.bankAccount} />
+          <TextField label="IFSC" value={values.ifsc} onChange={(e) => setValues((v) => ({ ...v, ifsc: e.target.value.toUpperCase() }))} error={errors.ifsc} placeholder="SBIN0001234" />
+        </div>
+        <TextField
+          label="GST number"
+          value={values.gstin}
+          onChange={(e) => setValues((v) => ({ ...v, gstin: e.target.value.toUpperCase() }))}
+          error={errors.gstin}
+          hint="Only if they bill you with GST"
+        />
+      </fieldset>
+
+      <TextAreaField label="Rates and notes" value={values.notes} onChange={set("notes")} error={errors.notes} placeholder="Marigold ₹40 a string, 50% advance" />
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
         {vendor ? "Save" : "Add vendor"}

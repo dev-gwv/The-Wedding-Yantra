@@ -5,6 +5,7 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { requireMoneyView } from "../money/access.js";
+import { assertOption, optionJoin } from "../options/service.js";
 
 /** Vendors and what they're owed: owners and managers run it, the accountant reads it. */
 const requireManage = (ctx: MemberContext) => {
@@ -18,36 +19,55 @@ const requireManage = (ctx: MemberContext) => {
 interface VendorRow {
   id: string;
   name: string;
+  category: string | null;
+  category_label: string | null;
   service: string | null;
+  contact_person: string | null;
   phone: string | null;
+  city: string | null;
   upi_id: string | null;
+  bank_account: string | null;
+  ifsc: string | null;
+  gstin: string | null;
+  preferred: boolean;
+  archived_at: Date | null;
   notes: string | null;
   owed: string;
   paid: string;
 }
 
 const VENDOR_SELECT = `
-  SELECT v.id, v.name, v.service, v.phone, v.upi_id, v.notes,
+  SELECT v.id, v.name, v.category, vc.label AS category_label, v.service, v.contact_person, v.phone, v.city, v.upi_id,
+         v.bank_account, v.ifsc, v.gstin, v.preferred, v.archived_at, v.notes,
          coalesce(sum(p.amount) FILTER (WHERE p.status = 'owed'), 0) AS owed,
          coalesce(sum(p.amount) FILTER (WHERE p.status = 'paid'), 0) AS paid
     FROM vendors v
+    ${optionJoin("vc", "vendor_category", "v.workspace_id", "v.category")}
     LEFT JOIN payouts p ON p.vendor_id = v.id AND p.deleted_at IS NULL`;
+const GROUP = "GROUP BY v.id, vc.label";
 
 const toSummary = (r: VendorRow): VendorSummary => ({
   id: r.id,
   name: r.name,
-  service: r.service,
+  category: r.category,
+  // What they do, in words: the category's name, or what was typed before categories.
+  service: r.category_label ?? r.service,
+  contactPerson: r.contact_person,
   phone: r.phone,
+  city: r.city,
   upiId: r.upi_id,
+  preferred: r.preferred,
+  archived: r.archived_at !== null,
   owed: Number(r.owed),
   paid: Number(r.paid),
 });
 
-export async function listVendors(db: Queryable, ctx: MemberContext): Promise<VendorSummary[]> {
+/** Vendors to pay first, then preferred ones, then by name. Archived ones only when asked. */
+export async function listVendors(db: Queryable, ctx: MemberContext, archived = false): Promise<VendorSummary[]> {
   requireMoneyView(ctx);
   const { rows } = await db.query<VendorRow>(
-    `${VENDOR_SELECT} WHERE v.workspace_id = $1 AND v.deleted_at IS NULL GROUP BY v.id
-      ORDER BY coalesce(sum(p.amount) FILTER (WHERE p.status = 'owed'), 0) DESC, v.name`,
+    `${VENDOR_SELECT} WHERE v.workspace_id = $1 AND v.deleted_at IS NULL AND v.archived_at IS ${archived ? "NOT NULL" : "NULL"} ${GROUP}
+      ORDER BY coalesce(sum(p.amount) FILTER (WHERE p.status = 'owed'), 0) DESC, v.preferred DESC, v.name`,
     [ctx.workspaceId],
   );
   return rows.map(toSummary);
@@ -55,40 +75,103 @@ export async function listVendors(db: Queryable, ctx: MemberContext): Promise<Ve
 
 export async function getVendor(db: Queryable, ctx: MemberContext, id: string): Promise<Vendor> {
   requireMoneyView(ctx);
-  const { rows } = await db.query<VendorRow>(`${VENDOR_SELECT} WHERE v.id = $1 AND v.workspace_id = $2 AND v.deleted_at IS NULL GROUP BY v.id`, [
+  const { rows } = await db.query<VendorRow>(`${VENDOR_SELECT} WHERE v.id = $1 AND v.workspace_id = $2 AND v.deleted_at IS NULL ${GROUP}`, [
     id,
     ctx.workspaceId,
   ]);
-  if (!rows[0]) throw notFound("This vendor");
-  return { ...toSummary(rows[0]), notes: rows[0].notes, payouts: await listPayouts(db, ctx, { vendorId: id }) };
+  const r = rows[0];
+  if (!r) throw notFound("This vendor");
+  return {
+    ...toSummary(r),
+    bankAccount: r.bank_account,
+    ifsc: r.ifsc,
+    gstin: r.gstin,
+    notes: r.notes,
+    payouts: await listPayouts(db, ctx, { vendorId: id }),
+  };
 }
 
 export interface VendorFields {
   name?: string;
   service?: string | null;
+  category?: string | null;
+  contactPerson?: string | null;
   phone?: string | null;
+  city?: string | null;
   upiId?: string | null;
+  bankAccount?: string | null;
+  ifsc?: string | null;
+  gstin?: string | null;
+  preferred?: boolean;
   notes?: string | null;
+  archived?: boolean;
 }
 const VENDOR_COLUMNS: [keyof VendorFields, string][] = [
   ["name", "name"],
   ["service", "service"],
+  ["category", "category"],
+  ["contactPerson", "contact_person"],
   ["phone", "phone"],
+  ["city", "city"],
   ["upiId", "upi_id"],
+  ["bankAccount", "bank_account"],
+  ["ifsc", "ifsc"],
+  ["gstin", "gstin"],
+  ["preferred", "preferred"],
   ["notes", "notes"],
 ];
 
+/** Two vendors with the same number or GST number are almost always the same one, typed twice. */
+async function checkDuplicates(db: Queryable, workspaceId: string, input: VendorFields, id?: string) {
+  const same = async (column: "phone" | "gstin", value: string | null | undefined, field: string, what: string) => {
+    if (!value) return;
+    const { rows } = await db.query<{ name: string }>(
+      `SELECT name FROM vendors WHERE workspace_id = $1 AND ${column} = $2 AND deleted_at IS NULL AND id IS DISTINCT FROM $3 LIMIT 1`,
+      [workspaceId, value, id ?? null],
+    );
+    if (rows[0]) {
+      const message = `${rows[0].name} already has this ${what}`;
+      throw new AppError(409, "DUPLICATE_VENDOR", message, { [field]: message });
+    }
+  };
+  await same("phone", input.phone, "phone", "number");
+  await same("gstin", input.gstin, "gstin", "GST number");
+}
+
+async function checkCategory(db: Queryable, workspaceId: string, category: string | null | undefined, current?: string | null) {
+  if (category) await assertOption(db, workspaceId, "vendor_category", category, "category", current);
+}
+
 export async function createVendor(db: Db, ctx: MemberContext, input: VendorFields & { name: string }): Promise<Vendor> {
   requireManage(ctx);
+  await checkCategory(db, ctx.workspaceId, input.category);
+  await checkDuplicates(db, ctx.workspaceId, input);
+  const cols = VENDOR_COLUMNS.filter(([key]) => input[key] !== undefined);
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO vendors (workspace_id, name, service, phone, upi_id, notes, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [ctx.workspaceId, input.name, input.service ?? null, input.phone ?? null, input.upiId ?? null, input.notes ?? null, ctx.userId],
+    `INSERT INTO vendors (workspace_id, created_by${cols.map(([, c]) => `, ${c}`).join("")})
+     VALUES ($1, $2${cols.map((_, i) => `, $${i + 3}`).join("")}) RETURNING id`,
+    [ctx.workspaceId, ctx.userId, ...cols.map(([key]) => input[key])],
   );
-  return getVendor(db, ctx, rows[0]!.id);
+  const id = rows[0]!.id;
+  await logActivity(db, { workspaceId: ctx.workspaceId, actorUserId: ctx.userId, action: "vendor.added", entityType: "vendor", entityId: id, meta: { name: input.name } });
+  return getVendor(db, ctx, id);
 }
 
 export async function updateVendor(db: Db, ctx: MemberContext, id: string, input: VendorFields): Promise<Vendor> {
   requireManage(ctx);
+  const current = await db.query<{ name: string; category: string | null; archived_at: Date | null }>(
+    `SELECT name, category, archived_at FROM vendors WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+    [id, ctx.workspaceId],
+  );
+  const was = current.rows[0];
+  if (!was) throw notFound("This vendor");
+  await checkCategory(db, ctx.workspaceId, input.category, was.category);
+  await checkDuplicates(db, ctx.workspaceId, input, id);
+  if (input.archived && !was.archived_at) {
+    // Nothing owed is lost from sight: pay or remove those first.
+    const owed = await db.query<{ n: string }>(`SELECT coalesce(sum(amount), 0) AS n FROM payouts WHERE vendor_id = $1 AND status = 'owed' AND deleted_at IS NULL`, [id]);
+    if (Number(owed.rows[0]!.n) > 0) throw new AppError(409, "VENDOR_OWED", `You still owe ${was.name}. Pay or remove those first.`);
+  }
   const sets: string[] = [];
   const values: unknown[] = [];
   for (const [key, column] of VENDOR_COLUMNS) {
@@ -96,13 +179,19 @@ export async function updateVendor(db: Db, ctx: MemberContext, id: string, input
     values.push(input[key]);
     sets.push(`${column} = $${values.length}`);
   }
+  if (input.archived !== undefined) {
+    values.push(input.archived ? (was.archived_at ?? new Date()) : null);
+    sets.push(`archived_at = $${values.length}`);
+  }
   if (sets.length) {
     values.push(id, ctx.workspaceId);
-    const r = await db.query(
-      `UPDATE vendors SET ${sets.join(", ")} WHERE id = $${values.length - 1} AND workspace_id = $${values.length} AND deleted_at IS NULL`,
-      values,
-    );
-    if (!r.rowCount) throw notFound("This vendor");
+    await db.query(`UPDATE vendors SET ${sets.join(", ")} WHERE id = $${values.length - 1} AND workspace_id = $${values.length}`, values);
+    const base = { workspaceId: ctx.workspaceId, actorUserId: ctx.userId, entityType: "vendor", entityId: id };
+    const name = input.name ?? was.name;
+    if (input.archived !== undefined && input.archived !== (was.archived_at !== null)) {
+      await logActivity(db, { ...base, action: input.archived ? "vendor.archived" : "vendor.restored", meta: { name } });
+    }
+    if (sets.length > (input.archived !== undefined ? 1 : 0)) await logActivity(db, { ...base, action: "vendor.updated", meta: { name } });
   }
   return getVendor(db, ctx, id);
 }

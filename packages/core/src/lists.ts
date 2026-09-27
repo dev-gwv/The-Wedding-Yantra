@@ -5,13 +5,14 @@
  * hidden option still shows its name on the records that use it.
  */
 
-export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation"] as const;
+export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category"] as const;
 export type OptionList = (typeof OPTION_LISTS)[number];
 
 export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; about: string }> = {
   payment_method: { title: "Payment modes", one: "payment mode", about: "How clients pay you and how you pay others." },
   expense_category: { title: "Expense categories", one: "category", about: "What your money goes on. Reports group expenses by these." },
   task_tag: { title: "Task tags", one: "tag", about: "Group tasks by kind of work, and filter the task board by them." },
+  vendor_category: { title: "Vendor categories", one: "category", about: "What your vendors do: florist, tent and décor, lights, DJ, caterer." },
   relation: { title: "Relationships", one: "relationship", about: "Who the client and their emergency contacts are to the wedding: bride, groom, bride's father…" },
 };
 
@@ -47,6 +48,20 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
     { key: "vendors", label: "Vendors" },
     { key: "marketing", label: "Marketing" },
     { key: "admin", label: "Admin" },
+  ],
+  vendor_category: [
+    { key: "florist", label: "Florist" },
+    { key: "decor", label: "Tent and décor" },
+    { key: "lights", label: "Lights" },
+    { key: "sound_dj", label: "Sound and DJ" },
+    { key: "caterer", label: "Caterer" },
+    { key: "photo_video", label: "Photo and video" },
+    { key: "makeup", label: "Makeup and mehendi" },
+    { key: "band", label: "Band, dhol and shehnai" },
+    { key: "transport", label: "Transport" },
+    { key: "printing", label: "Printing and stationery" },
+    { key: "helpers", label: "Helpers and labour" },
+    { key: "other", label: "Other" },
   ],
   relation: [
     { key: "bride", label: "Bride" },

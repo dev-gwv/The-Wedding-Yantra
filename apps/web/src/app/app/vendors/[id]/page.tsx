@@ -1,10 +1,10 @@
 "use client";
 
 import { can, formatMoney, formatPhone, whatsappLink } from "@wedding-yantra/core";
-import { useDeleteVendor, useVendor } from "@wedding-yantra/api-client/react";
-import type { Payout } from "@wedding-yantra/types";
-import { HandCoins, MessageCircle, Pencil, Phone } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useUpdateVendor, useVendor } from "@wedding-yantra/api-client/react";
+import type { Payout, Vendor } from "@wedding-yantra/types";
+import { Archive, ArchiveRestore, HandCoins, MessageCircle, Pencil, Phone, Star } from "lucide-react";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -21,13 +21,11 @@ export default function VendorPage() {
   const { workspace } = useCurrentWorkspace();
   const vendor = useVendor(workspace.id, id);
   const manage = can(workspace.role, "expenses.approve");
-  const remove = useDeleteVendor(workspace.id);
+  const update = useUpdateVendor(workspace.id);
   const toast = useToast();
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [sheet, setSheet] = useState<{ p?: Payout } | null>(null);
   const [paying, setPaying] = useState<Payout | null>(null);
-  const [confirm, setConfirm] = useState(false);
 
   if (vendor.isPending) return <Splash />;
   if (vendor.isError)
@@ -46,8 +44,12 @@ export default function VendorPage() {
         <div className="flex items-center gap-4">
           <Avatar name={v.name} className="size-14 text-lg" />
           <div className="min-w-0">
-            <h1 className="font-display text-[clamp(24px,4vw,32px)] font-extrabold leading-tight">{v.name}</h1>
-            <p className="text-ink-muted tabular">{[v.service, v.phone ? formatPhone(v.phone) : null, v.upiId].filter(Boolean).join(" · ")}</p>
+            <h1 className="flex items-center gap-2 font-display text-[clamp(24px,4vw,32px)] font-extrabold leading-tight">
+              {v.name}
+              {v.preferred && <Star className="size-5 shrink-0 fill-brand text-brand" aria-label="Preferred" />}
+            </h1>
+            <p className="text-ink-muted tabular">{[v.service, v.phone ? formatPhone(v.phone) : null, v.city].filter(Boolean).join(" · ")}</p>
+            {v.archived && <span className="mt-1 inline-block rounded-full bg-cream px-2.5 py-0.5 text-xs font-bold text-ink-subtle">Archived</span>}
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -76,9 +78,25 @@ export default function VendorPage() {
               <Pencil className="size-4" /> Edit
             </Button>
           )}
+          {manage && (
+            <Button
+              variant="ghost"
+              loading={update.isPending}
+              onClick={() =>
+                update.mutate(
+                  { id: v.id, preferred: !v.preferred },
+                  { onSuccess: () => toast(v.preferred ? "No longer preferred" : "Marked preferred"), onError: (err) => toast(errorMessage(err), "error") },
+                )
+              }
+            >
+              <Star className={v.preferred ? "size-4 fill-brand text-brand" : "size-4"} /> {v.preferred ? "Preferred" : "Mark preferred"}
+            </Button>
+          )}
         </div>
         {v.notes && <p className="mt-5 whitespace-pre-line rounded-2xl bg-cream p-4">{v.notes}</p>}
       </Card>
+
+      <VendorDetails vendor={v} />
 
       <section>
         <h2 className="mb-3 font-display text-lg font-extrabold">Payouts</h2>
@@ -102,35 +120,22 @@ export default function VendorPage() {
 
       {manage && (
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
-          {confirm ? (
-            <>
-              <p className="text-sm text-ink-muted">Remove {v.name}? Their past payouts stay in your expenses.</p>
-              <Button
-                variant="destructive"
-                size="sm"
-                loading={remove.isPending}
-                onClick={async () => {
-                  try {
-                    await remove.mutateAsync(v.id);
-                    toast("Vendor removed");
-                    router.replace("/app/vendors");
-                  } catch (err) {
-                    toast(errorMessage(err), "error");
-                    setConfirm(false);
-                  }
-                }}
-              >
-                Remove
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirm(false)}>
-                Keep
-              </Button>
-            </>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => setConfirm(true)}>
-              Remove vendor
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={update.isPending}
+            onClick={() =>
+              update.mutate(
+                { id: v.id, archived: !v.archived },
+                {
+                  onSuccess: () => toast(v.archived ? "Brought back" : "Archived. Their payouts stay in your expenses."),
+                  onError: (err) => toast(errorMessage(err), "error"),
+                },
+              )
+            }
+          >
+            {v.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />} {v.archived ? "Bring back" : "Archive vendor"}
+          </Button>
         </div>
       )}
 
@@ -138,5 +143,33 @@ export default function VendorPage() {
       <PayoutSheet open={sheet !== null} onClose={() => setSheet(null)} payout={sheet?.p} vendorId={v.id} />
       <PaySheet payout={paying} onClose={() => setPaying(null)} />
     </div>
+  );
+}
+
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  if (!children) return null;
+  return (
+    <div>
+      <dt className="text-xs font-semibold text-ink-muted">{label}</dt>
+      <dd className="font-semibold tabular">{children}</dd>
+    </div>
+  );
+}
+
+/** Contact and payment details, from the vendor master. */
+function VendorDetails({ vendor: v }: { vendor: Vendor }) {
+  if (!v.contactPerson && !v.city && !v.upiId && !v.bankAccount && !v.ifsc && !v.gstin) return null;
+  return (
+    <Card className="p-5">
+      <h2 className="mb-3 font-display text-lg font-extrabold">Details</h2>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px] sm:grid-cols-3">
+        <Detail label="Contact person">{v.contactPerson}</Detail>
+        <Detail label="City">{v.city}</Detail>
+        <Detail label="UPI ID">{v.upiId}</Detail>
+        <Detail label="Bank account">{v.bankAccount}</Detail>
+        <Detail label="IFSC">{v.ifsc}</Detail>
+        <Detail label="GST number">{v.gstin}</Detail>
+      </dl>
+    </Card>
   );
 }

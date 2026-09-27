@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -215,8 +215,8 @@ DELIV="$(api POST "/api/v1/workspaces/$WS_ID/deliverables" "{\"eventId\":\"$EVEN
 expect "a deliverable can be planned for the event" '.success and .data.status == "pending" and .data.late == false' "$DELIV"
 expect "and handed over with its link" '.success and .data.status == "delivered" and .data.link == "https://example.com/gallery"' \
   "$(api PATCH "/api/v1/workspaces/$WS_ID/deliverables/$(echo "$DELIV" | jq -r '.data.id')" '{"status":"delivered","link":"https://example.com/gallery"}' "$TOKEN")"
-VENDOR="$(api POST "/api/v1/workspaces/$WS_ID/vendors" '{"name":"Smoke Florist","upiId":"florist@okaxis"}' "$TOKEN")"
-expect "a vendor can be added" '.success and .data.owed == 0' "$VENDOR"
+VENDOR="$(api POST "/api/v1/workspaces/$WS_ID/vendors" '{"name":"Smoke Florist","upiId":"florist@okaxis","category":"florist","ifsc":"SBIN0001234","preferred":true}' "$TOKEN")"
+expect "a vendor can be added, with category and bank details" '.success and .data.owed == 0 and .data.service == "Florist" and .data.ifsc == "SBIN0001234" and .data.preferred == true' "$VENDOR"
 PAYOUT="$(api POST "/api/v1/workspaces/$WS_ID/payouts" "{\"vendorId\":\"$(echo "$VENDOR" | jq -r '.data.id')\",\"eventId\":\"$EVENT_ID\",\"description\":\"Flowers\",\"amount\":3000}" "$TOKEN")"
 expect "what the event owes them is noted" '.success and .data.status == "owed"' "$PAYOUT"
 api POST "/api/v1/workspaces/$WS_ID/payouts/$(echo "$PAYOUT" | jq -r '.data.id')/pay" '{"paidOn":"2026-09-25","method":"upi"}' "$TOKEN" >/dev/null

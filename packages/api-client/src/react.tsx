@@ -181,7 +181,7 @@ export const queryKeys = {
   /** Deliverables live under work: Home and My Day count them. */
   deliverables: (id: string, query: object) => ["workspace", id, "work", "deliverables", query] as const,
   /** Vendors and payouts live under bookings: paying one changes an event's profit. */
-  vendors: (id: string) => ["workspace", id, "bookings", "vendors"] as const,
+  vendors: (id: string, archived = false) => ["workspace", id, "bookings", "vendors", archived] as const,
   vendor: (id: string, vendorId: string) => ["workspace", id, "bookings", "vendor", vendorId] as const,
   payouts: (id: string, query: object) => ["workspace", id, "bookings", "payouts", query] as const,
   /** Stock and what events need of it. */
@@ -1177,9 +1177,9 @@ export function useDeleteDeliverable(workspaceId: string) {
 
 // ---- Vendors and payouts ------------------------------------------------------------
 
-export function useVendors(workspaceId: string, enabled = true) {
+export function useVendors(workspaceId: string, enabled = true, archived = false) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.vendors(workspaceId), queryFn: () => api.vendors.list(workspaceId), enabled });
+  return useQuery({ queryKey: queryKeys.vendors(workspaceId, archived), queryFn: () => api.vendors.list(workspaceId, archived), enabled });
 }
 
 export function useVendor(workspaceId: string, vendorId: string) {

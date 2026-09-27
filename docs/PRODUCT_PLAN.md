@@ -1154,3 +1154,19 @@ list with search, a short form, and archive instead of delete.
   - Where they came from (carried over from the enquiry when it's booked), notes, archive and
     bring back. Search finds a client by name, bride, groom or any contact's name or number.
     Every change is in the activity log.
+
+## 42. Master data, step 2: Vendors
+
+- **Vendor master** (migration 0031): category from the business's own list (florist, tent and
+  décor, lights, sound and DJ, caterer, photo and video, makeup and mehendi, band, transport,
+  printing, helpers, other), contact person, mobile, city, UPI, bank account and IFSC, GST number,
+  rates and notes, and a preferred star (shown first).
+- What vendors were described as before ("What they do") became their category: a matching one
+  where it existed, else a new category of the business's own. Nothing typed was lost.
+- Checks: IFSC, account number and GST number formats; a second vendor with the same number or
+  GST number is refused, naming the one that has it.
+- **Archive** instead of remove (not while money is still owed to them). An Archived tab brings
+  them back. Search by name, contact, city or number, and filter by category.
+- Every change is in the activity log, linking to the vendor. Owners and managers edit; the
+  accountant sees; staff don't.
+

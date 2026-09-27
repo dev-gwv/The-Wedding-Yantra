@@ -483,7 +483,8 @@ export function createApiClient(options: ApiClientOptions) {
         request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/deliverables/${encodeURIComponent(id)}`),
     },
     vendors: {
-      list: (workspaceId: string) => request<VendorSummary[]>("GET", `${ws(workspaceId)}/vendors`),
+      list: (workspaceId: string, archived = false) =>
+        request<VendorSummary[]>("GET", `${ws(workspaceId)}/vendors${qs({ archived: archived ? "true" : undefined })}`),
       get: (workspaceId: string, id: string) => request<Vendor>("GET", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`),
       create: (workspaceId: string, input: VendorInput) => request<Vendor>("POST", `${ws(workspaceId)}/vendors`, input),
       update: (workspaceId: string, id: string, input: UpdateVendorInput) =>

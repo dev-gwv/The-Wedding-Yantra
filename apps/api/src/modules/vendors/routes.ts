@@ -13,9 +13,9 @@ export function vendorRoutes(app: FastifyInstance, deps: { db: Db }) {
   const { db } = deps;
   const member = (request: Parameters<typeof requireMember>[1], workspaceId: string) => requireMember(db, request, workspaceId);
 
-  app.get<Ws>("/workspaces/:workspaceId/vendors", async (request) => {
+  app.get<Ws & { Querystring: { archived?: string } }>("/workspaces/:workspaceId/vendors", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
-    return ok(await vendors.listVendors(db, ctx));
+    return ok(await vendors.listVendors(db, ctx, request.query.archived === "true"));
   });
   app.post<Ws>("/workspaces/:workspaceId/vendors", async (request, reply) => {
     const ctx = await member(request, request.params.workspaceId);
