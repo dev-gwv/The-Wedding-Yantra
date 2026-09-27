@@ -12,7 +12,7 @@ export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; 
   payment_method: { title: "Payment modes", one: "payment mode", about: "How clients pay you and how you pay others." },
   expense_category: { title: "Expense categories", one: "category", about: "What your money goes on. Reports group expenses by these." },
   task_tag: { title: "Task tags", one: "tag", about: "Group tasks by kind of work, and filter the task board by them." },
-  relation: { title: "Family relations", one: "relation", about: "Who each contact is in the client's family: bride, groom, father, planner." },
+  relation: { title: "Relationships", one: "relationship", about: "Who the client and their emergency contacts are to the wedding: bride, groom, bride's father…" },
 };
 
 export interface OptionSeed {
@@ -51,14 +51,10 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
   relation: [
     { key: "bride", label: "Bride" },
     { key: "groom", label: "Groom" },
-    { key: "father", label: "Father" },
-    { key: "mother", label: "Mother" },
-    { key: "brother", label: "Brother" },
-    { key: "sister", label: "Sister" },
-    { key: "relative", label: "Relative" },
-    { key: "friend", label: "Friend" },
-    { key: "planner", label: "Planner" },
-    { key: "coordinator", label: "Coordinator" },
+    { key: "brides_father", label: "Bride's father" },
+    { key: "grooms_father", label: "Groom's father" },
+    { key: "brides_mother", label: "Bride's mother" },
+    { key: "grooms_mother", label: "Groom's mother" },
     { key: "other", label: "Other" },
   ],
 };

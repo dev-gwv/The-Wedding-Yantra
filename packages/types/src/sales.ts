@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { optionalText } from "./common.js";
-import { STATE_CODES, type CustomValues } from "@wedding-yantra/core";
+import type { CustomValues } from "@wedding-yantra/core";
 import { personName, phone } from "./auth.js";
 import { customValuesInput } from "./custom.js";
-import { GSTIN_PATTERN } from "./workspaces.js";
 
 // ---------------------------------------------------------------------------
 // Fixed lists
@@ -278,6 +277,8 @@ export interface ClientSummary {
   email: string | null;
   city: string | null;
   kind: ClientKind;
+  /** Who booked us, to the wedding: a key from the "relation" list (bride, groom, bride's father…) */
+  relation: string | null;
   archived: boolean;
   /** The next (or latest) function date of their events */
   weddingDate: string | null;
@@ -285,6 +286,7 @@ export interface ClientSummary {
   createdAt: string;
 }
 
+/** Someone to reach when the client can't be, e.g. on the wedding day. */
 export interface ClientContact {
   id: string;
   name: string;
@@ -302,13 +304,6 @@ export interface Client extends ClientSummary {
     groomName: string | null;
     guestCount: number | null;
   };
-  billing: {
-    name: string | null;
-    address: string | null;
-    /** GST state code, e.g. "27" for Maharashtra */
-    stateCode: string | null;
-    gstin: string | null;
-  };
   leads: LeadSummary[];
   /** Enquiries this client sent your way */
   referredLeads: LeadSummary[];
@@ -319,15 +314,17 @@ export interface Client extends ClientSummary {
   noMessages: boolean;
 }
 
+const relationKey = z
+  .string()
+  .trim()
+  .max(40)
+  .nullable()
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v || null));
+
 export const clientContactInput = z.object({
   name: personName,
-  relation: z
-    .string()
-    .trim()
-    .max(40)
-    .nullable()
-    .optional()
-    .transform((v) => (v === undefined ? undefined : v || null)),
+  relation: relationKey,
   phone: optionalPhone,
 });
 export type ClientContactInput = z.input<typeof clientContactInput>;
@@ -341,9 +338,10 @@ export const clientInput = z.object({
   custom: customValuesInput,
   noMessages: z.boolean().optional(),
   kind: z.enum(CLIENT_KINDS).optional(),
+  relation: relationKey,
   source: z.enum(LEAD_SOURCES).nullable().optional(),
-  /** The whole family, in order. Sent: replaces the list; left out: unchanged. */
-  contacts: z.array(clientContactInput).max(20, "Up to 20 contacts").optional(),
+  /** Emergency contacts, in order. Sent: replaces the list; left out: unchanged. */
+  contacts: z.array(clientContactInput).max(10, "Up to 10 emergency contacts").optional(),
   wedding: z
     .object({
       brideName: optionalText(80),
@@ -353,25 +351,6 @@ export const clientInput = z.object({
         .nullable()
         .optional()
         .transform((v) => (v === undefined ? undefined : v === "" || v === null ? null : v)),
-    })
-    .optional(),
-  billing: z
-    .object({
-      name: optionalText(120),
-      address: optionalText(300),
-      stateCode: z
-        .enum(STATE_CODES)
-        .nullable()
-        .optional()
-        .or(z.literal("").transform(() => null)),
-      gstin: z
-        .string()
-        .trim()
-        .toUpperCase()
-        .refine((v) => v === "" || GSTIN_PATTERN.test(v), "GST number should look like 27ABCDE1234F1Z5")
-        .nullable()
-        .optional()
-        .transform((v) => (v === undefined ? undefined : v || null)),
     })
     .optional(),
 });

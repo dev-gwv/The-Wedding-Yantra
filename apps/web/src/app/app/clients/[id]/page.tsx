@@ -1,8 +1,8 @@
 "use client";
 
-import { can, formatDate, formatPhone, stateName, whatsappLink } from "@wedding-yantra/core";
+import { can, formatDate, formatPhone, whatsappLink } from "@wedding-yantra/core";
 import { useBills, useClient, useEvents, useQuotes, useUpdateClient } from "@wedding-yantra/api-client/react";
-import { CLIENT_KIND_LABELS, SOURCE_LABELS, type Client } from "@wedding-yantra/types";
+import { SOURCE_LABELS, type Client } from "@wedding-yantra/types";
 import { Archive, ArchiveRestore, FilePlus2, FileText, MessageCircle, Pencil, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -28,6 +28,7 @@ export default function ClientPage() {
   const client = useClient(workspace.id, id);
   const toast = useToast();
   const [editing, setEditing] = useState(false);
+  const relations = useOptionList("relation");
   const c = client.data;
   const quotes = useQuotes(workspace.id, { clientId: id }, can(workspace.role, "quotes.view"));
   const events = useEvents(workspace.id, { clientId: id }, can(workspace.role, "events.view"));
@@ -53,7 +54,7 @@ export default function ClientPage() {
                   {[c.phone ? formatPhone(c.phone) : null, c.city, c.email].filter(Boolean).join(" · ")}
                 </p>
                 <p className="mt-1 flex flex-wrap gap-1.5 text-xs font-bold">
-                  <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-muted">{CLIENT_KIND_LABELS[c.kind]}</span>
+                  {c.relation && <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink">{relations.labelOf(c.relation)}</span>}
                   {c.weddingDate && <span className="rounded-full bg-sun-50 px-2.5 py-0.5 text-brand-strong">{formatDate(c.weddingDate)}</span>}
                   {c.source && <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-muted">From {SOURCE_LABELS[c.source]}</span>}
                   {c.archived && <span className="rounded-full bg-cream px-2.5 py-0.5 text-ink-subtle">Archived</span>}
@@ -211,24 +212,23 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-/** The family, the wedding and billing, from the client master. */
+/** Emergency contacts and the wedding, from the client master. */
 function MasterDetails({ client: c }: { client: Client }) {
   const relations = useOptionList("relation");
   const w = c.wedding;
-  const b = c.billing;
   const hasWedding = w.brideName || w.groomName || w.guestCount !== null;
-  const hasBilling = b.name || b.address || b.stateCode || b.gstin;
-  if (!c.contacts.length && !hasWedding && !hasBilling) return null;
+  if (!c.contacts.length && !hasWedding) return null;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {c.contacts.length > 0 && (
-        <Card className="overflow-hidden lg:col-span-2">
-          <h2 className="px-5 pt-4 font-display text-lg font-extrabold">Family and contacts</h2>
+        <Card className="overflow-hidden">
+          <h2 className="px-5 pt-4 font-display text-lg font-extrabold">Emergency contacts</h2>
+          <p className="px-5 text-sm text-ink-muted">When {c.name.split(" ")[0]} can&apos;t be reached</p>
           <ul className="mt-2 divide-y divide-line">
             {c.contacts.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <Avatar name={p.name} className="size-9 text-xs" />
-                <span className="min-w-[10rem] flex-1">
+                <span className="min-w-[9rem] flex-1">
                   <span className="block font-bold">
                     {p.name}
                     {p.relation && <span className="font-semibold text-ink-muted"> · {relations.labelOf(p.relation)}</span>}
@@ -258,19 +258,6 @@ function MasterDetails({ client: c }: { client: Client }) {
             <Item label="Groom">{w.groomName}</Item>
             <Item label="Guests">{w.guestCount !== null ? w.guestCount.toLocaleString("en-IN") : null}</Item>
             <Item label="Wedding date">{c.weddingDate ? formatDate(c.weddingDate) : null}</Item>
-          </dl>
-        </Card>
-      )}
-      {hasBilling && (
-        <Card className="p-5">
-          <h2 className="mb-3 font-display text-lg font-extrabold">Billing</h2>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px]">
-            <Item label="Name on invoices">{b.name}</Item>
-            <Item label="State">{stateName(b.stateCode)}</Item>
-            <div className="col-span-2">
-              <Item label="Address">{b.address}</Item>
-            </div>
-            <Item label="GST number">{b.gstin}</Item>
           </dl>
         </Card>
       )}

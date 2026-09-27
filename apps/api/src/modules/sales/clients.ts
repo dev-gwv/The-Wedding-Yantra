@@ -9,9 +9,9 @@ import { assertOption } from "../options/service.js";
 import { scopeCondition, toSummary, type SummaryRow } from "./leads.js";
 
 /**
- * The client master: a family (or a company, or a planner who sends us work), everyone we
- * deal with in it, the wedding, and who invoices are made out to. Archived, never deleted,
- * so old events and invoices keep their client.
+ * The client master: the person who booked us (and who they are to the wedding), who to
+ * call when they can't be reached, and the wedding. Billing is filled in on each invoice.
+ * Archived, never deleted, so old events and invoices keep their client.
  */
 
 interface ClientRow {
@@ -27,10 +27,7 @@ interface ClientRow {
   bride_name: string | null;
   groom_name: string | null;
   guest_count: number | null;
-  billing_name: string | null;
-  billing_address: string | null;
-  state_code: string | null;
-  gstin: string | null;
+  relation: string | null;
   portal_token: string | null;
   custom: Record<string, string | number | boolean | null>;
   no_messages: boolean;
@@ -46,6 +43,7 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
   email: r.email,
   city: r.city,
   kind: r.kind,
+  relation: r.relation,
   archived: r.archived_at !== null,
   weddingDate: r.wedding_date,
   leadCount: Number(r.lead_count),
@@ -56,7 +54,7 @@ const toClientSummary = (r: ClientRow): ClientSummary => ({
 const SELECT = `
   SELECT c.id, c.name, c.phone, c.email, c.city, c.notes, c.kind, c.archived_at, c.source,
          c.bride_name, c.groom_name, c.guest_count,
-         c.billing_name, c.billing_address, c.state_code, c.gstin,
+         c.relation,
          c.portal_token, c.custom, c.no_messages, c.created_at,
          coalesce(
            (SELECT min(f.date) FROM events e JOIN event_functions f ON f.event_id = e.id
@@ -69,10 +67,6 @@ const SELECT = `
 
 function duplicate(err: unknown): never {
   if ((err as { code?: string }).code === "23505") {
-    if ((err as { constraint?: string }).constraint === "clients_gstin_uniq") {
-      const message = "Another client already has this GST number";
-      throw new AppError(409, "DUPLICATE_CLIENT", message, { "billing.gstin": message });
-    }
     const message = "A client with this number already exists";
     throw new AppError(409, "DUPLICATE_CLIENT", message, { phone: message });
   }
@@ -89,7 +83,7 @@ export async function listClients(db: Db, ctx: MemberContext, q?: string, archiv
     const digits = q.replace(/\D/g, "");
     const byPhone = digits.length >= 3 ? ` OR c.phone LIKE $${at + 1} OR EXISTS (SELECT 1 FROM client_contacts cc WHERE cc.client_id = c.id AND cc.phone LIKE $${at + 1})` : "";
     // A family is found by any of its names: the bride, the groom, a contact.
-    filter += ` AND (c.name ILIKE $${at} OR c.bride_name ILIKE $${at} OR c.groom_name ILIKE $${at} OR c.billing_name ILIKE $${at}
+    filter += ` AND (c.name ILIKE $${at} OR c.bride_name ILIKE $${at} OR c.groom_name ILIKE $${at}
                      OR EXISTS (SELECT 1 FROM client_contacts cc WHERE cc.client_id = c.id AND cc.name ILIKE $${at})${byPhone})`;
     if (digits.length >= 3) params.push(`%${digits}%`);
   }
@@ -140,7 +134,6 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     source: row.source,
     contacts,
     wedding: { brideName: row.bride_name, groomName: row.groom_name, guestCount: row.guest_count },
-    billing: { name: row.billing_name, address: row.billing_address, stateCode: row.state_code, gstin: row.gstin },
     leads,
     referredLeads,
     custom: row.custom,
@@ -162,7 +155,7 @@ export interface ClientFields {
   source?: LeadSource | null;
   contacts?: ClientContactInput[];
   wedding?: { brideName?: string | null; groomName?: string | null; guestCount?: number | null };
-  billing?: { name?: string | null; address?: string | null; stateCode?: string | null; gstin?: string | null };
+  relation?: string | null;
   archived?: boolean;
 }
 
@@ -183,15 +176,13 @@ function columnsOf(input: ClientFields): [string, unknown][] {
   put("bride_name", input.wedding?.brideName);
   put("groom_name", input.wedding?.groomName);
   put("guest_count", input.wedding?.guestCount);
-  put("billing_name", input.billing?.name);
-  put("billing_address", input.billing?.address);
-  put("state_code", input.billing?.stateCode);
-  put("gstin", input.billing?.gstin);
+  put("relation", input.relation);
   return out;
 }
 
-/** Relations must be the business's own options. */
-async function checkRelations(db: Queryable, workspaceId: string, input: ClientFields) {
+/** Relationships must be the business's own options (a hidden one is fine if it's already set). */
+async function checkRelations(db: Queryable, workspaceId: string, input: ClientFields, current?: string | null) {
+  if (input.relation) await assertOption(db, workspaceId, "relation", input.relation, "relation", current);
   for (const [i, c] of (input.contacts ?? []).entries()) {
     if (c.relation) await assertOption(db, workspaceId, "relation", c.relation, `contacts.${i}.relation`);
   }
@@ -236,21 +227,18 @@ const SECTION_OF: Record<string, string> = {
   bride_name: "wedding",
   groom_name: "wedding",
   guest_count: "wedding",
-  billing_name: "billing",
-  billing_address: "billing",
-  state_code: "billing",
-  gstin: "billing",
+  relation: "details",
 };
 
 export async function updateClient(db: Db, ctx: MemberContext, clientId: string, input: ClientFields) {
   if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can change clients");
-  const current = await db.query<{ name: string; archived_at: Date | null }>(
-    `SELECT name, archived_at FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+  const current = await db.query<{ name: string; relation: string | null; archived_at: Date | null }>(
+    `SELECT name, relation, archived_at FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
     [clientId, ctx.workspaceId],
   );
   const was = current.rows[0];
   if (!was) throw notFound("This client");
-  await checkRelations(db, ctx.workspaceId, input);
+  await checkRelations(db, ctx.workspaceId, input, was.relation);
 
   await withTransaction(db, async (tx) => {
     const cols = columnsOf(input);

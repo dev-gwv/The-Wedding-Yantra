@@ -1142,14 +1142,15 @@ list with search, a short form, and archive instead of delete.
 **Built now:**
 - **Master data page** (More, and the desktop side menu): tiles for all six. Clients and Lists
   are live; the rest say "Coming next" and open today's screens where they exist.
-- **Client master:** a client is a family, a company or a planner/agency.
-  - **Family and contacts:** any number of people, each with a relation (the business's own
-    list) and a mobile.
+- **Client master** (reworked with the owner, migration 0029):
+  - **Client name** is the person who booked us, with their **relationship** beside it (the
+    business's list: bride, groom, bride's father, groom's father, bride's mother, groom's
+    mother, other).
+  - **Emergency contacts:** who to call when the client can't be reached, each with a
+    relationship and a mobile.
   - **The wedding:** bride's and groom's names and guests; the wedding date comes from their
     events.
-  - **Billing:** name on invoices, address, state, GST number (checked; a second client with the
-    same GST number is refused). A new invoice for the client fills these in and takes the state
-    as the place of supply, so IGST or CGST+SGST follows.
+  - **No billing on the client:** it is filled in on each invoice, as before.
   - Where they came from (carried over from the enquiry when it's booked), notes, archive and
-    bring back. Search finds a client by family, bride, groom or any contact's name or number.
+    bring back. Search finds a client by name, bride, groom or any contact's name or number.
     Every change is in the activity log.

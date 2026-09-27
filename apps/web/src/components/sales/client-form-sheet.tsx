@@ -1,8 +1,7 @@
 "use client";
 
-import { INDIAN_STATES, type StateCode } from "@wedding-yantra/core";
 import { useCreateClient, useUpdateClient } from "@wedding-yantra/api-client/react";
-import { CLIENT_KIND_LABELS, CLIENT_KINDS, clientInput, LEAD_SOURCES, SOURCE_LABELS, type Client, type ClientKind, type LeadSource } from "@wedding-yantra/types";
+import { clientInput, LEAD_SOURCES, SOURCE_LABELS, type Client, type LeadSource } from "@wedding-yantra/types";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -74,19 +73,13 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
     city: client?.city ?? "",
     notes: client?.notes ?? "",
   });
-  const [kind, setKind] = useState<ClientKind>(client?.kind ?? "family");
+  const [relation, setRelation] = useState<string | null>(client?.relation ?? null);
   const [source, setSource] = useState<LeadSource | "">(client?.source ?? "");
   const [contacts, setContacts] = useState<ContactDraft[]>((client?.contacts ?? []).map((c) => ({ key: c.id, name: c.name, relation: c.relation, phone: local(c.phone) })));
   const [wedding, setWedding] = useState({
     brideName: client?.wedding.brideName ?? "",
     groomName: client?.wedding.groomName ?? "",
     guestCount: client?.wedding.guestCount != null ? String(client.wedding.guestCount) : "",
-  });
-  const [billing, setBilling] = useState({
-    name: client?.billing.name ?? "",
-    address: client?.billing.address ?? "",
-    stateCode: (client?.billing.stateCode ?? "") as StateCode | "",
-    gstin: client?.billing.gstin ?? "",
   });
   const [noMessages, setNoMessages] = useState(client?.noMessages ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,11 +93,10 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
     e.preventDefault();
     const payload = {
       ...values,
-      kind,
+      relation,
       source: source || null,
       contacts: contacts.filter((c) => c.name.trim() || c.phone.trim()).map((c) => ({ name: c.name, relation: c.relation, phone: c.phone })),
       wedding,
-      billing,
       custom: customPayload(fields, custom),
       ...(client ? { noMessages } : {}),
     };
@@ -124,31 +116,21 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
     [wedding.brideName && wedding.groomName ? `${wedding.brideName} & ${wedding.groomName}` : wedding.brideName || wedding.groomName, wedding.guestCount && `${wedding.guestCount} guests`]
       .filter(Boolean)
       .join(" · ") || "Bride, groom, guests";
-  const billingHint = [billing.name, billing.gstin && `GST ${billing.gstin}`].filter(Boolean).join(" · ") || "Name on invoices, address, state, GST";
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Kind of client">
-        {CLIENT_KINDS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            aria-pressed={kind === k}
-            onClick={() => setKind(k)}
-            className={cn("h-9 rounded-full px-4 text-sm font-bold transition", kind === k ? "bg-gradient-primary text-on-brand shadow-soft" : "border border-line bg-surface text-ink hover:bg-cream")}
-          >
-            {CLIENT_KIND_LABELS[k]}
-          </button>
-        ))}
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
+        <TextField
+          label="Client name"
+          value={values.name}
+          onChange={set("name")}
+          error={errors.name}
+          autoFocus={!client}
+          placeholder="Who booked you"
+          hint="The bride, the groom, a parent, or a group"
+        />
+        <OptionSelect list="relation" label="Relationship" value={relation} onChange={setRelation} error={errors.relation} />
       </div>
-      <TextField
-        label={kind === "family" ? "Family name" : kind === "company" ? "Company name" : "Planner or agency"}
-        value={values.name}
-        onChange={set("name")}
-        error={errors.name}
-        autoFocus={!client}
-        placeholder={kind === "family" ? "Sharma family" : undefined}
-      />
       <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
       <div className="grid grid-cols-2 gap-3">
         <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} />
@@ -164,11 +146,12 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
       </SelectField>
 
       <Section
-        title="Family and contacts"
-        hint={contacts.map((c) => c.name).filter(Boolean).join(", ") || "Bride, groom, parents, planner"}
+        title="Emergency contacts"
+        hint={contacts.map((c) => c.name).filter(Boolean).join(", ") || "Who to call when the client can't be reached"}
         defaultOpen={contacts.length > 0}
         forceOpen={hasErrorIn("contacts")}
       >
+        <p className="text-sm text-ink-muted">Who to call for decisions on the wedding day, or whenever the client can&apos;t be reached.</p>
         {contacts.map((c, i) => (
           <div key={c.key} className="space-y-3 rounded-2xl bg-cream/60 p-3">
             <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -182,13 +165,13 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
                 <Trash2 className="size-4" />
               </button>
             </div>
-            <OptionSelect list="relation" label="Relation" value={c.relation} onChange={(v) => setContact(c.key, { relation: v })} error={errors[`contacts.${i}.relation`]} />
+            <OptionSelect list="relation" label="Relationship" value={c.relation} onChange={(v) => setContact(c.key, { relation: v })} error={errors[`contacts.${i}.relation`]} />
             <PhoneField label="Mobile" value={c.phone} onChange={(e) => setContact(c.key, { phone: e.target.value })} error={errors[`contacts.${i}.phone`]} />
           </div>
         ))}
-        {contacts.length < 20 && (
+        {contacts.length < 10 && (
           <Button variant="secondary" size="sm" onClick={() => setContacts((cs) => [...cs, blankContact()])}>
-            <Plus className="size-4" /> Add a family member or contact
+            <Plus className="size-4" /> Add an emergency contact
           </Button>
         )}
       </Section>
@@ -206,39 +189,6 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
           error={errors["wedding.guestCount"]}
           hint="The wedding date comes from their event."
         />
-      </Section>
-
-      <Section title="Billing" hint={billingHint} defaultOpen={!!(billing.name || billing.address || billing.gstin)} forceOpen={hasErrorIn("billing")}>
-        <TextField label="Name on invoices" value={billing.name} onChange={(e) => setBilling((x) => ({ ...x, name: e.target.value }))} error={errors["billing.name"]} placeholder={values.name || undefined} />
-        <TextAreaField label="Billing address" value={billing.address} onChange={(e) => setBilling((x) => ({ ...x, address: e.target.value }))} error={errors["billing.address"]} />
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label="State"
-            value={billing.stateCode}
-            onChange={(e) => setBilling((x) => ({ ...x, stateCode: e.target.value as StateCode | "" }))}
-            error={errors["billing.stateCode"]}
-            hint="Decides CGST + SGST or IGST"
-          >
-            <option value="">Not set</option>
-            {INDIAN_STATES.map((s) => (
-              <option key={s.code} value={s.code}>
-                {s.name}
-              </option>
-            ))}
-          </SelectField>
-          <TextField
-            label="GST number"
-            value={billing.gstin}
-            onChange={(e) => {
-              const gstin = e.target.value.toUpperCase();
-              // A GST number's first two digits are its state.
-              const fromGst = INDIAN_STATES.find((st) => st.code === gstin.slice(0, 2))?.code;
-              setBilling((x) => ({ ...x, gstin, stateCode: x.stateCode || fromGst || "" }));
-            }}
-            error={errors["billing.gstin"]}
-            hint="Only for businesses"
-          />
-        </div>
       </Section>
 
       <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />

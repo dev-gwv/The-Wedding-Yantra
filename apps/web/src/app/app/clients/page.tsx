@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useDeferredValue, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { useOptionList } from "@/components/app/option-picker";
 import { ClientFormSheet } from "@/components/sales/client-form-sheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
@@ -24,6 +25,7 @@ export default function ClientsPage() {
   const clients = useClients(workspace.id, q, archived);
   const [adding, setAdding] = useState(false);
   const canManage = can(workspace.role, "clients.manage");
+  const relations = useOptionList("relation");
 
   if (!canView) {
     return (
@@ -46,7 +48,7 @@ export default function ClientsPage() {
       <BackLink href="/app/masters" label="Master data" />
       <PageHeader
         title="Clients"
-        subtitle="Families and companies who book you: their contacts, the wedding and billing. Booked enquiries are added automatically."
+        subtitle="Everyone who books you, with emergency contacts and the wedding. Booked enquiries are added automatically."
         action={
           canManage && (
             <Button onClick={() => setAdding(true)}>
@@ -111,7 +113,10 @@ export default function ClientsPage() {
             <Link key={c.id} href={`/app/clients/${c.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream">
               <Avatar name={c.name} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-bold">{c.name}</span>
+                <span className="block truncate font-bold">
+                  {c.name}
+                  {c.relation && <span className="font-semibold text-ink-muted"> · {relations.labelOf(c.relation)}</span>}
+                </span>
                 <span className="block truncate text-sm text-ink-muted tabular">
                   {[c.weddingDate ? formatDate(c.weddingDate) : null, c.phone ? formatPhone(c.phone) : null, c.city].filter(Boolean).join(" · ") || "No contact details"}
                 </span>

@@ -35,7 +35,7 @@ export default function MastersPage() {
     {
       key: "clients",
       title: "Clients",
-      about: "Families and companies: contacts, the wedding, billing",
+      about: "Who booked you, emergency contacts, the wedding",
       icon: UsersRound,
       href: "/app/clients",
       status: "live",
@@ -81,7 +81,7 @@ export default function MastersPage() {
     {
       key: "lists",
       title: "Lists",
-      about: "Choices in the forms: relations, payment modes, categories",
+      about: "Choices in the forms: relationships, payment modes, categories",
       icon: Tags,
       href: "/app/settings/lists",
       status: "live",

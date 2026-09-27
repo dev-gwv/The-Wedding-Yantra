@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -203,8 +203,8 @@ expect "every business starts on a free trial" '.success and .data.status == "tr
 expect "days off can be marked" '.success and .data.startDate == "2026-12-24" and .data.endDate == "2026-12-26"' \
   "$(api POST "/api/v1/workspaces/$WS_ID/time-off" '{"startDate":"2026-12-24","endDate":"2026-12-26","note":"Smoke holiday"}' "$TOKEN")"
 CLIENT_ID="$(api GET "/api/v1/workspaces/$WS_ID/leads/$LEAD_ID" "" "$TOKEN" | jq -r '.data.clientId')"
-expect "a client keeps the family, the wedding and billing" '.success and (.data.contacts | length) == 1 and .data.wedding.brideName == "Smoke Bride" and .data.billing.stateCode == "27"' \
-  "$(api PATCH "/api/v1/workspaces/$WS_ID/clients/$CLIENT_ID" '{"contacts":[{"name":"Smoke Father","relation":"father","phone":"9811122233"}],"wedding":{"brideName":"Smoke Bride","guestCount":300},"billing":{"stateCode":"27"}}' "$TOKEN")"
+expect "a client keeps who booked, emergency contacts and the wedding" '.success and .data.relation == "bride" and (.data.contacts | length) == 1 and .data.wedding.brideName == "Smoke Bride"' \
+  "$(api PATCH "/api/v1/workspaces/$WS_ID/clients/$CLIENT_ID" '{"relation":"bride","contacts":[{"name":"Smoke Father","relation":"brides_father","phone":"9811122233"}],"wedding":{"brideName":"Smoke Bride","guestCount":300}}' "$TOKEN")"
 PORTAL="$(api POST "/api/v1/workspaces/$WS_ID/clients/$CLIENT_ID/portal" "" "$TOKEN")"
 expect "a client's own page can be shared" '.success and (.data.token | length) >= 32' "$PORTAL"
 expect "the client opens it without signing in and sees their bill" '.success and .data.client.name == "Smoke Lead" and (.data.bills | length) == 1 and .data.totals.due == 0' \

@@ -5,12 +5,12 @@ type Client = {
   id: string;
   name: string;
   kind: string;
+  relation: string | null;
   archived: boolean;
   weddingDate: string | null;
   source: string | null;
   contacts: { name: string; relation: string | null; phone: string | null }[];
   wedding: { brideName: string | null; groomName: string | null; guestCount: number | null };
-  billing: { name: string | null; address: string | null; stateCode: string | null; gstin: string | null };
 };
 
 let t: TestContext;
@@ -34,32 +34,32 @@ async function team(prefix: string) {
 }
 
 const family = {
-  name: "Sharma Family",
+  name: "Rakesh Sharma",
+  relation: "brides_father",
   phone: "9822200011",
   city: "Jaipur",
   kind: "family",
   source: "instagram",
   contacts: [
-    { name: "Priya Sharma", relation: "bride", phone: "9822200012" },
-    { name: "Rakesh Sharma", relation: "father", phone: "9822200013" },
+    { name: "Sunita Sharma", relation: "brides_mother", phone: "9822200012" },
+    { name: "Vikram Mehta", relation: "grooms_father", phone: "9822200013" },
   ],
   wedding: { brideName: "Priya", groomName: "Arjun", guestCount: 450 },
-  billing: { name: "Rakesh Sharma", address: "C-Scheme, Jaipur", stateCode: "08", gstin: "" },
 };
 
 describe("the client master", () => {
-  it("keeps the family, the wedding and billing, and finds a client by any name or number", async () => {
+  it("keeps who booked, emergency contacts and the wedding, and finds a client by any name or number", async () => {
     const { owner, ws } = await team("851");
     const made = await call<Client>(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: family });
     expect(made.status).toBe(201);
     const c = made.body.data;
-    expect(c).toMatchObject({ kind: "family", source: "instagram", archived: false });
+    expect(c).toMatchObject({ name: "Rakesh Sharma", relation: "brides_father", source: "instagram", archived: false });
+    expect(c).not.toHaveProperty("billing");
     expect(c.contacts.map((x) => [x.name, x.relation, x.phone])).toEqual([
-      ["Priya Sharma", "bride", "+919822200012"],
-      ["Rakesh Sharma", "father", "+919822200013"],
+      ["Sunita Sharma", "brides_mother", "+919822200012"],
+      ["Vikram Mehta", "grooms_father", "+919822200013"],
     ]);
     expect(c.wedding).toEqual({ brideName: "Priya", groomName: "Arjun", guestCount: 450 });
-    expect(c.billing).toEqual({ name: "Rakesh Sharma", address: "C-Scheme, Jaipur", stateCode: "08", gstin: null });
 
     // Found by the groom's name and by a contact's number.
     const byGroom = await call<{ id: string }[]>(t.app, "GET", `/workspaces/${ws}/clients?q=Arjun`, { token: owner });
@@ -78,9 +78,9 @@ describe("the client master", () => {
     // Contacts are replaced as a whole when sent, and left alone when not.
     const edited = await call<Client>(t.app, "PATCH", `/workspaces/${ws}/clients/${c.id}`, {
       token: owner,
-      body: { contacts: [{ name: "Arjun Mehta", relation: "groom", phone: "9822200014" }], wedding: { guestCount: 500 } },
+      body: { contacts: [{ name: "Vikram Mehta", relation: "grooms_father", phone: "9822200014" }], wedding: { guestCount: 500 } },
     });
-    expect(edited.body.data.contacts.map((x) => x.name)).toEqual(["Arjun Mehta"]);
+    expect(edited.body.data.contacts.map((x) => x.name)).toEqual(["Vikram Mehta"]);
     expect(edited.body.data.wedding).toMatchObject({ guestCount: 500, brideName: "Priya" });
     const again = await call<Client>(t.app, "PATCH", `/workspaces/${ws}/clients/${c.id}`, { token: owner, body: { notes: "Loves marigolds" } });
     expect(again.body.data.contacts).toHaveLength(1);
@@ -92,19 +92,17 @@ describe("the client master", () => {
     expect(actions).toContain("client.updated");
   });
 
-  it("checks relations, GST numbers and duplicates", async () => {
+  it("checks relationships and duplicate numbers", async () => {
     const { owner, ws } = await team("852");
-    const badList = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { ...family, contacts: [{ name: "X", relation: "martian" }] } });
-    expect(badList.status).toBe(400);
-    const badGst = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Co", billing: { gstin: "12345" } } });
-    expect(badGst.status).toBe(400);
-    expect(badGst.body.error.fields).toHaveProperty(["billing.gstin"]);
+    const badClient = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Asha Rao", relation: "martian" } });
+    expect(badClient.status).toBe(400);
+    expect(badClient.body.error.fields).toHaveProperty("relation");
+    const badContact = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Asha Rao", contacts: [{ name: "Ravi Rao", relation: "martian" }] } });
+    expect(badContact.status).toBe(400);
+    // The earlier choices are hidden from new records.
+    const hidden = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Asha Rao", relation: "planner" } });
+    expect(hidden.status).toBe(400);
 
-    const co = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Acme Events", kind: "company", billing: { gstin: "27abcde1234f1z5" } } });
-    expect(co.status).toBe(201);
-    const dupGst = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Acme again", billing: { gstin: "27ABCDE1234F1Z5" } } });
-    expect(dupGst.status).toBe(409);
-    expect(dupGst.body.error.message).toBe("Another client already has this GST number");
     await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "First", phone: "9811100001" } });
     const dupPhone = await call(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Second", phone: "9811100001" } });
     expect(dupPhone.status).toBe(409);
@@ -127,25 +125,5 @@ describe("the client master", () => {
     const other = await signIn(t.app, "8539999999", "Stranger");
     await createBusiness(t.app, other, "Elsewhere");
     expect((await call(t.app, "GET", `/workspaces/${ws}/clients/${c.id}`, { token: other })).status).toBe(404);
-  });
-
-  it("fills an invoice from the client's billing details and state", async () => {
-    const { owner, ws } = await team("854");
-    await call(t.app, "PATCH", `/workspaces/${ws}`, { token: owner, body: { gstin: "08ABCDE1234F1Z5" } });
-    const c = (
-      await call<Client>(t.app, "POST", `/workspaces/${ws}/clients`, {
-        token: owner,
-        body: { name: "Mehta Family", phone: "9811100002", billing: { name: "Mehta Traders", address: "Linking Road, Mumbai 400050", gstin: "27ABCDE1234F1Z5" } },
-      })
-    ).body.data;
-    const draft = await call<{ billTo: { name: string; address: string | null; gstin: string | null }; placeOfSupply: string | null }>(
-      t.app,
-      "GET",
-      `/workspaces/${ws}/bill-draft?clientId=${c.id}`,
-      { token: owner },
-    );
-    expect(draft.body.data.billTo).toMatchObject({ name: "Mehta Traders", address: "Linking Road, Mumbai 400050", gstin: "27ABCDE1234F1Z5" });
-    // Maharashtra client, Rajasthan business: IGST.
-    expect(draft.body.data.placeOfSupply).toBe("27");
   });
 });
