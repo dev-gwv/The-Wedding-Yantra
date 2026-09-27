@@ -19,6 +19,7 @@ import { deliverableRoutes } from "./modules/deliverables/routes.js";
 import { growRoutes } from "./modules/grow/routes.js";
 import { inventoryRoutes } from "./modules/inventory/routes.js";
 import { vendorRoutes } from "./modules/vendors/routes.js";
+import { venueRoutes } from "./modules/venues/routes.js";
 import type { Files } from "./modules/files/service.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { moneyRoutes } from "./modules/money/routes.js";
@@ -153,6 +154,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       growRoutes(v1, { db });
       deliverableRoutes(v1, { db });
       vendorRoutes(v1, { db });
+      venueRoutes(v1, { db });
       inventoryRoutes(v1, { db });
       fieldRoutes(v1, { db });
       optionRoutes(v1, { db });

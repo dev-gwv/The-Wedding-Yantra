@@ -34,6 +34,7 @@ const ADD_RIGHT: Record<OptionList, Permission[]> = {
   relation: ["clients.manage"],
   vendor_category: ["expenses.approve"],
   designation: ["members.hr"],
+  venue_type: ["events.manage"],
 };
 
 /** A new business starts with the built-in options, plus the categories its trade usually needs. */

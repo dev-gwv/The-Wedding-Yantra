@@ -110,6 +110,8 @@ const GUIDES: Guide[] = [
       "Every event shows its profit: what you billed before GST, minus what you spent on it.",
       "Keep your vendors in Master data, Vendors: florists, tent and décor, DJ, caterers. Each has a category, a contact person, their city, UPI, bank account and IFSC, GST number, and your rates and notes. Star the ones you prefer: they come first.",
       "Note what each event owes a vendor, and pay by UPI in one tap. Paying adds it to the event's expenses, so its profit stays right. Archive vendors you no longer use; their payouts stay. Change the categories in Master data, Lists.",
+      "Keep the places you work at in Master data, Venues: type, address, Google Maps link, the banquet manager's number, how many guests it holds, when the music must stop, whether outside caterers are allowed, and when setup can start.",
+      "Type or pick a saved venue's name on an event or a function. The event then shows the venue's address, rules and an Open in Maps button to everyone on it, and the venue's page lists every event there. Renaming a venue renames it on its events too.",
       "Money, Monthly report shows the month's cash, profit, GST, where the work came from and what sold, with spreadsheets for your CA.",
     ],
   },

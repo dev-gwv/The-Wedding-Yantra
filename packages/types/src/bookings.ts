@@ -2,6 +2,7 @@ import type { CustomValues } from "@wedding-yantra/core";
 import { z } from "zod";
 import { personName, phone } from "./auth.js";
 import { customValuesInput } from "./custom.js";
+import type { VenueBrief } from "./venues.js";
 import { SERVICE_UNITS, type ServiceUnit } from "./business-types.js";
 import { optionalText } from "./common.js";
 import { EVENT_TYPES, type EventType } from "./sales.js";
@@ -248,6 +249,8 @@ export interface WeddingEvent extends EventSummary {
   reviewRequestedAt: string | null;
   /** The business's own fields, keyed by field id */
   custom: CustomValues;
+  /** Saved venues this event's venue names match: address, Maps link, contact */
+  venues: VenueBrief[];
   createdAt: string;
 }
 

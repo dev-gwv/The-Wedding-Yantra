@@ -144,6 +144,10 @@ import type {
   OtpRequestResult,
   OtpVerifyInput,
   Team,
+  Venue,
+  VenueInput,
+  VenueSummary,
+  UpdateVenueInput,
   Employee,
   EmployeeDetailsInput,
   UpdateMeInput,
@@ -497,6 +501,14 @@ export function createApiClient(options: ApiClientOptions) {
       update: (workspaceId: string, id: string, input: UpdateVendorInput) =>
         request<Vendor>("PATCH", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`, input),
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/vendors/${encodeURIComponent(id)}`),
+    },
+    venues: {
+      list: (workspaceId: string, archived = false) =>
+        request<VenueSummary[]>("GET", `${ws(workspaceId)}/venues${qs({ archived: archived ? "true" : undefined })}`),
+      get: (workspaceId: string, id: string) => request<Venue>("GET", `${ws(workspaceId)}/venues/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: VenueInput) => request<Venue>("POST", `${ws(workspaceId)}/venues`, input),
+      update: (workspaceId: string, id: string, input: UpdateVenueInput) =>
+        request<Venue>("PATCH", `${ws(workspaceId)}/venues/${encodeURIComponent(id)}`, input),
     },
     payouts: {
       list: (workspaceId: string, query: PayoutListQuery = {}) => request<Payout[]>("GET", `${ws(workspaceId)}/payouts${qs(query)}`),

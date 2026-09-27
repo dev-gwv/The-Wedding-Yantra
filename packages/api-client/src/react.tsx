@@ -79,6 +79,8 @@ import type {
   UpdateLeadInput,
   CreateInvitationInput,
   EmployeeDetailsInput,
+  VenueInput,
+  UpdateVenueInput,
   CreateWorkspaceInput,
   OtpRequestInput,
   OtpVerifyInput,
@@ -185,6 +187,8 @@ export const queryKeys = {
   /** Vendors and payouts live under bookings: paying one changes an event's profit. */
   vendors: (id: string, archived = false) => ["workspace", id, "bookings", "vendors", archived] as const,
   vendor: (id: string, vendorId: string) => ["workspace", id, "bookings", "vendor", vendorId] as const,
+  venues: (id: string, archived = false) => ["workspace", id, "bookings", "venues", archived] as const,
+  venue: (id: string, venueId: string) => ["workspace", id, "bookings", "venue", venueId] as const,
   payouts: (id: string, query: object) => ["workspace", id, "bookings", "payouts", query] as const,
   /** Stock and what events need of it. */
   inventory: (id: string) => ["workspace", id, "inventory"] as const,
@@ -1215,6 +1219,27 @@ function useVendorMutation<TInput, TResult>(workspaceId: string, fn: (input: TIn
       void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
     },
   });
+}
+
+export function useVenues(workspaceId: string, enabled = true, archived = false) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.venues(workspaceId, archived), queryFn: () => api.venues.list(workspaceId, archived), enabled });
+}
+
+export function useVenue(workspaceId: string, venueId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.venue(workspaceId, venueId), queryFn: () => api.venues.get(workspaceId, venueId), enabled: !!venueId });
+}
+
+/** Venue changes can change what events show, so refresh bookings. */
+export function useCreateVenue(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, (input: VenueInput) => api.venues.create(workspaceId, input));
+}
+
+export function useUpdateVenue(workspaceId: string) {
+  const api = useApi();
+  return useVendorMutation(workspaceId, ({ id, ...input }: UpdateVenueInput & { id: string }) => api.venues.update(workspaceId, id, input));
 }
 
 export function useCreateVendor(workspaceId: string) {

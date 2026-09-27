@@ -1186,3 +1186,20 @@ list with search, a short form, and archive instead of delete.
 - Checks: IFSC, PAN, account number, UPI and mobile formats; an amount needs monthly or per day.
   Changes are in the activity log, linking to the person.
 
+## 44. Master data, step 4: Venues
+
+- **Venue master** (migration 0033, table `venues`): name, type from the business's own list
+  (banquet hall, hotel, resort, lawn or garden, farmhouse, palace or heritage, community hall,
+  temple or gurudwara, home, other), address, city, Google Maps link, contact person and mobile,
+  guests it holds, and rules: music cut-off time, outside caterers allowed or not, setup and
+  load-in, notes. Archive and bring back; search; filter by type.
+- **Linked to events by name**, with no change to how events are stored: an event or function
+  whose venue is a saved venue's name (any capitals, spaces trimmed) shows that venue's address,
+  rules, contact and an Open in Maps button, for everyone on the event, freelancers included.
+  The event form suggests saved venue names. Names are unique per business, so the match is
+  never ambiguous; renaming a venue renames it on its events.
+- The venue page lists its events (coming up, and before) with the functions held there. The
+  list shows how many events are coming up at each venue.
+- Owners and managers edit; staff and the accountant see; freelancers see venues only on their
+  events. Changes are in the activity log.
+

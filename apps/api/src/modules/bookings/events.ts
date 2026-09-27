@@ -14,6 +14,7 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { writeCustom } from "../fields/service.js";
+import { venuesNamed } from "../venues/service.js";
 
 /** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
@@ -228,6 +229,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
           ),
     reviewRequestedAt: r.review_requested_at?.toISOString() ?? null,
     custom: r.custom,
+    venues: await venuesNamed(db, ctx.workspaceId, [r.venue, ...functions.map((f) => f.venue)]),
     createdAt: r.created_at.toISOString(),
   };
 }

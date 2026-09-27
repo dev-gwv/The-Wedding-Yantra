@@ -37,6 +37,7 @@ import {
   Users,
   UsersRound,
   type LucideIcon,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -134,6 +135,7 @@ export default function MorePage() {
         {can(workspace.role, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: relations, communities, payment modes and more" />}
         {can(workspace.role, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
+        {can(workspace.role, "events.view") && <Row href="/app/venues" icon={MapPin} label="Venues" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/notifications?tab=settings" icon={Bell} label="Alerts: what reaches you, and when" />
         <Row href="/app/team" icon={Users} label="Employees" />

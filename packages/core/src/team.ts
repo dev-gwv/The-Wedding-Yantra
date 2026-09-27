@@ -120,6 +120,14 @@ export function activityText(a: ActivityFacts): string {
       return `archived ${subject || "a vendor"}`;
     case "vendor.restored":
       return `brought back ${subject || "a vendor"}`;
+    case "venue.added":
+      return `added ${subject || "a venue"} as a venue`;
+    case "venue.updated":
+      return `updated ${subject ? `${subject}'s` : "a venue's"} details`;
+    case "venue.archived":
+      return `archived ${subject || "a venue"}`;
+    case "venue.restored":
+      return `brought back ${subject || "a venue"}`;
     case "client.portal_shared":
       return `shared ${subject ? `${subject}'s` : "a client's"} page with them`;
     case "client.portal_stopped":

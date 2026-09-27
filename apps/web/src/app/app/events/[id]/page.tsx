@@ -2,7 +2,7 @@
 
 import { can, formatDate, formatMoney, formatPhone, whatsappLink } from "@wedding-yantra/core";
 import { useDeleteEvent, useEvent, useUpdateEvent } from "@wedding-yantra/api-client/react";
-import { EVENT_LABELS, EVENT_STATUS_LABELS, type WeddingEvent } from "@wedding-yantra/types";
+import { EVENT_LABELS, EVENT_STATUS_LABELS, venueMapsLink, type WeddingEvent } from "@wedding-yantra/types";
 import { AlertTriangle, CircleCheck, Clock, FileText, Inbox, MapPin, MessageCircle, Pencil, Phone, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { eventDates } from "@/components/bookings/event-card";
 import { EventDeliverables } from "@/components/deliverables/deliverables";
 import { ReviewCard } from "@/components/grow/review-card";
 import { EventPayouts } from "@/components/vendors/payouts";
+import { EventVenues, venueFor } from "@/components/venues/event-venues";
 import { EventStock } from "@/components/inventory/inventory";
 import { EventMoneyCard } from "@/components/money/event-money";
 import { EventExpenses } from "@/components/money/expenses-view";
@@ -153,11 +154,21 @@ function EventView({ event }: { event: WeddingEvent }) {
                           <span className="inline-flex items-center gap-1">
                             <Clock className="size-3.5" /> {f.startTime ? `${f.startTime}${f.endTime ? `–${f.endTime}` : ""}` : "Time to be set"}
                           </span>
-                          {(f.venue ?? event.venue) && (
-                            <span className="inline-flex items-center gap-1">
-                              <MapPin className="size-3.5" /> {f.venue ?? event.venue}
-                            </span>
-                          )}
+                          {(f.venue ?? event.venue) &&
+                            (venueFor(event, f.venue ?? event.venue) ? (
+                              <a
+                                href={venueMapsLink(venueFor(event, f.venue ?? event.venue)!)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 font-semibold text-brand-strong hover:underline"
+                              >
+                                <MapPin className="size-3.5" /> {f.venue ?? event.venue}
+                              </a>
+                            ) : (
+                              <span className="inline-flex items-center gap-1">
+                                <MapPin className="size-3.5" /> {f.venue ?? event.venue}
+                              </span>
+                            ))}
                         </p>
                         {f.notes && <p className="mt-2 text-sm">{f.notes}</p>}
                       </Card>
@@ -168,6 +179,8 @@ function EventView({ event }: { event: WeddingEvent }) {
           </ol>
         )}
       </section>
+
+      <EventVenues event={event} />
 
       <CustomFieldCard entity="event" values={event.custom} />
 

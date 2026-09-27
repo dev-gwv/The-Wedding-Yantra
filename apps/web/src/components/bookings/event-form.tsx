@@ -1,7 +1,7 @@
 "use client";
 
-import { formatDate, formatPhone } from "@wedding-yantra/core";
-import { useClashes, useClients, useCreateEvent, useUpdateEvent } from "@wedding-yantra/api-client/react";
+import { can, formatDate, formatPhone } from "@wedding-yantra/core";
+import { useClashes, useClients, useCreateEvent, useUpdateEvent, useVenues } from "@wedding-yantra/api-client/react";
 import {
   EVENT_LABELS,
   EVENT_TYPES,
@@ -54,6 +54,8 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
       : [{ key: key(), name: "Wedding", date: "", startTime: "", venue: "" }],
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const venueList = useVenues(workspace.id, can(workspace.role, "events.view"));
+  const venueNames = (venueList.data ?? []).map((v) => v.name);
   const fields = useEntityFields("event");
   const [custom, setCustom] = useState(() => toDraft(event?.custom));
 
@@ -148,7 +150,14 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
           ))}
         </SelectField>
         <TextField label="Booking value (₹)" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ""))} error={errors.value} />
-        <TextField label="Main venue" value={venue} onChange={(e) => setVenue(e.target.value)} error={errors.venue} />
+        <TextField
+          label="Main venue"
+          value={venue}
+          onChange={(e) => setVenue(e.target.value)}
+          error={errors.venue}
+          list="venue-names"
+          hint={venueNames.length ? "Pick a saved venue to show its address and Maps link" : undefined}
+        />
         <TextField label="City" value={city} onChange={(e) => setCity(e.target.value)} error={errors.city} />
       </div>
 
@@ -201,6 +210,7 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
               <input
                 value={f.venue}
                 onChange={(e) => setFn(f.key, { venue: e.target.value })}
+                list="venue-names"
                 placeholder="Venue for this function (if different)"
                 aria-label={`Venue for ${f.name || "this function"}`}
                 className="mt-3 h-11 w-full rounded-xl border border-line px-3 text-[15px] focus:border-sun-300 focus:shadow-glow focus:outline-none"
@@ -208,6 +218,11 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
               {fnError(i) && <p className="mt-2 text-sm text-danger">{fnError(i)}</p>}
             </Card>
           ))}
+          <datalist id="venue-names">
+            {venueNames.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
           <datalist id="function-names">
             {FUNCTION_NAMES.map((n) => (
               <option key={n} value={n} />

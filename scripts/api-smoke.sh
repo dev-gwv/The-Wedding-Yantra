@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -218,6 +218,8 @@ expect "and handed over with its link" '.success and .data.status == "delivered"
 ME_ID="$(api GET "/api/v1/workspaces/$WS_ID/members/me" "" "$TOKEN" | jq -r '.data.id')"
 expect "the employee master keeps designation, pay and bank" '.success and .data.designationLabel == "Event coordinator" and .data.pay.ifsc == "SBIN0001234" and .data.emergency.name == "Smoke Contact"' \
   "$(api PUT "/api/v1/workspaces/$WS_ID/members/$ME_ID/details" '{"designation":"coordinator","employmentType":"full_time","emergencyName":"Smoke Contact","emergencyPhone":"9812300099","payType":"monthly","payAmount":30000,"ifsc":"sbin0001234"}' "$TOKEN")"
+expect "the venue master keeps address, Maps link and rules" '.success and .data.venueTypeLabel == "Banquet hall" and .data.musicCutoff == "22:00" and .data.outsideCatering == false' \
+  "$(api POST "/api/v1/workspaces/$WS_ID/venues" '{"name":"Smoke Banquets","venueType":"banquet","city":"Jaipur","mapsUrl":"https://maps.app.goo.gl/smoke","musicCutoff":"22:00","outsideCatering":false,"capacity":500}' "$TOKEN")"
 VENDOR="$(api POST "/api/v1/workspaces/$WS_ID/vendors" '{"name":"Smoke Florist","upiId":"florist@okaxis","category":"florist","ifsc":"SBIN0001234","preferred":true}' "$TOKEN")"
 expect "a vendor can be added, with category and bank details" '.success and .data.owed == 0 and .data.service == "Florist" and .data.ifsc == "SBIN0001234" and .data.preferred == true' "$VENDOR"
 PAYOUT="$(api POST "/api/v1/workspaces/$WS_ID/payouts" "{\"vendorId\":\"$(echo "$VENDOR" | jq -r '.data.id')\",\"eventId\":\"$EVENT_ID\",\"description\":\"Flowers\",\"amount\":3000}" "$TOKEN")"
