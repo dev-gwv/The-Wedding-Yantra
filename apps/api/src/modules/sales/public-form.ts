@@ -2,6 +2,7 @@ import type { PublicLeadForm } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, notFound } from "../../lib/http.js";
 import { firstOpenStage } from "./leads.js";
+import { findPartnerByCode } from "./partners.js";
 import { logoPath } from "../files/logo.js";
 
 const MAX_PER_IP_PER_HOUR = 10;
@@ -41,9 +42,12 @@ async function findReferrer(db: Queryable, workspaceId: string, code: string | u
   return rows[0] ?? null;
 }
 
-export async function getPublicForm(db: Db, slug: string, ref?: string): Promise<PublicLeadForm> {
+export async function getPublicForm(db: Db, slug: string, ref?: string, partnerCode?: string): Promise<PublicLeadForm> {
   const f = await loadForm(db, slug);
   const referrer = await findReferrer(db, f.workspace_id, ref);
+  // Opened through a partner's QR code: count the scan.
+  const partner = await findPartnerByCode(db, f.workspace_id, partnerCode);
+  if (partner) await db.query(`UPDATE partners SET scans = scans + 1 WHERE id = $1`, [partner.id]);
   return {
     businessName: f.name,
     businessTypeName: f.business_type_name,
@@ -52,6 +56,7 @@ export async function getPublicForm(db: Db, slug: string, ref?: string): Promise
     logoUrl: logoPath(f.workspace_id, f.logo_file_id),
     // Only the first name: the link travels between friends.
     referrer: referrer ? (referrer.name.trim().split(/\s+/)[0] ?? null) : null,
+    partner: partner?.name ?? null,
   };
 }
 
@@ -72,6 +77,7 @@ export async function submitPublicForm(
     message?: string | null;
     website?: string;
     ref?: string;
+    p?: string;
   },
 ): Promise<{ received: true }> {
   const form = await loadForm(db, slug);
@@ -105,13 +111,15 @@ export async function submitPublicForm(
       return;
     }
 
-    // Sent from a client's "recommend us" link: it's their referral.
-    const referrer = await findReferrer(tx, form.workspace_id, input.ref);
+    // Sent through a partner's QR code: theirs. Else from a client's "recommend us" link: their referral.
+    // An unknown or archived code still makes the lead, just not credited.
+    const partner = await findPartnerByCode(tx, form.workspace_id, input.p);
+    const referrer = partner ? null : await findReferrer(tx, form.workspace_id, input.ref);
     const stage = await firstOpenStage(tx, form.workspace_id);
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO leads (workspace_id, stage_id, name, phone, event_type, event_date, city, requirements,
-                          source, referred_by, referred_by_client_id, assigned_to, next_follow_up_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+                          source, referred_by, referred_by_client_id, partner_id, assigned_to, next_follow_up_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
        RETURNING id`,
       [
         form.workspace_id,
@@ -122,9 +130,10 @@ export async function submitPublicForm(
         input.eventDate ?? null,
         input.city ?? null,
         input.message ?? null,
-        referrer ? "referral" : "enquiry_form",
-        referrer?.name ?? null,
+        partner ? "partner" : referrer ? "referral" : "enquiry_form",
+        partner?.name ?? referrer?.name ?? null,
         referrer?.id ?? null,
+        partner?.id ?? null,
         form.owner_id,
       ],
     );
@@ -133,7 +142,11 @@ export async function submitPublicForm(
       [
         form.workspace_id,
         rows[0]!.id,
-        referrer ? { source: "referral", via: "enquiry_form", referrer: referrer.name } : { source: "enquiry_form" },
+        partner
+          ? { source: "partner", via: "enquiry_form", partner: partner.name }
+          : referrer
+            ? { source: "referral", via: "enquiry_form", referrer: referrer.name }
+            : { source: "enquiry_form" },
       ],
     );
     // A form enquiry wants a reply the same day: that's its first follow-up.

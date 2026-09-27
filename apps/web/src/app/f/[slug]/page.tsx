@@ -2,7 +2,7 @@
 
 import { usePublicForm, useSubmitPublicForm } from "@wedding-yantra/api-client/react";
 import { EVENT_LABELS, EVENT_TYPES, submitLeadFormInput, type EventType } from "@wedding-yantra/types";
-import { CircleCheck, Heart, MailX } from "lucide-react";
+import { CircleCheck, Handshake, Heart, MailX } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { BusinessMark } from "@/components/app/business-mark";
@@ -25,8 +25,11 @@ export default function PublicEnquiryPage() {
 function PublicEnquiry() {
   const { slug } = useParams<{ slug: string }>();
   // Opened from a client's "recommend us" link: the enquiry is credited to them.
-  const ref = useSearchParams().get("ref")?.trim().slice(0, 40) || undefined;
-  const form = usePublicForm(slug, ref);
+  const params = useSearchParams();
+  const ref = params.get("ref")?.trim().slice(0, 40) || undefined;
+  // Scanned from a partner's QR code: the enquiry is credited to that partner.
+  const partnerCode = params.get("p")?.trim().slice(0, 20) || undefined;
+  const form = usePublicForm(slug, ref, partnerCode);
   const submit = useSubmitPublicForm(slug);
   const [values, setValues] = useState({ name: "", phone: "", eventType: "", eventDate: "", city: "", message: "", website: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -36,7 +39,7 @@ function PublicEnquiry() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const payload = { ...values, eventType: (values.eventType || null) as EventType | null, ...(ref && { ref }) };
+    const payload = { ...values, eventType: (values.eventType || null) as EventType | null, ...(ref && { ref }), ...(partnerCode && { p: partnerCode }) };
     const check = validate(submitLeadFormInput, payload);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
@@ -63,6 +66,11 @@ function PublicEnquiry() {
             {business.referrer && (
               <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-sm font-semibold text-brand-strong ring-1 ring-sun-300/60">
                 <Heart className="size-4" /> Recommended by {business.referrer}
+              </p>
+            )}
+            {business.partner && (
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-sm font-semibold text-brand-strong ring-1 ring-sun-300/60">
+                <Handshake className="size-4" /> Sent via {business.partner}
               </p>
             )}
           </div>

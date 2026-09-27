@@ -83,6 +83,8 @@ import type {
   UpdateVenueInput,
   PackageInput,
   UpdatePackageInput,
+  PartnerInput,
+  UpdatePartnerInput,
   CreateWorkspaceInput,
   OtpRequestInput,
   OtpVerifyInput,
@@ -128,7 +130,10 @@ export const queryKeys = {
   client: (id: string, clientId: string) => ["workspace", id, "sales", "client", clientId] as const,
   templates: (id: string) => ["workspace", id, "templates"] as const,
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
-  publicForm: (slug: string, ref: string) => ["public-form", slug, ref] as const,
+  publicForm: (slug: string, ref: string, p = "") => ["public-form", slug, ref, p] as const,
+  partners: (id: string, archived = false) => ["workspace", id, "partners", archived] as const,
+  partner: (id: string, partnerId: string) => ["workspace", id, "partners", "one", partnerId] as const,
+  partnerPage: (token: string) => ["public-partner", token] as const,
   catalogue: (id: string, all: boolean) => ["workspace", id, "catalogue", all] as const,
   /** Under the price list: a service's price change changes what a package is worth. */
   packages: (id: string, all: boolean) => ["workspace", id, "catalogue", "packages", all] as const,
@@ -487,9 +492,60 @@ export function useSetLeadFormEnabled(workspaceId: string) {
 }
 
 /** `ref` is the code from a client's "recommend us" link. */
-export function usePublicForm(slug: string, ref?: string) {
+export function usePublicForm(slug: string, ref?: string, partnerCode?: string) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.publicForm(slug, ref ?? ""), queryFn: () => api.leadForm.publicGet(slug, ref), retry: false });
+  // Opening the form through a partner's code counts a scan, so fetch it once.
+  return useQuery({
+    queryKey: queryKeys.publicForm(slug, ref ?? "", partnerCode ?? ""),
+    queryFn: () => api.leadForm.publicGet(slug, ref, partnerCode),
+    retry: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
+// ---- Partner QR codes -------------------------------------------------------
+
+export function usePartners(workspaceId: string, enabled = true, archived = false) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.partners(workspaceId, archived), queryFn: () => api.partners.list(workspaceId, archived), enabled });
+}
+
+export function usePartner(workspaceId: string, partnerId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.partner(workspaceId, partnerId), queryFn: () => api.partners.get(workspaceId, partnerId), enabled: !!partnerId });
+}
+
+function usePartnerMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "partners"] });
+      void qc.invalidateQueries({ queryKey: ["workspace", workspaceId, "activity"] });
+    },
+  });
+}
+
+export function useCreatePartner(workspaceId: string) {
+  const api = useApi();
+  return usePartnerMutation(workspaceId, (input: PartnerInput) => api.partners.create(workspaceId, input));
+}
+
+export function useUpdatePartner(workspaceId: string) {
+  const api = useApi();
+  return usePartnerMutation(workspaceId, ({ id, ...input }: UpdatePartnerInput & { id: string }) => api.partners.update(workspaceId, id, input));
+}
+
+export function useSetPartnerSharing(workspaceId: string) {
+  const api = useApi();
+  return usePartnerMutation(workspaceId, ({ id, on }: { id: string; on: boolean }) => api.partners.setSharing(workspaceId, id, on));
+}
+
+export function usePartnerPage(token: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.partnerPage(token), queryFn: () => api.partners.page(token), retry: false });
 }
 
 export function useSubmitPublicForm(slug: string) {

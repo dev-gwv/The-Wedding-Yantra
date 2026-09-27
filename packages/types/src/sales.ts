@@ -18,6 +18,7 @@ export const LEAD_SOURCES = [
   "wedding_portal",
   "website",
   "ads",
+  "partner",
   "other",
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
@@ -32,6 +33,7 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   wedding_portal: "Wedding portal",
   website: "Website",
   ads: "Ads",
+  partner: "Partner QR",
   other: "Other",
 };
 
@@ -124,6 +126,8 @@ export interface LeadSummary {
   nextFollowUpAt: string | null;
   followUpState: FollowUpState;
   clientId: string | null;
+  /** The partner whose QR code brought them */
+  partner: PersonRef | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +238,7 @@ export const leadListQuery = z.object({
   q: z.string().trim().max(80).optional(),
   followUp: z.enum(["due", "overdue", "today", "upcoming"]).optional(),
   mine: z.enum(["true", "false"]).optional(),
+  partnerId: z.uuid().optional(),
 });
 export type LeadListQuery = z.input<typeof leadListQuery>;
 
@@ -400,6 +405,8 @@ export interface PublicLeadForm {
   logoUrl: string | null;
   /** First name of the client whose "recommend us" link was opened */
   referrer: string | null;
+  /** The partner whose QR code was scanned */
+  partner: string | null;
 }
 
 export const submitLeadFormInput = z.object({
@@ -413,5 +420,7 @@ export const submitLeadFormInput = z.object({
   website: z.string().max(200).optional(),
   /** The code from a client's "recommend us" link */
   ref: z.string().trim().max(40).optional(),
+  /** The code from a partner's QR */
+  p: z.string().trim().max(20).optional(),
 });
 export type SubmitLeadFormInput = z.input<typeof submitLeadFormInput>;

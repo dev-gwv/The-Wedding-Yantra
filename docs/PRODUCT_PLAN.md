@@ -1231,3 +1231,23 @@ The app serves every kind of wedding business, so the price list is built on wha
   (product supplier; album printer; grocery supplier, crockery rental…). The migration adds them
   to existing businesses by their trade and files their starter services under categories.
 
+
+## 46. Partner QR codes
+
+- **Partners** (migration 0035, table `partners`, `leads.partner_id`): a boutique, jeweller,
+  salon or venue the business collaborates with. Name, what they are, mobile, optional link to
+  the vendor master, notes. Owners and managers manage them (More → Partner QR codes).
+- **Their own QR code:** `/f/<form>?p=<code>` (6-character code). Download it print-ready
+  (HD PNG with the business name and "Scan to enquire · via <partner>", or SVG). Opening the
+  form through it counts a scan and shows "Sent via <partner>".
+- **Credit:** an enquiry through the code becomes a lead with source "Partner QR" and the
+  partner on it, shown on lead cards and the lead page. First touch wins: a repeat enquiry from
+  the same number within a day adds a note and keeps the credit. An unknown or ended partner's
+  code still makes the lead, uncredited, so no enquiry is ever lost.
+- **The partner's page** (`/p/<token>`, no sign-in, not indexed): the business, scans,
+  enquiries, booked, and each enquiry with its date, event and status (New / In talks /
+  Booked / Not booked). No prices or payments. Numbers are masked (98xxxxx123) unless the
+  business switches them on for that partner. Send it on WhatsApp; stop sharing or make a new
+  link any time.
+- **Ending a partnership** (archive) keeps the printed QR working, uncredited, and turns
+  their page off. Changes are in the activity log; Grow shows the partner totals.

@@ -144,6 +144,11 @@ import type {
   OtpRequestResult,
   OtpVerifyInput,
   Team,
+  Partner,
+  PartnerInput,
+  PartnerPage,
+  PartnerSummary,
+  UpdatePartnerInput,
   ServicePackage,
   PackageInput,
   UpdatePackageInput,
@@ -308,8 +313,8 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string) => request<LeadFormSettings>("GET", `${ws(workspaceId)}/lead-form`),
       setEnabled: (workspaceId: string, enabled: boolean) =>
         request<LeadFormSettings>("PATCH", `${ws(workspaceId)}/lead-form`, { enabled }),
-      /** `ref` is the code from a client's "recommend us" link */
-      publicGet: (slug: string, ref?: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}${qs({ ref })}`),
+      /** `ref` is the code from a client's "recommend us" link; `p` from a partner's QR code */
+      publicGet: (slug: string, ref?: string, p?: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}${qs({ ref, p })}`),
       submit: (slug: string, input: SubmitLeadFormInput) =>
         request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
     },
@@ -513,6 +518,19 @@ export function createApiClient(options: ApiClientOptions) {
       remove: (workspaceId: string, id: string) => request<{ deleted: true }>("DELETE", `${ws(workspaceId)}/packages/${encodeURIComponent(id)}`),
       /** Add the example packages for the business's trade */
       addStarter: (workspaceId: string) => request<ServicePackage[]>("POST", `${ws(workspaceId)}/packages/starter`),
+    },
+    partners: {
+      list: (workspaceId: string, archived = false) =>
+        request<PartnerSummary[]>("GET", `${ws(workspaceId)}/partners${qs({ archived: archived ? "true" : undefined })}`),
+      get: (workspaceId: string, id: string) => request<Partner>("GET", `${ws(workspaceId)}/partners/${encodeURIComponent(id)}`),
+      create: (workspaceId: string, input: PartnerInput) => request<Partner>("POST", `${ws(workspaceId)}/partners`, input),
+      update: (workspaceId: string, id: string, input: UpdatePartnerInput) =>
+        request<Partner>("PATCH", `${ws(workspaceId)}/partners/${encodeURIComponent(id)}`, input),
+      /** On: a fresh page link (the old one stops working). Off: stop sharing. */
+      setSharing: (workspaceId: string, id: string, on: boolean) =>
+        request<Partner>("POST", `${ws(workspaceId)}/partners/${encodeURIComponent(id)}/sharing`, { on }),
+      /** Public: the partner's own page */
+      page: (token: string) => request<PartnerPage>("GET", `/public/partners/${encodeURIComponent(token)}`),
     },
     venues: {
       list: (workspaceId: string, archived = false) =>

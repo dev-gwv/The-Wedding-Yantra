@@ -4,18 +4,22 @@ import {
   clientInput,
   createLeadInput,
   leadListQuery,
+  partnerInput,
   saveStagesInput,
   submitLeadFormInput,
   templateInput,
   updateClientInput,
   updateLeadFormInput,
   updateLeadInput,
+  updatePartnerInput,
 } from "@wedding-yantra/types";
+import { z } from "zod";
 import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as clients from "./clients.js";
 import * as leads from "./leads.js";
+import * as partners from "./partners.js";
 import * as publicForm from "./public-form.js";
 import * as settings from "./settings.js";
 
@@ -131,9 +135,38 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
   });
 
   // Public: no sign-in. Anyone with the link can see the form and send an enquiry.
-  app.get<{ Params: { slug: string }; Querystring: { ref?: string } }>("/public/forms/:slug", async (request) => {
+  app.get<{ Params: { slug: string }; Querystring: { ref?: string; p?: string } }>("/public/forms/:slug", async (request) => {
     const ref = typeof request.query.ref === "string" ? request.query.ref.trim().slice(0, 40) : undefined;
-    return ok(await publicForm.getPublicForm(db, request.params.slug, ref || undefined));
+    const p = typeof request.query.p === "string" ? request.query.p.trim().slice(0, 20) : undefined;
+    return ok(await publicForm.getPublicForm(db, request.params.slug, ref || undefined, p || undefined));
+  });
+
+  // ---- Partner QR codes -----------------------------------------------------------
+  app.get<Ws & { Querystring: { archived?: string } }>("/workspaces/:workspaceId/partners", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await partners.listPartners(db, ctx, request.query.archived === "true"));
+  });
+  app.post<Ws>("/workspaces/:workspaceId/partners", async (request, reply) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return reply.status(201).send(ok(await partners.createPartner(db, ctx, parse(partnerInput, request.body))));
+  });
+  app.get<WsId>("/workspaces/:workspaceId/partners/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await partners.getPartner(db, ctx, assertId(request.params.id, "This partner")));
+  });
+  app.patch<WsId>("/workspaces/:workspaceId/partners/:id", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await partners.updatePartner(db, ctx, assertId(request.params.id, "This partner"), parse(updatePartnerInput, request.body)));
+  });
+  /** Their page link: on gives a fresh link (the old one stops), off stops sharing. */
+  app.post<WsId>("/workspaces/:workspaceId/partners/:id/sharing", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const { on } = parse(z.object({ on: z.boolean() }), request.body);
+    return ok(await partners.setPartnerSharing(db, ctx, assertId(request.params.id, "This partner"), on));
+  });
+  // Public: the partner's own page.
+  app.get<{ Params: { token: string } }>("/public/partners/:token", async (request) => {
+    return ok(await partners.getPartnerPage(db, request.params.token.slice(0, 100)));
   });
 
   app.post<{ Params: { slug: string } }>("/public/forms/:slug", async (request, reply) => {

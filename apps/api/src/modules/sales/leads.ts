@@ -24,6 +24,7 @@ const SUMMARY_COLUMNS = `
   l.stage_id, s.name AS stage_name, s.kind AS stage_kind,
   l.assigned_to, au.name AS assigned_name,
   l.next_follow_up_at, l.client_id, l.created_at, l.updated_at,
+  l.partner_id, pa.name AS partner_name,
   CASE
     WHEN l.next_follow_up_at IS NULL OR s.kind <> 'open' THEN 'none'
     WHEN (l.next_follow_up_at AT TIME ZONE w.timezone)::date < (now() AT TIME ZONE w.timezone)::date THEN 'overdue'
@@ -35,7 +36,8 @@ const FROM = `
   FROM leads l
   JOIN pipeline_stages s ON s.id = l.stage_id
   JOIN workspaces w ON w.id = l.workspace_id
-  LEFT JOIN users au ON au.id = l.assigned_to`;
+  LEFT JOIN users au ON au.id = l.assigned_to
+  LEFT JOIN partners pa ON pa.id = l.partner_id`;
 
 export interface SummaryRow {
   id: string;
@@ -55,6 +57,8 @@ export interface SummaryRow {
   client_id: string | null;
   created_at: Date;
   updated_at: Date;
+  partner_id: string | null;
+  partner_name: string | null;
   follow_up_state: FollowUpState;
 }
 
@@ -74,6 +78,7 @@ export const toSummary = (r: SummaryRow): LeadSummary => ({
   nextFollowUpAt: r.next_follow_up_at?.toISOString() ?? null,
   followUpState: r.follow_up_state,
   clientId: r.client_id,
+  partner: r.partner_id ? { id: r.partner_id, name: r.partner_name } : null,
   createdAt: r.created_at.toISOString(),
   updatedAt: r.updated_at.toISOString(),
 });
@@ -93,6 +98,7 @@ export interface ListFilters {
   q?: string;
   followUp?: "due" | "overdue" | "today" | "upcoming";
   mine?: boolean;
+  partnerId?: string;
 }
 
 export async function listLeads(db: Db, ctx: MemberContext, filters: ListFilters): Promise<LeadList> {
@@ -105,6 +111,7 @@ export async function listLeads(db: Db, ctx: MemberContext, filters: ListFilters
 
   if (filters.stageId) where.push(`l.stage_id = ${add(filters.stageId)}`);
   if (filters.mine) where.push(`l.assigned_to = ${add(ctx.userId)}`);
+  if (filters.partnerId) where.push(`l.partner_id = ${add(filters.partnerId)}`);
   if (filters.q) {
     const byName = `l.name ILIKE ${add(`%${filters.q.replace(/[%_\\]/g, "\\$&")}%`)}`;
     const digits = filters.q.replace(/\D/g, "");

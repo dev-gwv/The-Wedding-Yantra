@@ -120,6 +120,18 @@ export function activityText(a: ActivityFacts): string {
       return `archived ${subject || "a vendor"}`;
     case "vendor.restored":
       return `brought back ${subject || "a vendor"}`;
+    case "partner.added":
+      return `added ${subject || "a partner"} as a QR partner`;
+    case "partner.updated":
+      return `updated ${subject ? `${subject}'s` : "a partner's"} details`;
+    case "partner.archived":
+      return `ended the QR partnership with ${subject || "a partner"}`;
+    case "partner.restored":
+      return `brought back ${subject || "a partner"} as a QR partner`;
+    case "partner.shared":
+      return `made a new page link for ${subject || "a partner"}`;
+    case "partner.sharing_stopped":
+      return `stopped sharing enquiries with ${subject || "a partner"}`;
     case "venue.added":
       return `added ${subject || "a venue"} as a venue`;
     case "venue.updated":

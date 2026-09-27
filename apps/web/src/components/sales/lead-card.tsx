@@ -1,6 +1,6 @@
 import { formatDate, formatMoneyShort } from "@wedding-yantra/core";
 import { EVENT_LABELS, type LeadSummary } from "@wedding-yantra/types";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, Handshake, MapPin } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { FollowUpBadge } from "./follow-up-badge";
@@ -22,7 +22,7 @@ export function LeadCard({ lead, showStage = false, className }: { lead: LeadSum
         <p className="min-w-0 truncate font-bold">{lead.name}</p>
         {lead.budget !== null && <span className="shrink-0 text-sm font-bold tabular">{formatMoneyShort(lead.budget)}</span>}
       </div>
-      {(event || lead.city) && (
+      {(event || lead.city || lead.partner) && (
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-ink-muted">
           {event && (
             <span className="inline-flex items-center gap-1">
@@ -32,6 +32,11 @@ export function LeadCard({ lead, showStage = false, className }: { lead: LeadSum
           {lead.city && (
             <span className="inline-flex items-center gap-1">
               <MapPin className="size-3.5" /> {lead.city}
+            </span>
+          )}
+          {lead.partner && (
+            <span className="inline-flex items-center gap-1 text-brand-strong">
+              <Handshake className="size-3.5" /> via {lead.partner.name}
             </span>
           )}
         </p>

@@ -25,6 +25,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
   tasks: (id) => (id ? `/app/tasks?open=${id}` : "/app/tasks?view=team"),
   vendor: (id) => (id ? `/app/vendors/${id}` : "/app/vendors"),
   venue: (id) => (id ? `/app/venues/${id}` : "/app/venues"),
+  partner: (id) => (id ? `/app/partners/${id}` : "/app/partners"),
 };
 
 /** Who did what, and when. For owners and managers. */

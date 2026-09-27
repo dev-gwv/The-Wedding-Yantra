@@ -120,10 +120,11 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
       `SELECT l.id, l.name, l.phone, l.event_type, l.event_date, l.city, l.budget, l.source,
               l.stage_id, s.name AS stage_name, s.kind AS stage_kind,
               l.assigned_to, au.name AS assigned_name, l.next_follow_up_at, l.client_id,
-              l.created_at, l.updated_at, 'none' AS follow_up_state
+              l.created_at, l.updated_at, l.partner_id, pa.name AS partner_name, 'none' AS follow_up_state
          FROM leads l
          JOIN pipeline_stages s ON s.id = l.stage_id
          LEFT JOIN users au ON au.id = l.assigned_to
+         LEFT JOIN partners pa ON pa.id = l.partner_id
         WHERE l.workspace_id = $1 AND l.${column} = $2 AND l.deleted_at IS NULL AND ${scope}
         ORDER BY l.created_at DESC`,
       params,

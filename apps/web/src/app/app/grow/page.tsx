@@ -1,9 +1,9 @@
 "use client";
 
 import { can, formatDate, reviewMessage, whatsappLink } from "@wedding-yantra/core";
-import { useGrow, useRequestReview } from "@wedding-yantra/api-client/react";
+import { useGrow, usePartners, useRequestReview } from "@wedding-yantra/api-client/react";
 import type { GrowSummary, ReviewAsk } from "@wedding-yantra/types";
-import { ChevronRight, Heart, Lock, Megaphone, MessageCircle, Star } from "lucide-react";
+import { ChevronRight, Handshake, Heart, Lock, Megaphone, MessageCircle, Star } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -44,8 +44,25 @@ export default function GrowPage() {
 
 function Grow({ data }: { data: GrowSummary }) {
   const { referrals } = data;
+  const { workspace } = useCurrentWorkspace();
+  const partners = usePartners(workspace.id, can(workspace.role, "leads.view_all"));
+  const sent = (partners.data ?? []).reduce((a, p) => ({ n: a.n + 1, enquiries: a.enquiries + p.enquiries, booked: a.booked + p.booked }), { n: 0, enquiries: 0, booked: 0 });
   return (
     <div className="space-y-8">
+      {can(workspace.role, "leads.view_all") && (
+        <Link href="/app/partners" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
+          <IconSquare icon={Handshake} />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">Partner QR codes</p>
+            <p className="text-sm text-ink-muted">
+              {sent.n > 0
+                ? `${sent.n} partner${sent.n === 1 ? "" : "s"} · ${sent.enquiries} enquir${sent.enquiries === 1 ? "y" : "ies"} · ${sent.booked} booked`
+                : "A QR code for each boutique, salon or venue you collaborate with. See who sends you work."}
+            </p>
+          </div>
+          <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
+        </Link>
+      )}
       <Link href="/app/messages" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
         <IconSquare icon={Megaphone} />
         <div className="min-w-0 flex-1">

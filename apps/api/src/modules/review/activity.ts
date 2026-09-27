@@ -196,6 +196,10 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.subject = str(m.name);
         item.link = { kind: "vendor", id: id ?? null };
         break;
+      case "partner":
+        item.subject = str(m.name);
+        item.link = { kind: "partner", id: id ?? null };
+        break;
       case "venue":
         item.subject = str(m.name);
         item.link = { kind: "venue", id: id ?? null };

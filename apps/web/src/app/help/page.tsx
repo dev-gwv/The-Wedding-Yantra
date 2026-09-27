@@ -110,6 +110,8 @@ const GUIDES: Guide[] = [
       "If a purchase bill has GST on it, open GST and bill number and pick the rate: the GST inside the amount is worked out for you, and your CA can claim it back.",
       "Payments and invoices, Expenses filters by period, category and who paid, searches by who you paid or their bill number, and downloads it all as a spreadsheet.",
       "Every event shows its profit: what you billed before GST, minus what you spent on it.",
+      "Collaborating with a boutique, salon, jeweller or venue? In More, Partner QR codes, add them and download their own QR code for print. Every enquiry through it is marked as theirs, and you see scans, enquiries and bookings for each partner.",
+      "Send the partner their page link on WhatsApp. They see each enquiry from their QR and where it stands (new, in talks, booked or not booked), never prices. Numbers are masked unless you switch them on. Stop sharing or make a new link any time; ending a partnership keeps the QR working, just uncredited.",
       "Keep your vendors in Master data, Vendors: florists, tent and décor, DJ, caterers. Each has a category, a contact person, their city, UPI, bank account and IFSC, GST number, and your rates and notes. Star the ones you prefer: they come first.",
       "Note what each event owes a vendor, and pay by UPI in one tap. Paying adds it to the event's expenses, so its profit stays right. Archive vendors you no longer use; their payouts stay. Change the categories in Master data, Lists.",
       "Keep the places you work at in Master data, Venues: type, address, Google Maps link, the banquet manager's number, how many guests it holds, when the music must stop, whether outside caterers are allowed, and when setup can start.",

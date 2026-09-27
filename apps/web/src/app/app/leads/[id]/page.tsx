@@ -316,7 +316,23 @@ function Details({ lead }: { lead: Lead }) {
   const { workspace } = useCurrentWorkspace();
   const referrer = lead.referredByClient;
   const rows: [string, ReactNode][] = [
-    ["Came from", SOURCE_LABELS[lead.source]],
+    [
+      "Came from",
+      lead.partner ? (
+        <span>
+          {SOURCE_LABELS[lead.source]} ·{" "}
+          {can(workspace.role, "leads.view_all") ? (
+            <Link href={`/app/partners/${lead.partner.id}`} className="text-brand-strong hover:text-brand-deep">
+              via {lead.partner.name}
+            </Link>
+          ) : (
+            `via ${lead.partner.name}`
+          )}
+        </span>
+      ) : (
+        SOURCE_LABELS[lead.source]
+      ),
+    ],
     ["Venue", lead.venue],
     ["City", lead.city],
     ["Guests", lead.guestCount !== null ? lead.guestCount.toLocaleString("en-IN") : null],
@@ -327,7 +343,7 @@ function Details({ lead }: { lead: Lead }) {
         <Link href={`/app/clients/${referrer.id}`} className="text-brand-strong hover:text-brand-deep">
           {referrer.name}
         </Link>
-      ) : (
+      ) : lead.partner ? null : (
         (referrer?.name ?? lead.referredBy)
       ),
     ],

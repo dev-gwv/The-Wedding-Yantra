@@ -38,6 +38,7 @@ import {
   UsersRound,
   type LucideIcon,
   MapPin,
+  Handshake,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -99,6 +100,7 @@ export default function MorePage() {
             {can(workspace.role, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
             {can(workspace.role, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
+            {can(workspace.role, "leads.view_all") && <Row href="/app/partners" icon={Handshake} label="Partner QR codes" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
             {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
             {(can(workspace.role, "catalogue.manage") || can(workspace.role, "quotes.view")) && (

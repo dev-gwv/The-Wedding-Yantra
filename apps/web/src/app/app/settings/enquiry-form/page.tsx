@@ -2,7 +2,8 @@
 
 import { can, whatsappLink } from "@wedding-yantra/core";
 import { useLeadForm, useSetLeadFormEnabled } from "@wedding-yantra/api-client/react";
-import { Copy, ExternalLink, MessageCircle } from "lucide-react";
+import { ChevronRight, Copy, ExternalLink, Handshake, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -91,6 +92,19 @@ export default function EnquiryFormPage() {
               <p className="mt-2 text-xs text-ink-muted">A sharp image for printing up to A4, with your business name under it. SVG is for designers and large prints.</p>
             </div>
           </Card>
+
+          {can(workspace.role, "leads.view_all") && (
+            <Link href="/app/partners" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand">
+                <Handshake className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">Partner QR codes</span>
+                <span className="block text-sm text-ink-muted">A separate QR for each boutique, salon or venue you work with. See which enquiries each one sends.</span>
+              </span>
+              <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
+            </Link>
+          )}
 
           <Card className="flex items-center justify-between gap-4 p-5">
             <div>
