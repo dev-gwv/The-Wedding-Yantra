@@ -1170,3 +1170,19 @@ list with search, a short form, and archive instead of delete.
 - Every change is in the activity log, linking to the vendor. Owners and managers edit; the
   accountant sees; staff don't.
 
+## 43. Master data, step 3: Employees
+
+- **Employee master** (migration 0032, table `member_details`, one row per membership): designation
+  from the business's own list (event coordinator, sales, photographer, videographer, editor,
+  designer, decorator, makeup artist, chef or cook, driver, helper, accounts, other), type
+  (full-time, part-time, freelance), joining date, an emergency contact (name and mobile), and pay
+  and bank: monthly salary or day rate, UPI, bank account, IFSC, PAN.
+- **Who sees what:** everyone who sees the team sees work details. The emergency contact is for the
+  owner, managers and the person. Pay, bank and PAN are for the owner and the person only (a new
+  owner-only permission, `members.hr`). Only the owner edits. Everyone, freelancers included, can
+  open their own record (`/members/me`).
+- **Left tab:** people taken off the team keep their record, for owners and managers. Someone
+  invited back starts with the details they had.
+- Checks: IFSC, PAN, account number, UPI and mobile formats; an amount needs monthly or per day.
+  Changes are in the activity log, linking to the person.
+

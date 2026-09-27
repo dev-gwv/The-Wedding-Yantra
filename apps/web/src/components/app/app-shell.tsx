@@ -82,10 +82,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <Link
             href="/app/masters"
-            aria-current={["/app/masters", "/app/clients", "/app/vendors"].some((p) => pathname.startsWith(p)) ? "page" : undefined}
+            aria-current={["/app/masters", "/app/clients", "/app/vendors", "/app/team"].some((p) => pathname.startsWith(p)) ? "page" : undefined}
             className={cn(
               "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-              ["/app/masters", "/app/clients", "/app/vendors"].some((p) => pathname.startsWith(p)) ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+              ["/app/masters", "/app/clients", "/app/vendors", "/app/team"].some((p) => pathname.startsWith(p)) ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
             )}
           >
             <Database className="size-[18px] shrink-0" strokeWidth={2} />

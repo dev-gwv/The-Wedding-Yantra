@@ -136,7 +136,7 @@ export default function MorePage() {
         {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
         {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/notifications?tab=settings" icon={Bell} label="Alerts: what reaches you, and when" />
-        <Row href="/app/team" icon={Users} label="Team" />
+        <Row href="/app/team" icon={Users} label="Employees" />
         {can(workspace.role, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
         {me.workspaces.length > 1 && (
           <Row onClick={() => setSwitching(true)} icon={ArrowLeftRight} label="Switch business" />

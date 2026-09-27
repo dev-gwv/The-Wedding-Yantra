@@ -5,7 +5,7 @@
  * hidden option still shows its name on the records that use it.
  */
 
-export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category"] as const;
+export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category", "designation"] as const;
 export type OptionList = (typeof OPTION_LISTS)[number];
 
 export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; about: string }> = {
@@ -14,6 +14,7 @@ export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; 
   task_tag: { title: "Task tags", one: "tag", about: "Group tasks by kind of work, and filter the task board by them." },
   vendor_category: { title: "Vendor categories", one: "category", about: "What your vendors do: florist, tent and décor, lights, DJ, caterer." },
   relation: { title: "Relationships", one: "relationship", about: "Who the client and their emergency contacts are to the wedding: bride, groom, bride's father…" },
+  designation: { title: "Designations", one: "designation", about: "What each person in your team does: photographer, editor, coordinator, driver." },
 };
 
 export interface OptionSeed {
@@ -70,6 +71,21 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
     { key: "grooms_father", label: "Groom's father" },
     { key: "brides_mother", label: "Bride's mother" },
     { key: "grooms_mother", label: "Groom's mother" },
+    { key: "other", label: "Other" },
+  ],
+  designation: [
+    { key: "coordinator", label: "Event coordinator" },
+    { key: "sales", label: "Sales" },
+    { key: "photographer", label: "Photographer" },
+    { key: "videographer", label: "Videographer" },
+    { key: "editor", label: "Editor" },
+    { key: "designer", label: "Designer" },
+    { key: "decorator", label: "Decorator" },
+    { key: "makeup", label: "Makeup artist" },
+    { key: "cook", label: "Chef or cook" },
+    { key: "driver", label: "Driver" },
+    { key: "helper", label: "Helper" },
+    { key: "accounts", label: "Accounts" },
     { key: "other", label: "Other" },
   ],
 };

@@ -20,7 +20,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
   bill: (id) => `/app/bills/${id}`,
   quote: (id) => `/app/quotes/${id}`,
   client: (id) => `/app/clients/${id}`,
-  team: () => "/app/team",
+  team: (id) => (id ? `/app/team/${id}` : "/app/team"),
   expenses: () => "/app/money?view=expenses",
   tasks: (id) => (id ? `/app/tasks?open=${id}` : "/app/tasks?view=team"),
   vendor: (id) => (id ? `/app/vendors/${id}` : "/app/vendors"),

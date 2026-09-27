@@ -144,6 +144,8 @@ import type {
   OtpRequestResult,
   OtpVerifyInput,
   Team,
+  Employee,
+  EmployeeDetailsInput,
   UpdateMeInput,
   UpdateMemberInput,
   UpdateWorkspaceInput,
@@ -258,6 +260,11 @@ export function createApiClient(options: ApiClientOptions) {
         request<{ updated: true }>("PATCH", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}`, input),
       removeMember: (workspaceId: string, memberId: string) =>
         request<{ removed: true }>("DELETE", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}`),
+      /** One person's record in the employee master */
+      employee: (workspaceId: string, memberId: string) => request<Employee>("GET", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}`),
+      /** The owner only */
+      saveDetails: (workspaceId: string, memberId: string, input: EmployeeDetailsInput) =>
+        request<Employee>("PUT", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}/details`, input),
     },
     leads: {
       list: (workspaceId: string, query: LeadListQuery = {}) =>

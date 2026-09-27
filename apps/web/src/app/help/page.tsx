@@ -117,7 +117,9 @@ const GUIDES: Guide[] = [
     id: "team",
     title: "Your team",
     steps: [
-      "Invite people by phone from More, Team. They join with one tap on the link you send them on WhatsApp.",
+      "Invite people by phone from Master data, Employees. They join with one tap on the link you send them on WhatsApp.",
+      "Tap a person to see their record: designation, full-time, part-time or freelance, joining date, an emergency contact, and pay (monthly or per day), UPI, bank account, IFSC and PAN. Only the owner changes these. Pay, bank and PAN are seen only by the owner and the person; the emergency contact by managers too. Everyone can see their own record.",
+      "Someone who leaves moves to the Left tab with their details kept. Invite them again and their details come back with them. Change the designations in Master data, Lists.",
       "Everyone sees their own day on Home: their events this week, when to reach, and what's due.",
       "Make a task repeat: every day, on chosen days of the week, or on a day each month. A fresh copy appears on each of those days; missed days don't pile up. Stop it any time from Tasks, Repeating.",
       "Scores are worked out each month from the work itself: tasks done on time, follow-ups kept, enquiries booked and expenses added in a day.",

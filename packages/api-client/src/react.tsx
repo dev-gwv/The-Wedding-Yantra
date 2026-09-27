@@ -78,6 +78,7 @@ import type {
   UpdateClientInput,
   UpdateLeadInput,
   CreateInvitationInput,
+  EmployeeDetailsInput,
   CreateWorkspaceInput,
   OtpRequestInput,
   OtpVerifyInput,
@@ -113,6 +114,7 @@ export const queryKeys = {
   workspace: (id: string) => ["workspace", id] as const,
   home: (id: string) => ["workspace", id, "home"] as const,
   team: (id: string) => ["workspace", id, "team"] as const,
+  employee: (id: string, memberId: string) => ["workspace", id, "team", "member", memberId] as const,
   invitation: (token: string) => ["invitation", token] as const,
   /** Everything about leads in one business; invalidate this after any lead change. */
   sales: (id: string) => ["workspace", id, "sales"] as const,
@@ -319,6 +321,17 @@ export function useUpdateMember(workspaceId: string) {
 export function useRemoveMember(workspaceId: string) {
   const api = useApi();
   return useTeamMutation(workspaceId, (memberId: string) => api.team.removeMember(workspaceId, memberId));
+}
+
+/** One person's record in the employee master. */
+export function useEmployee(workspaceId: string, memberId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.employee(workspaceId, memberId), queryFn: () => api.team.employee(workspaceId, memberId), enabled: !!memberId });
+}
+
+export function useSaveEmployeeDetails(workspaceId: string, memberId: string) {
+  const api = useApi();
+  return useTeamMutation(workspaceId, (input: EmployeeDetailsInput) => api.team.saveDetails(workspaceId, memberId, input));
 }
 
 // ---- Invitations ------------------------------------------------------------

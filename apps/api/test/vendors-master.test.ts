@@ -135,8 +135,10 @@ describe("the vendor master", () => {
       `INSERT INTO vendors (workspace_id, name, service) VALUES ($1, 'A', ' florist '), ($1, 'B', 'Generator'), ($1, 'C', 'generator'), ($1, 'D', NULL)`,
       [ws],
     );
-    // The migration runs again safely: only vendors without a category change.
-    await t.db.query(await readFile(new URL("../migrations/0031_vendor_master.sql", import.meta.url), "utf8"));
+    // The migration runs again safely: only vendors without a category change. (Its check on
+    // the lists is left out: later migrations widen it.)
+    const sql = await readFile(new URL("../migrations/0031_vendor_master.sql", import.meta.url), "utf8");
+    await t.db.query(sql.replace(/ALTER TABLE custom_options[^;]*;\s*ALTER TABLE custom_options[^;]*;/, ""));
     const list = (await call<Vendor[]>(t.app, "GET", `/workspaces/${ws}/vendors`, { token: owner })).body.data;
     const by = (n: string) => list.find((v) => v.name === n)!;
     expect(by("A")).toMatchObject({ category: "florist", service: "Florist" });

@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   "members.view",
   "members.invite",
   "members.manage",
+  /** Change employee details, and see everyone's pay, bank and PAN. The owner only. */
+  "members.hr",
   "finance.view",
   "billing.manage",
   /** Add leads and work on the ones you can see */

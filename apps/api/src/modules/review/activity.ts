@@ -177,7 +177,7 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
       case "membership":
         item.subject = (id && members.get(id)?.name) ?? null;
         item.detail = roleLabel(m.to);
-        item.link = { kind: "team", id: null };
+        item.link = { kind: "team", id: id ?? null };
         break;
       case "quote": {
         const quote = id ? quotes.get(id) : undefined;

@@ -78,6 +78,8 @@ export function activityText(a: ActivityFacts): string {
       return `made ${a.subject ?? "a team member"}${a.detail ? ` ${a.detail.toLowerCase()}` : " something else"}`;
     case "member.removed":
       return `took ${a.subject ?? "someone"} off the team`;
+    case "member.details_updated":
+      return `updated ${a.subject ? `${a.subject}'s` : "a team member's"} employee details`;
     case "member.invite_revoked":
       return `cancelled the invitation for ${a.subject ?? "someone"}`;
     case "sales.stages_updated":

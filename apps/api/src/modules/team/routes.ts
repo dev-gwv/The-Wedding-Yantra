@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createInvitationInput, updateMemberInput } from "@wedding-yantra/types";
+import { createInvitationInput, employeeDetailsInput, updateMemberInput } from "@wedding-yantra/types";
 import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember, requireUser } from "../auth/guard.js";
@@ -35,6 +35,19 @@ export function teamRoutes(app: FastifyInstance, deps: { db: Db }) {
     const { role } = parse(updateMemberInput, request.body);
     await team.updateMemberRole(db, ctx, assertId(request.params.memberId, "This team member"), role);
     return ok({ updated: true as const });
+  });
+
+  app.get<MemberParams>("/workspaces/:workspaceId/members/:memberId", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    // "me" is your own record, for anyone (freelancers too) to check their details.
+    const id = request.params.memberId === "me" ? ctx.membershipId : assertId(request.params.memberId, "This team member");
+    return ok(await team.getEmployee(db, ctx, id));
+  });
+
+  app.put<MemberParams>("/workspaces/:workspaceId/members/:memberId/details", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    const input = parse(employeeDetailsInput, request.body);
+    return ok(await team.updateEmployeeDetails(db, ctx, assertId(request.params.memberId, "This team member"), input));
   });
 
   app.delete<MemberParams>("/workspaces/:workspaceId/members/:memberId", async (request) => {

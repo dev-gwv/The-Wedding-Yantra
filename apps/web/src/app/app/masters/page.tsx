@@ -1,7 +1,7 @@
 "use client";
 
 import { can, eventScope } from "@wedding-yantra/core";
-import { useClients, useVendors } from "@wedding-yantra/api-client/react";
+import { useClients, useTeam, useVendors } from "@wedding-yantra/api-client/react";
 import { ChevronRight, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
@@ -31,6 +31,7 @@ export default function MastersPage() {
   const role = workspace.role;
   const clients = useClients(workspace.id, "", false, can(role, "clients.view"));
   const vendors = useVendors(workspace.id, can(role, "finance.view"));
+  const team = useTeam(can(role, "members.view") ? workspace.id : null);
 
   const tiles: Tile[] = [
     {
@@ -46,11 +47,12 @@ export default function MastersPage() {
     {
       key: "employees",
       title: "Employees",
-      about: "Your team. Coming next: designation, pay and bank details",
+      about: can(role, "members.hr") ? "Your team: designation, emergency contact, pay and bank" : "Your team: designation and emergency contact",
       icon: Users,
-      href: "/app/team",
-      status: "next",
+      href: can(role, "members.view") ? "/app/team" : "/app/team/me",
+      status: "live",
       show: true,
+      count: team.data?.members.length ?? null,
     },
     {
       key: "vendors",
@@ -83,7 +85,7 @@ export default function MastersPage() {
     {
       key: "lists",
       title: "Lists",
-      about: "Choices in the forms: relationships, vendor categories, payment modes",
+      about: "Choices in the forms: relationships, designations, vendor categories, payment modes",
       icon: Tags,
       href: "/app/settings/lists",
       status: "live",

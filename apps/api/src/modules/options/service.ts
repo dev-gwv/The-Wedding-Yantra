@@ -33,6 +33,7 @@ const ADD_RIGHT: Record<OptionList, Permission[]> = {
   task_tag: ["tasks.manage"],
   relation: ["clients.manage"],
   vendor_category: ["expenses.approve"],
+  designation: ["members.hr"],
 };
 
 /** A new business starts with the built-in options, plus the categories its trade usually needs. */

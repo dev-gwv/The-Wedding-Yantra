@@ -1,26 +1,14 @@
 "use client";
 
-import {
-  assignableRoles,
-  can,
-  canManageMember,
-  firstName,
-  formatPhone,
-  ROLE_INFO,
-  whatsappLink,
-  type Role,
-} from "@wedding-yantra/core";
-import {
-  useInviteMember,
-  useRemoveMember,
-  useRevokeInvitation,
-  useTeam,
-  useUpdateMember,
-} from "@wedding-yantra/api-client/react";
-import { createInvitationInput, type Invitation, type Member } from "@wedding-yantra/types";
+import { assignableRoles, can, firstName, formatDate, formatPhone, ROLE_INFO, whatsappLink, type Role } from "@wedding-yantra/core";
+import { useInviteMember, useRevokeInvitation, useTeam } from "@wedding-yantra/api-client/react";
+import { createInvitationInput, EMPLOYMENT_TYPE_LABELS, type Invitation } from "@wedding-yantra/types";
 import { ChevronRight, Copy, Lock, MessageCircle, UserPlus, Users } from "lucide-react";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { cn } from "@/lib/cn";
 import { Button, buttonClass } from "@/components/ui/button";
 import { PhoneField, SelectField, TextField } from "@/components/ui/field";
 import { Avatar, Card, EmptyState, Notice, PageHeader, Pill } from "@/components/ui/misc";
@@ -38,15 +26,16 @@ export default function TeamPage() {
   const team = useTeam(can(myRole, "members.view") ? workspace.id : null);
   const [inviting, setInviting] = useState(false);
   const [share, setShare] = useState<Share | null>(null);
-  const [managing, setManaging] = useState<Member | null>(null);
+  const [tab, setTab] = useState<"team" | "left">("team");
 
   if (!can(myRole, "members.view")) {
     return (
       <>
-        <PageHeader title="Team" />
+        <BackLink href="/app/more" label="More" />
+        <PageHeader title="Employees" />
         <Card>
-          <EmptyState icon={Lock} title="Only the owner and managers see the team">
-            Ask them if you need to know who is working on an event.
+          <EmptyState icon={Lock} title="Only the owner and managers see the team" action={<Link href="/app/team/me" className={buttonClass({})}>See your details</Link>}>
+            Your own work details, emergency contact and bank details are here.
           </EmptyState>
         </Card>
       </>
@@ -56,12 +45,15 @@ export default function TeamPage() {
   const canInvite = can(myRole, "members.invite");
   const members = team.data?.members ?? [];
   const invitations = team.data?.invitations ?? [];
+  const former = team.data?.former ?? [];
+  const showing = former.length > 0 ? tab : "team";
 
   return (
     <>
+      <BackLink href="/app/masters" label="Master data" />
       <PageHeader
-        title="Team"
-        subtitle={team.data ? `${members.length} ${members.length === 1 ? "person" : "people"}` : undefined}
+        title="Employees"
+        subtitle={team.data ? `${members.length} ${members.length === 1 ? "person" : "people"} in your team` : undefined}
         action={
           canInvite && (
             <Button onClick={() => setInviting(true)}>
@@ -80,41 +72,65 @@ export default function TeamPage() {
 
       {team.data && (
         <div className="space-y-8">
-          <Card className="divide-y divide-line overflow-hidden">
-            {members.map((m) => {
-              const manageable = !m.isYou && can(myRole, "members.manage") && canManageMember(myRole, m.role);
-              const body = (
-                <>
+          {former.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["team", `In the team (${members.length})`],
+                  ["left", `Left (${former.length})`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={showing === key}
+                  onClick={() => setTab(key)}
+                  className={cn("h-9 rounded-full px-4 text-sm font-bold", showing === key ? "bg-ink text-surface" : "border border-line bg-surface text-ink hover:bg-cream")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showing === "left" ? (
+            <Card className="divide-y divide-line overflow-hidden">
+              {former.map((f) => (
+                <Link key={f.id} href={`/app/team/${f.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-cream">
+                  <Avatar name={f.name} muted />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{f.name ?? "Former member"}</span>
+                    <span className="block text-sm text-ink-muted tabular">
+                      {[f.designationLabel, formatPhone(f.phone)].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <span className="text-xs text-ink-muted">Left {formatDate(f.leftAt.slice(0, 10))}</span>
+                  <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
+                </Link>
+              ))}
+            </Card>
+          ) : (
+            <Card className="divide-y divide-line overflow-hidden">
+              {members.map((m) => (
+                <Link key={m.id} href={`/app/team/${m.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-cream">
                   <Avatar name={m.name} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
                       {m.name ?? "New member"}
                       {m.isYou && <span className="font-normal text-ink-muted"> (you)</span>}
                     </span>
-                    <span className="block text-sm text-ink-muted tabular">{formatPhone(m.phone)}</span>
+                    <span className="block truncate text-sm text-ink-muted tabular">
+                      {[m.designationLabel, m.employmentType && EMPLOYMENT_TYPE_LABELS[m.employmentType], formatPhone(m.phone)].filter(Boolean).join(" · ")}
+                    </span>
                   </span>
                   <Pill tone={m.role === "owner" ? "brand" : "neutral"}>{ROLE_INFO[m.role].label}</Pill>
-                  {manageable && <ChevronRight className="size-4 shrink-0 text-ink-subtle" />}
-                </>
-              );
-              return manageable ? (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setManaging(m)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-cream"
-                >
-                  {body}
-                </button>
-              ) : (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-3">
-                  {body}
-                </div>
-              );
-            })}
-          </Card>
+                  <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
+                </Link>
+              ))}
+            </Card>
+          )}
 
-          {members.length === 1 && canInvite && invitations.length === 0 && (
+          {showing === "team" && members.length === 1 && canInvite && invitations.length === 0 && (
             <Card>
               <EmptyState
                 icon={Users}
@@ -126,7 +142,7 @@ export default function TeamPage() {
             </Card>
           )}
 
-          {invitations.length > 0 && (
+          {showing === "team" && invitations.length > 0 && (
             <section>
               <h2 className="mb-3 text-sm font-medium text-ink-muted">Waiting to join</h2>
               <Card className="divide-y divide-line overflow-hidden">
@@ -149,7 +165,6 @@ export default function TeamPage() {
         }}
       />
       <ShareSheet share={share} onClose={() => setShare(null)} />
-      <ManageSheet member={managing} myRole={myRole} onClose={() => setManaging(null)} />
     </>
   );
 }
@@ -308,84 +323,6 @@ function ShareSheet({ share, onClose }: { share: Share | null; onClose: () => vo
         </Button>
         <p className="break-all rounded-xl bg-cream px-3 py-2 text-xs text-ink-muted">{url}</p>
       </div>
-    </Sheet>
-  );
-}
-
-function ManageSheet({ member, myRole, onClose }: { member: Member | null; myRole: Role; onClose: () => void }) {
-  const { workspace } = useCurrentWorkspace();
-  const update = useUpdateMember(workspace.id);
-  const remove = useRemoveMember(workspace.id);
-  const toast = useToast();
-  const [role, setRole] = useState<Role | null>(null);
-  const [confirming, setConfirming] = useState(false);
-
-  if (!member) return <Sheet open={false} onClose={onClose} title="">{null}</Sheet>;
-  const current = role ?? member.role;
-  const roles = assignableRoles(myRole);
-
-  function close() {
-    setRole(null);
-    setConfirming(false);
-    onClose();
-  }
-
-  async function save() {
-    try {
-      await update.mutateAsync({ memberId: member!.id, role: current });
-      toast("Role updated");
-      close();
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    }
-  }
-
-  async function removeMember() {
-    try {
-      await remove.mutateAsync(member!.id);
-      toast(`${member!.name ?? "Member"} removed`);
-      close();
-    } catch (err) {
-      toast(errorMessage(err), "error");
-    }
-  }
-
-  return (
-    <Sheet open onClose={close} title={member.name ?? "Team member"} description={formatPhone(member.phone)}>
-      {confirming ? (
-        <div className="space-y-4">
-          <p className="text-sm text-ink-muted">
-            {member.name ?? "They"} will lose access to {workspace.name} straight away. Their past work stays.
-          </p>
-          <Button variant="destructive" size="lg" onClick={removeMember} loading={remove.isPending}>
-            Remove from team
-          </Button>
-          <Button variant="ghost" size="lg" onClick={() => setConfirming(false)}>
-            Keep
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          <SelectField
-            label="Role"
-            value={current}
-            onChange={(e) => setRole(e.target.value as Role)}
-            hint={ROLE_INFO[current].description}
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_INFO[r].label}
-              </option>
-            ))}
-          </SelectField>
-          <Button size="lg" onClick={save} loading={update.isPending} disabled={current === member.role}>
-            Save
-          </Button>
-          <Button variant="danger" size="lg" onClick={() => setConfirming(true)}>
-            Remove from team
-          </Button>
-        </div>
-      )}
     </Sheet>
   );
 }
