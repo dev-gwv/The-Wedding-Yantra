@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
-import { MoneyLocked, MoneyPageHeader, ToPayVendorsLink, useMoneyRange } from "@/components/money/money-page";
+import { MoneyLocked, MoneyPageHeader, useMoneyRange } from "@/components/money/money-page";
 import { PaymentsView, RecordPaymentSheet } from "@/components/money/payments-view";
 import { Button } from "@/components/ui/button";
 import { Splash } from "@/components/ui/spinner";
@@ -55,7 +55,6 @@ function TransactionsScreen() {
         }
       />
       <PaymentsView range={range} />
-      <ToPayVendorsLink />
       <RecordPaymentSheet open={recording} onClose={() => setRecording(false)} dues={overview.data?.dues ?? []} />
     </>
   );
