@@ -62,7 +62,7 @@ const GUIDES: Guide[] = [
       "Pick a design (Classic, Modern, Minimal or Bold) and your colour. The preview shows your invoice as clients will see it.",
       "Record money when it comes in, in your own payment modes (add Google Pay or anything else as you go). Each gets a receipt number, and the invoice shows what's still due. Payments and invoices, Payments lists it all by period and mode, with a spreadsheet for your CA.",
       "Money taken before there's an invoice is kept as an advance and counted in the event's next invoice.",
-      "Payments and invoices, To collect lists everything still due. One tap sends the client a polite reminder on WhatsApp.",
+      "Payments and invoices, Outstanding lists everything still due. One tap sends the client a polite reminder on WhatsApp.",
     ],
   },
   {

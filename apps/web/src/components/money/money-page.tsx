@@ -13,12 +13,12 @@ import { cn } from "@/lib/cn";
 import { rangeFromParams, rangeSentence, rangeToParams, type DateRange } from "@/lib/periods";
 import { DateRangeButton } from "./list-kit";
 
-export type MoneySection = "transactions" | "to-collect" | "invoices" | "quotes" | "expenses" | "reports";
+export type MoneySection = "transactions" | "outstanding" | "invoices" | "quotes" | "expenses" | "reports";
 
 /** The parts of Payments and invoices, in the side menu and the phone's title switcher. */
 export const MONEY_SECTIONS: { key: MoneySection; label: string; href: string; icon: LucideIcon; also?: string[] }[] = [
   { key: "transactions", label: "Transactions", href: "/app/money", icon: ArrowLeftRight },
-  { key: "to-collect", label: "To collect", href: "/app/money/to-collect", icon: Wallet },
+  { key: "outstanding", label: "Outstanding", href: "/app/money/outstanding", icon: Wallet, also: ["/app/money/to-collect"] },
   { key: "invoices", label: "Invoices", href: "/app/money/invoices", icon: ReceiptIndianRupee, also: ["/app/bills"] },
   { key: "quotes", label: "Quotes", href: "/app/money/quotes", icon: FileText, also: ["/app/quotes"] },
   { key: "expenses", label: "Expenses", href: "/app/money/expenses", icon: ReceiptText },

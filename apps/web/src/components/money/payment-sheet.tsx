@@ -206,7 +206,7 @@ function PaymentForm({
       )}
       {confirmDelete && (
         <div className="rounded-2xl bg-danger-soft p-4 text-sm text-danger">
-          <p className="font-semibold">Remove {formatMoney(payment?.amount ?? 0)}? It goes back to money to collect.</p>
+          <p className="font-semibold">Remove {formatMoney(payment?.amount ?? 0)}? It goes back to outstanding.</p>
           <div className="mt-3 flex gap-2">
             <Button variant="destructive" size="sm" onClick={deleteIt} loading={remove.isPending}>
               Yes, remove it

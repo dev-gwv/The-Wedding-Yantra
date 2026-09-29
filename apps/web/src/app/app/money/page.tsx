@@ -13,7 +13,7 @@ import { Splash } from "@/components/ui/spinner";
 
 /** Old links (?view=due and so on) now have pages of their own. */
 const MOVED: Record<string, string> = {
-  due: "/app/money/to-collect",
+  due: "/app/money/outstanding",
   invoices: "/app/money/invoices",
   bills: "/app/money/invoices",
   quotes: "/app/money/quotes",

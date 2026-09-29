@@ -21,7 +21,7 @@ import { dueHref, dueReminderLink, withoutName } from "./rows";
 
 type Show = "all" | "overdue" | "soon" | "later" | "not_invoiced";
 const SHOW: [Show, string][] = [
-  ["all", "Everyone who owes"],
+  ["all", "All outstanding"],
   ["overdue", "Overdue"],
   ["soon", "Due in the next 7 days"],
   ["later", "Due later"],
@@ -55,7 +55,7 @@ function NotInvoiced() {
 }
 
 /**
- * To collect: who still owes you money today. Invoices not paid in full, and booked events
+ * Outstanding: what clients still owe today. Invoices not paid in full, and booked events
  * that have a price but no invoice yet. Not tied to the dates picked: it's always "as of today".
  */
 export function DueView() {
@@ -92,8 +92,8 @@ export function DueView() {
 
   function exportList() {
     downloadCsv(
-      "to-collect.csv",
-      ["Due by", "Client", "Phone", "For", "Invoice", "Total", "Paid so far", "Still to pay", "Status"],
+      "outstanding.csv",
+      ["Due date", "Client", "Phone", "For", "Invoice", "Total", "Received", "Balance due", "Status"],
       list.map((d) => [dueBy(d), d.clientName, d.clientPhone, withoutName(d.eventTitle, d.clientName), d.billNumber ?? "Not invoiced yet", d.total, d.received, d.due, STATE_PILL[stateOf(d, today, week)][0]]),
     );
   }
@@ -116,11 +116,11 @@ export function DueView() {
           variant="secondary"
           size="sm"
           onClick={() => setReceiving(d)}
-          title={`Money received from ${d.clientName}`}
-          aria-label={compact ? `Money received from ${d.clientName}` : undefined}
+          title={`Record a payment from ${d.clientName}`}
+          aria-label={compact ? `Record a payment from ${d.clientName}` : undefined}
           className={compact ? "px-2.5" : undefined}
         >
-          {compact ? <IndianRupee className="size-4" /> : "Money received"}
+          {compact ? <IndianRupee className="size-4" /> : "Record payment"}
         </Button>
       )}
     </span>
@@ -128,7 +128,7 @@ export function DueView() {
 
   const columns: Column<DueItem>[] = [
     {
-      head: "Due by",
+      head: "Due date",
       cell: (d) => {
         const date = dueBy(d);
         return <span className={cn("whitespace-nowrap", d.overdue && "font-semibold text-danger")}>{date ? tableDate(date) : "No date"}</span>;
@@ -147,7 +147,7 @@ export function DueView() {
       ),
     },
     {
-      head: "Paid so far",
+      head: "Received",
       align: "right",
       cell: (d) => (
         <span className="block text-ink-muted">
@@ -156,7 +156,7 @@ export function DueView() {
         </span>
       ),
     },
-    { head: "Still to pay", align: "right", cell: (d) => <span className={cn("font-bold", d.overdue && "text-danger")}>{formatMoney(d.due)}</span> },
+    { head: "Balance due", align: "right", cell: (d) => <span className={cn("font-bold", d.overdue && "text-danger")}>{formatMoney(d.due)}</span> },
     { head: "Status", cell: (d) => <StatePill state={stateOf(d, today, week)} /> },
     { head: "Actions", cell: (d) => actions(d, true), className: "w-px" },
   ];
@@ -165,7 +165,7 @@ export function DueView() {
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2">
         <SummaryCard
-          label="Still to collect"
+          label="Total outstanding"
           value={dues ? formatMoney(total) : "…"}
           icon={Wallet}
           note={dues ? `From ${people} client${people === 1 ? "" : "s"}, on ${all.length} invoice${all.length === 1 ? "" : "s"} and booking${all.length === 1 ? "" : "s"}` : undefined}
@@ -175,7 +175,7 @@ export function DueView() {
           value={dues ? formatMoney(overdueTotal) : "…"}
           icon={AlarmClock}
           tone={overdueTotal > 0 ? "danger" : undefined}
-          note={overdue.length > 0 ? `${overdue.length} past the date it was due. Remind them first.` : "Nothing is past its due date"}
+          note={overdue.length > 0 ? `${overdue.length} payment${overdue.length === 1 ? "" : "s"} past ${overdue.length === 1 ? "its" : "their"} due date` : "Nothing is past its due date"}
         />
       </div>
 
@@ -198,14 +198,14 @@ export function DueView() {
       {overview.isError && <Notice tone="danger">{errorMessage(overview.error)}</Notice>}
       {dues && list.length === 0 && (
         <Card>
-          <EmptyState icon={PartyPopper} title={all.length === 0 ? "Nobody owes you anything" : "No one here"}>
+          <EmptyState icon={PartyPopper} title={all.length === 0 ? "No outstanding payments" : "Nothing matches"}>
             {all.length === 0 ? "Every invoice and booking is paid in full." : "Try another filter or clear the search."}
           </EmptyState>
         </Card>
       )}
       {list.length > 0 && (
         <MoneyTable
-          label="Money to collect"
+          label="Outstanding payments"
           rows={list}
           columns={columns}
           rowKey={(d) => `${d.kind}-${d.billId ?? d.eventId}`}
