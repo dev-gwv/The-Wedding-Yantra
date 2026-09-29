@@ -1,7 +1,7 @@
 "use client";
 
-import { can, formatDate, formatPhone } from "@wedding-yantra/core";
-import { useClashes, useClients, useCreateEvent, useUpdateEvent, useVenues } from "@wedding-yantra/api-client/react";
+import { can, formatDate } from "@wedding-yantra/core";
+import { useClashes, useCreateEvent, useUpdateEvent, useVenues } from "@wedding-yantra/api-client/react";
 import {
   EVENT_LABELS,
   EVENT_TYPES,
@@ -11,9 +11,10 @@ import {
   type WeddingEvent,
 } from "@wedding-yantra/types";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
-import { useDeferredValue, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { ClientPicker, type PickedClient } from "@/components/sales/client-picker";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Card, Notice } from "@/components/ui/misc";
@@ -38,9 +39,8 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
   const create = useCreateEvent(workspace.id);
   const update = useUpdateEvent(workspace.id, event?.id ?? "");
   const [clientMode, setClientMode] = useState<"pick" | "new">("pick");
-  const [clientSearch, setClientSearch] = useState("");
-  const clients = useClients(workspace.id, useDeferredValue(clientSearch.trim()));
-  const [clientId, setClientId] = useState<string | null>(null);
+  const [client, setClient] = useState<PickedClient | null>(null);
+  const clientId = client?.id ?? null;
   const [newClient, setNewClient] = useState({ name: "", phone: "" });
   const [title, setTitle] = useState(event?.title ?? "");
   const [eventType, setEventType] = useState<string>(event?.eventType ?? "");
@@ -105,31 +105,16 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
             </div>
           </div>
           {clientMode === "pick" ? (
-            <div className="space-y-2">
-              <TextField label="Find a client" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="Name or number" error={errors.clientId} />
-              <ul className="max-h-56 space-y-1 overflow-y-auto">
-                {clients.data?.slice(0, 20).map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setClientId(c.id);
-                        if (!title) setTitle(c.name);
-                      }}
-                      aria-pressed={clientId === c.id}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left",
-                        clientId === c.id ? "border-brand bg-cream" : "border-transparent hover:bg-cream",
-                      )}
-                    >
-                      <span className="font-semibold">{c.name}</span>
-                      <span className="text-sm text-ink-muted tabular">{c.phone ? formatPhone(c.phone) : ""}</span>
-                    </button>
-                  </li>
-                ))}
-                {clients.data?.length === 0 && <li className="px-3 py-2 text-sm text-ink-muted">No clients found. Switch to New.</li>}
-              </ul>
-            </div>
+            <ClientPicker
+              label="Find a client"
+              value={client}
+              onChange={(c) => {
+                setClient(c);
+                if (c && !title) setTitle(c.name ?? "");
+              }}
+              error={errors.clientId}
+              hint="Not in your list? Switch to New."
+            />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <TextField label="Client name" value={newClient.name} onChange={(e) => setNewClient((c) => ({ ...c, name: e.target.value }))} error={errors["newClient.name"] ?? errors.clientId} />
