@@ -15,13 +15,13 @@ import { useState, type FormEvent } from "react";
 import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { ClientPicker, type PickedClient } from "@/components/sales/client-picker";
+import { FunctionPicker } from "./function-picker";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Card, Notice } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
-const FUNCTION_NAMES = ["Roka", "Engagement", "Haldi", "Mehendi", "Sangeet", "Wedding", "Reception", "Pre-wedding shoot", "Cocktail"];
 
 interface FnRow {
   key: string;
@@ -29,6 +29,8 @@ interface FnRow {
   date: string;
   startTime: string;
   venue: string;
+  /** Just added: open the function dropdown straight away */
+  fresh?: boolean;
 }
 
 let seq = 0;
@@ -153,15 +155,10 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
           {fns.map((f, i) => (
             <Card key={f.key} className="p-4">
               <div className="flex items-end gap-2">
-                <label className="min-w-0 flex-1 text-xs font-semibold text-ink-muted">
+                <div className="min-w-0 flex-1 text-xs font-semibold text-ink-muted">
                   Function
-                  <input
-                    list="function-names"
-                    value={f.name}
-                    onChange={(e) => setFn(f.key, { name: e.target.value })}
-                    className="mt-1 h-11 w-full rounded-xl border border-line px-3 text-[15px] font-semibold text-ink focus:border-sun-300 focus:shadow-glow focus:outline-none"
-                  />
-                </label>
+                  <FunctionPicker value={f.name} onChange={(name) => setFn(f.key, { name })} autoOpen={f.fresh} ariaLabel={`Function ${i + 1}`} />
+                </div>
                 <button
                   type="button"
                   onClick={() => setFns((list) => list.filter((x) => x.key !== f.key))}
@@ -208,11 +205,6 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
               <option key={n} value={n} />
             ))}
           </datalist>
-          <datalist id="function-names">
-            {FUNCTION_NAMES.map((n) => (
-              <option key={n} value={n} />
-            ))}
-          </datalist>
         </div>
         {errors.functions && <p className="mt-2 text-sm text-danger">{errors.functions}</p>}
         <Button
@@ -220,7 +212,7 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
           variant="secondary"
           className="mt-3"
           disabled={fns.length >= 20}
-          onClick={() => setFns((list) => [...list, { key: key(), name: "", date: list.at(-1)?.date ?? "", startTime: "", venue: "" }])}
+          onClick={() => setFns((list) => [...list.map((x) => ({ ...x, fresh: false })), { key: key(), name: "", date: list.at(-1)?.date ?? "", startTime: "", venue: "", fresh: true }])}
         >
           <Plus className="size-4" strokeWidth={2.5} /> Add a function
         </Button>
