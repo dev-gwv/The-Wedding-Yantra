@@ -44,7 +44,7 @@ function BillView({ bill, business }: { bill: Bill; business: Workspace }) {
   const record = can(workspace.role, "payments.record");
   const cancelled = bill.status === "cancelled";
   const url = billUrl(bill.shareToken);
-  const back = bill.eventId ? `/app/events/${bill.eventId}` : bill.clientId ? `/app/clients/${bill.clientId}` : "/app/money";
+  const back = bill.eventId ? `/app/events/${bill.eventId}` : bill.clientId ? `/app/clients/${bill.clientId}` : "/app/money/invoices";
   const message = billMessage({
     clientName: bill.billTo.name,
     business: business.name,

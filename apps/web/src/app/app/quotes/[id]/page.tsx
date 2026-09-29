@@ -43,7 +43,7 @@ function QuoteView({ quote, business }: { quote: Quote; business: Workspace }) {
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/q/${quote.shareToken}`;
   const first = quote.customerName.split(" ")[0];
   const message = `Hi ${first}, here is your quote ${quote.number} from ${business.name}. You can see the details and accept it here: ${url}`;
-  const back = quote.leadId ? `/app/leads/${quote.leadId}` : quote.clientId ? `/app/clients/${quote.clientId}` : "/app/money";
+  const back = quote.leadId ? `/app/leads/${quote.leadId}` : quote.clientId ? `/app/clients/${quote.clientId}` : "/app/money/quotes";
 
   /** Runs an action and says how it went. Resolves to true when it worked. */
   async function run(action: Parameters<typeof act.mutateAsync>[0], done: string) {

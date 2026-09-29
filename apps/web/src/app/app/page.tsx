@@ -100,7 +100,7 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
       <PlanBanner billing={home.billing ?? null} />
 
       {home.money && home.money.pendingExpenses > 0 && (
-        <Banner href="/app/money?view=expenses" icon={ReceiptText}>
+        <Banner href="/app/money/expenses" icon={ReceiptText}>
           {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
         </Banner>
       )}
@@ -148,7 +148,7 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
         <div className="space-y-6">
           {home.money && home.money.toCollect > 0 && (
             <section>
-              <SectionHead title="To collect" href="/app/money?view=due" link="See all" />
+              <SectionHead title="To collect" href="/app/money/to-collect" link="See all" />
               <Card className="divide-y divide-line overflow-hidden">
                 <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-4">
                   <span className="font-display text-2xl font-extrabold tabular">{formatMoney(home.money.toCollect)}</span>
@@ -260,12 +260,12 @@ function Numbers({ home }: { home: HomeSummary }) {
           note: home.sales.monthBookedValue ? formatMoneyShort(home.sales.monthBookedValue) : undefined,
           noteTone: "brand",
         },
-        { label: `Received in ${month}`, value: formatMoneyShort(home.money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?view=payments&range=month" },
+        { label: `Received in ${month}`, value: formatMoneyShort(home.money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?range=month" },
         {
           label: "To collect",
           value: formatMoneyShort(home.money.toCollect),
           icon: Wallet,
-          href: "/app/money?view=due",
+          href: "/app/money/to-collect",
           tone: home.money.overdue > 0 ? "danger" : undefined,
           note: home.money.overdue > 0 ? `${formatMoneyShort(home.money.overdue)} late` : undefined,
         },

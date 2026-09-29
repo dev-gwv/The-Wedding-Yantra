@@ -1,9 +1,11 @@
 "use client";
 
-import { CalendarDays, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
+import { can } from "@wedding-yantra/core";
+import { CalendarDays, ChevronDown, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { MONEY_SECTIONS, moneySectionOf } from "@/components/money/money-page";
 import { cn } from "@/lib/cn";
 import { AlertBell } from "./alert-bell";
 import { BusinessMark } from "./business-mark";
@@ -31,9 +33,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { workspace } = useCurrentWorkspace();
 
   return (
-    <div className="min-h-dvh bg-surface lg:pl-72 print:pl-0">
+    <div className="min-h-dvh bg-surface lg:pl-76 print:pl-0">
       {/* Desktop: a floating white panel, like PhotoLancer's studio menu */}
-      <aside className="fixed inset-y-4 left-4 hidden w-60 print:!hidden flex-col rounded-3xl border border-line bg-surface p-3 shadow-soft lg:flex">
+      <aside className="fixed inset-y-4 left-4 hidden w-64 print:!hidden flex-col rounded-3xl border border-line bg-surface p-3 shadow-soft lg:flex">
         <div className="px-2 pb-5 pt-3">
           <Logo className="[&_svg]:size-9 [&>span:last-child]:text-lg" />
         </div>
@@ -50,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="flex flex-col gap-1" aria-label="Main">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
+            if (href === "/app/money" && can(workspace.role, "finance.view")) return <MoneyGroup key={href} pathname={pathname} active={active} />;
             return (
               <Link
                 key={href}
@@ -154,6 +157,65 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </ul>
       </nav>
+    </div>
+  );
+}
+
+/**
+ * Payments and invoices, with its parts under it: open while you're in it, and the arrow
+ * shows them from anywhere else without leaving the page.
+ */
+function MoneyGroup({ pathname, active }: { pathname: string; active: boolean }) {
+  const [peek, setPeek] = useState(false);
+  const open = active || peek;
+  const current = moneySectionOf(pathname);
+  return (
+    <div>
+      <div
+        className={cn(
+          "flex items-center rounded-2xl text-sm font-semibold transition",
+          active ? "bg-gradient-primary text-on-brand shadow-warm" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+        )}
+      >
+        <Link href="/app/money" className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3">
+          <IndianRupee className="size-[18px] shrink-0" strokeWidth={2} />
+          <span className="truncate">Payments and invoices</span>
+        </Link>
+        {!active && (
+          <button
+            type="button"
+            onClick={() => setPeek((p) => !p)}
+            aria-expanded={open}
+            aria-label={open ? "Hide the parts of Payments and invoices" : "Show the parts of Payments and invoices"}
+            className="grid size-9 shrink-0 place-items-center rounded-xl hover:bg-sun-100"
+          >
+            <ChevronDown className={cn("size-4 transition", open && "rotate-180")} />
+          </button>
+        )}
+        {active && <ChevronDown className="mr-3 size-4 shrink-0 rotate-180" aria-hidden />}
+      </div>
+      {open && (
+        <ul className="ml-[22px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2" aria-label="Payments and invoices">
+          {MONEY_SECTIONS.map(({ key, label, href, icon: Icon }) => {
+            const here = current === key;
+            return (
+              <li key={key}>
+                <Link
+                  href={href}
+                  aria-current={here ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold transition",
+                    here ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" strokeWidth={2} />
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

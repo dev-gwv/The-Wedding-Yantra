@@ -5,10 +5,10 @@ import { useApi, useMonthReport } from "@wedding-yantra/api-client/react";
 import { SOURCE_LABELS, type ExportKind, type MonthReport } from "@wedding-yantra/types";
 import { ChevronLeft, ChevronRight, Download, Lock } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { MoneyPageHeader } from "@/components/money/money-page";
 import { Button } from "@/components/ui/button";
-import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
+import { Card, EmptyState, Notice } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
@@ -29,8 +29,7 @@ export default function ReportsPage() {
 
   return (
     <>
-      <BackLink href="/app/money" label="Payments and invoices" />
-      <PageHeader title="Monthly report" />
+      <MoneyPageHeader section="reports" subtitle="A month of the business in plain numbers, and the spreadsheets your CA asks for" />
       {!allowed ? (
         <Card>
           <EmptyState icon={Lock} title="Reports aren't part of your role">

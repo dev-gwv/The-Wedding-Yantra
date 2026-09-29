@@ -84,7 +84,7 @@ export function QuoteEditor({
       {(errors._ || errors.leadId) && <Notice tone="danger">{errors._ ?? errors.leadId}</Notice>}
 
       {/* Totals stay in view while editing */}
-      <div className="pb-safe fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-72">
+      <div className="pb-safe fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-76">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 sm:px-2 lg:px-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold text-ink-muted">

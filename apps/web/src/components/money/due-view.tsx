@@ -163,9 +163,6 @@ export function DueView() {
 
   return (
     <div className="space-y-5">
-      <p className="text-[15px] text-ink-muted">
-        Money clients still owe you, as of today: invoices not paid in full, and booked events you haven&apos;t invoiced yet.
-      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <SummaryCard
           label="Still to collect"

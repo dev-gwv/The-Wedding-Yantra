@@ -30,10 +30,10 @@ function NewBill() {
   if (draft.isError) return <Notice tone="danger">{errorMessage(draft.error)}</Notice>;
 
   const d = draft.data;
-  const back = d.eventId ? `/app/events/${d.eventId}` : d.clientId ? `/app/clients/${d.clientId}` : "/app/money";
+  const back = d.eventId ? `/app/events/${d.eventId}` : d.clientId ? `/app/clients/${d.clientId}` : "/app/money/invoices";
   return (
     <>
-      <BackLink href={back} label={d.billTo.name || "Payments and invoices"} />
+      <BackLink href={back} label={d.billTo.name || "Invoices"} />
       <PageHeader
         title="New invoice"
         subtitle={d.quoteId ? "From the accepted quote. Check it and make the invoice." : d.clientId ? undefined : "For anyone: a client, or someone new."}
