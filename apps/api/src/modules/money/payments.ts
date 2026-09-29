@@ -22,6 +22,8 @@ interface PaymentRow {
   event_id: string | null;
   client_id: string | null;
   client_name: string | null;
+  client_phone: string | null;
+  event_title: string | null;
   created_by: string | null;
   created_by_name: string | null;
   created_at: Date;
@@ -30,10 +32,12 @@ interface PaymentRow {
 const PAYMENT_SELECT = `
   SELECT p.id, p.number, p.amount, p.paid_on::text AS paid_on, p.method, coalesce(pm.label, p.method) AS method_label, p.reference, p.note,
          p.bill_id, b.number AS bill_number, p.event_id, p.client_id, coalesce(c.name, b.bill_to_name) AS client_name,
+         coalesce(c.phone, b.bill_to_phone) AS client_phone, e.title AS event_title,
          p.created_by, u.name AS created_by_name, p.created_at
     FROM payments p
     LEFT JOIN bills b ON b.id = p.bill_id
     LEFT JOIN clients c ON c.id = p.client_id
+    LEFT JOIN events e ON e.id = coalesce(p.event_id, b.event_id)
     LEFT JOIN users u ON u.id = p.created_by
     ${optionJoin("pm", "payment_method", "p.workspace_id", "p.method")}`;
 
@@ -51,6 +55,8 @@ const toPayment = (r: PaymentRow): Payment => ({
   eventId: r.event_id,
   clientId: r.client_id,
   clientName: r.client_name,
+  clientPhone: r.client_phone,
+  eventTitle: r.event_title,
   recordedBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
   createdAt: r.created_at.toISOString(),
 });
@@ -89,7 +95,9 @@ export async function listPayments(
     else {
       params.push(`%${filters.q.replace(/[%_]/g, "")}%`);
       const n = `$${params.length}`;
-      where.push(`(coalesce(c.name, b.bill_to_name) ILIKE ${n} OR p.reference ILIKE ${n} OR b.number ILIKE ${n})`);
+      where.push(
+        `(coalesce(c.name, b.bill_to_name) ILIKE ${n} OR coalesce(c.phone, b.bill_to_phone) ILIKE ${n} OR p.reference ILIKE ${n} OR b.number ILIKE ${n} OR e.title ILIKE ${n})`,
+      );
     }
   }
   const { rows } = await db.query<PaymentRow>(

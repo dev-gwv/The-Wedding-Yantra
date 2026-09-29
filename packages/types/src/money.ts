@@ -54,6 +54,7 @@ export interface BillSummary {
   overdue: boolean;
   clientId: string | null;
   clientName: string;
+  clientPhone: string | null;
   eventId: string | null;
   eventTitle: string | null;
   issueDate: string;
@@ -83,6 +84,9 @@ export interface Payment {
   eventId: string | null;
   clientId: string | null;
   clientName: string | null;
+  clientPhone: string | null;
+  /** The event it was for, directly or through its invoice */
+  eventTitle: string | null;
   recordedBy: PersonRef | null;
   createdAt: string;
 }
@@ -258,7 +262,7 @@ export const billListQuery = z.object({
   clientId: z.uuid().optional(),
   eventId: z.uuid().optional(),
   status: z.enum(["open", "overdue", "paid", "cancelled"]).optional(),
-  /** Invoice number or customer name */
+  /** Invoice number, customer name, phone or event */
   q: z.string().trim().max(80).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
@@ -290,7 +294,7 @@ export interface PublicBill {
     invoiceDesign: InvoiceDesign;
     invoiceAccent: string;
   };
-  bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
+  bill: Omit<Bill, "shareToken" | "clientId" | "clientPhone" | "eventId" | "quoteId" | "payments"> & {
     payments: Pick<Payment, "number" | "amount" | "paidOn" | "method" | "methodLabel">[];
   };
 }
@@ -331,7 +335,7 @@ export const paymentListQuery = z.object({
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   method: optionKey.optional(),
-  /** Receipt number, reference or client */
+  /** Receipt number, reference, client, phone or event */
   q: z.string().trim().max(80).optional(),
 });
 export type PaymentListQuery = z.input<typeof paymentListQuery>;

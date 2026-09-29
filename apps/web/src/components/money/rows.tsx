@@ -11,7 +11,7 @@ import { billUrl } from "@/lib/links";
 import { BillStatusPill } from "./bill-status";
 
 /** Event titles made from a lead start with the client's name; drop it where the name is already shown. */
-const withoutName = (title: string | null, name: string) =>
+export const withoutName = (title: string | null, name: string) =>
   title?.startsWith(`${name} · `) ? title.slice(name.length + 3) : title;
 
 /** One bill in a list. */
@@ -35,18 +35,16 @@ export function BillRow({ bill, showClient = true }: { bill: BillSummary; showCl
   );
 }
 
-/**
- * Money still to collect: from whom, for what, by when. One tap reminds them on
- * WhatsApp, another records the money when it comes.
- */
-export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item: DueItem) => void }) {
-  const { workspace } = useCurrentWorkspace();
-  const href = item.billId ? `/app/bills/${item.billId}` : `/app/events/${item.eventId}`;
+/** Where a due opens: its invoice, or the event when there's no invoice yet. */
+export const dueHref = (item: DueItem) => (item.billId ? `/app/bills/${item.billId}` : `/app/events/${item.eventId}`);
+
+/** A ready WhatsApp reminder for what's owed, asking for the part that's due now. */
+export function dueReminderLink(item: DueItem, business: string): string {
   const forWhat = item.eventTitle ?? (item.billNumber ? `invoice ${item.billNumber}` : "your booking");
-  const reminder = whatsappLink(
+  return whatsappLink(
     reminderMessage({
       clientName: item.clientName,
-      business: workspace.name,
+      business,
       due: item.part?.amount ?? item.due,
       forWhat,
       dueDate: item.part ? item.part.dueDate : item.dueDate,
@@ -56,13 +54,23 @@ export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item
     }),
     item.clientPhone ?? undefined,
   );
+}
+
+/**
+ * Money still to collect: from whom, for what, by when. One tap reminds them on
+ * WhatsApp, another records the money when it comes.
+ */
+export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item: DueItem) => void }) {
+  const { workspace } = useCurrentWorkspace();
+  const href = dueHref(item);
+  const reminder = dueReminderLink(item, workspace.name);
   return (
     <div className="px-5 py-4">
       <Link href={href} className="flex items-start gap-3">
         <span className="min-w-0 flex-1">
           <span className="block truncate font-bold">{item.clientName}</span>
           <span className="block truncate text-sm text-ink-muted">
-            {item.billNumber ? `${item.billNumber} · ` : "No invoice yet · "}
+            {item.billNumber ? `${item.billNumber} · ` : "Not invoiced yet · "}
             {withoutName(item.eventTitle, item.clientName) ?? "Invoice"}
           </span>
           {item.part && (

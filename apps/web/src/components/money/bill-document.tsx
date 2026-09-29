@@ -19,7 +19,7 @@ export interface BillDocumentProps {
     invoiceDesign?: InvoiceDesign;
     invoiceAccent?: string;
   };
-  bill: Omit<Bill, "shareToken" | "clientId" | "eventId" | "quoteId" | "payments"> & {
+  bill: Omit<Bill, "shareToken" | "clientId" | "clientPhone" | "eventId" | "quoteId" | "payments"> & {
     payments: Pick<Payment, "number" | "amount" | "paidOn" | "method" | "methodLabel">[];
   };
   className?: string;

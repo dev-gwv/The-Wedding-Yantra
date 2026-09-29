@@ -9,7 +9,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { DueView } from "@/components/money/due-view";
 import { ExpensesView } from "@/components/money/expenses-view";
+import { DateRangeButton } from "@/components/money/list-kit";
 import { InvoicesView } from "@/components/money/invoices-view";
 import { PaymentsView, RecordPaymentSheet } from "@/components/money/payments-view";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -17,14 +19,19 @@ import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
+import { rangeFromParams, rangeSentence, rangeToParams, type DateRange } from "@/lib/periods";
 
-type View = "invoices" | "payments" | "expenses" | "quotes";
+type View = "payments" | "due" | "invoices" | "expenses" | "quotes";
+/** Received comes first: like a transactions page, it's every rupee that came in. */
 const VIEWS: [View, string][] = [
+  ["payments", "Received"],
+  ["due", "To collect"],
   ["invoices", "Invoices"],
-  ["payments", "Payments"],
   ["expenses", "Expenses"],
   ["quotes", "Quotes"],
 ];
+/** Old links: "bills" is the invoices, "received" the payments. */
+const ALIASES: Record<string, View> = { bills: "invoices", received: "payments" };
 
 function MoneyScreen() {
   const { workspace } = useCurrentWorkspace();
@@ -33,9 +40,10 @@ function MoneyScreen() {
   const pathname = usePathname();
   const allowed = can(workspace.role, "finance.view");
   const overview = useMoneyOverview(workspace.id, allowed);
-  const asked = params.get("view");
-  // Old links: "bills" and "due" are the invoices now.
-  const view = (VIEWS.some(([v]) => v === asked) ? asked : "invoices") as View;
+  const asked = params.get("view") ?? "";
+  const view: View = VIEWS.find(([v]) => v === asked)?.[0] ?? ALIASES[asked] ?? "payments";
+  // One set of dates for every tab, kept in the address so it survives switching tabs.
+  const range = rangeFromParams(params);
   const [recording, setRecording] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
 
@@ -52,9 +60,21 @@ function MoneyScreen() {
     );
   }
 
-  const setView = (v: View) => router.replace(v === "invoices" ? pathname : `${pathname}?view=${v}`, { scroll: false });
+  const go = (next: URLSearchParams) => router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  const setView = (v: View) => {
+    const next = new URLSearchParams(params);
+    next.set("view", v);
+    go(next);
+  };
+  const setRange = (r: DateRange) => go(rangeToParams(r, params));
+  const datesApply = view === "payments" || view === "invoices" || view === "expenses";
   const o = overview.data;
   const primary = {
+    due: can(workspace.role, "payments.record") ? (
+      <Button onClick={() => setRecording(true)}>
+        <Plus className="size-4" strokeWidth={2.5} /> Record payment
+      </Button>
+    ) : null,
     invoices: can(workspace.role, "bills.manage") ? (
       <ButtonLink href="/app/bills/new">
         <Plus className="size-4" strokeWidth={2.5} /> New invoice
@@ -81,14 +101,7 @@ function MoneyScreen() {
     <>
       <PageHeader
         title="Payments and invoices"
-        subtitle={
-          o ? (
-            <span>
-              {formatMoneyShort(o.toCollect)} to collect{o.overdue > 0 && <span className="font-semibold text-danger"> · {formatMoneyShort(o.overdue)} overdue</span>} ·{" "}
-              {formatMoneyShort(o.receivedThisMonth)} received this month
-            </span>
-          ) : undefined
-        }
+        subtitle={datesApply ? rangeSentence(range) : view === "due" ? "Everything clients owe you, as of today" : "Every quote you've made"}
         action={
           <div className="flex gap-2">
             <ButtonLink href="/app/reports" variant="secondary" aria-label="Monthly report" title="Monthly report">
@@ -99,26 +112,32 @@ function MoneyScreen() {
         }
       />
 
-      <div className="mb-6 flex w-full rounded-2xl border border-line bg-cream p-1 sm:inline-flex sm:w-auto" role="tablist" aria-label="Money view">
-        {VIEWS.map(([key, label]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={view === key}
-            onClick={() => setView(key)}
-            className={cn(
-              "h-10 flex-1 whitespace-nowrap rounded-xl px-2 text-sm font-bold transition sm:flex-none sm:px-5",
-              view === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="inline-flex min-w-full rounded-2xl border border-line bg-cream p-1 sm:min-w-0" role="tablist" aria-label="Payments and invoices view">
+            {VIEWS.map(([key, label]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={view === key}
+                onClick={() => setView(key)}
+                className={cn(
+                  "h-10 flex-1 shrink-0 whitespace-nowrap rounded-xl px-3 text-sm font-bold transition sm:flex-none sm:px-5",
+                  view === key ? "bg-surface text-ink shadow-soft" : "text-ink-muted hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {datesApply && <DateRangeButton value={range} onChange={setRange} align="right" />}
       </div>
 
-      {view === "invoices" && <InvoicesView dues={o?.dues} />}
-      {view === "payments" && <PaymentsView />}
-      {view === "expenses" && <ExpensesView adding={addingExpense} onAddingChange={setAddingExpense} />}
+      {view === "payments" && <PaymentsView range={range} />}
+      {view === "due" && <DueView />}
+      {view === "invoices" && <InvoicesView range={range} />}
+      {view === "expenses" && <ExpensesView adding={addingExpense} onAddingChange={setAddingExpense} range={range} />}
       {view === "quotes" && <QuotesView />}
 
       <RecordPaymentSheet open={recording} onClose={() => setRecording(false)} dues={o?.dues ?? []} />

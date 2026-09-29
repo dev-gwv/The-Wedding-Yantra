@@ -125,6 +125,7 @@ export function toBillSummary(r: BillRow): BillSummary {
     overdue: due > 0 && ((r.due_date !== null && r.due_date < r.today) || Number(r.plan_due_by_today) > received + 0.5),
     clientId: r.client_id,
     clientName: r.client_name,
+    clientPhone: r.client_phone,
     eventId: r.event_id,
     eventTitle: r.event_title,
     issueDate: r.issue_date,
@@ -338,7 +339,7 @@ export async function listBills(db: Queryable, ctx: MemberContext, filters: Bill
   if (filters.eventId) add("b.event_id = ?", filters.eventId);
   if (filters.from) add("b.issue_date >= ?", filters.from);
   if (filters.to) add("b.issue_date <= ?", filters.to);
-  if (filters.q) add("(b.number ILIKE ? OR coalesce(c.name, b.bill_to_name) ILIKE ? OR b.subject ILIKE ? OR e.title ILIKE ?)", `%${filters.q.replace(/[%_]/g, "")}%`);
+  if (filters.q) add("(b.number ILIKE ? OR coalesce(c.name, b.bill_to_name) ILIKE ? OR coalesce(c.phone, b.bill_to_phone) ILIKE ? OR b.subject ILIKE ? OR e.title ILIKE ?)", `%${filters.q.replace(/[%_]/g, "")}%`);
   if (filters.status === "cancelled") where.push("b.status = 'cancelled'");
   else if (filters.status) where.push("b.status = 'issued'");
   const { rows } = await db.query<BillRow>(
@@ -939,8 +940,9 @@ export async function getPublicBill(db: Db, token: string): Promise<PublicBill> 
       WHERE p.bill_id = $1 AND p.deleted_at IS NULL ORDER BY p.paid_on, p.number`,
     [row.id],
   );
-  const { shareToken: _t, clientId: _c, eventId: _e, quoteId: _q, payments: _p, ...visible } = bill;
+  const { shareToken: _t, clientId: _c, clientPhone: _m, eventId: _e, quoteId: _q, payments: _p, ...visible } = bill;
   void _t;
+  void _m;
   void _c;
   void _e;
   void _q;

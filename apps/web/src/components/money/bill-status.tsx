@@ -13,5 +13,5 @@ export function BillStatusPill({ bill }: { bill: Pick<BillSummary, "status" | "p
           : bill.payState === "part_paid"
             ? [PAY_STATE_LABELS.part_paid, "bg-cream text-brand-strong ring-1 ring-sun-300/60"]
             : [PAY_STATE_LABELS.unpaid, "bg-cream text-ink"];
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tone)}>{label}</span>;
+  return <span className={cn("inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold", tone)}>{label}</span>;
 }

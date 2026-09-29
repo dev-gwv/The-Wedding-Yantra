@@ -3,33 +3,38 @@
 import { can, formatMoney, formatMoneyShort } from "@wedding-yantra/core";
 import { useExpenses, useExpensesSummary } from "@wedding-yantra/api-client/react";
 import type { Expense, ExpenseListQuery } from "@wedding-yantra/types";
-import { Clock, Download, HandCoins, Plus, ReceiptText, Wallet } from "lucide-react";
+import { Clock, Plus, ReceiptText, Wallet } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useOptionList } from "@/components/app/option-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Notice } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
-import { downloadCsv, periodRange, type Period } from "@/lib/periods";
+import { downloadCsv, rangeDates, type DateRange } from "@/lib/periods";
 import { ExpenseRow, ExpenseSheet } from "./expense-sheet";
-import { Chips, MoneyTile, PeriodPills, SearchBox } from "./list-kit";
+import { DateRangeButton, SummaryCard, Toolbar } from "./list-kit";
 
 type Who = "all" | "business" | "reimburse";
 type Status = "all" | "pending";
 
 /**
- * Money spent. Filter by period, category and who paid; search by who it went to or their
+ * Money spent. Filter by dates, category and who paid; search by who it went to or their
  * bill number; see what's waiting for approval and what's owed back to the team; download
  * it for the CA. Owners, managers and the accountant see everyone's; the team sees their own.
+ * On the Payments and invoices screen the dates come from the top of the page.
  */
-export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { adding?: boolean; onAddingChange?: (adding: boolean) => void } = {}) {
+export function ExpensesView({
+  adding: addingFromHeader,
+  onAddingChange,
+  range: sharedRange,
+}: { adding?: boolean; onAddingChange?: (adding: boolean) => void; range?: DateRange } = {}) {
   const { workspace } = useCurrentWorkspace();
   const seesAll = can(workspace.role, "finance.view");
   const canAdd = can(workspace.role, "expenses.submit");
   const { active } = useOptionList("expense_category");
-  const [period, setPeriod] = useState<Period>("month");
+  const [ownRange, setOwnRange] = useState<DateRange>({ period: "month" });
+  const range = sharedRange ?? ownRange;
   const [category, setCategory] = useState("all");
   const [who, setWho] = useState<Who>("all");
   const [status, setStatus] = useState<Status>("all");
@@ -37,7 +42,7 @@ export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { add
   const onSearch = useCallback((v: string) => setQ(v), []);
   // Tiles and category totals follow the period, search and who paid, but not the category or
   // status picked, so the other chips keep their numbers.
-  const tileQuery: ExpenseListQuery = { ...periodRange(period), ...(who !== "all" ? { paidBy: who } : {}), ...(q ? { q } : {}) };
+  const tileQuery: ExpenseListQuery = { ...rangeDates(range), ...(who !== "all" ? { paidBy: who } : {}), ...(q ? { q } : {}) };
   const query: ExpenseListQuery = {
     ...tileQuery,
     ...(category !== "all" ? { category } : {}),
@@ -59,14 +64,14 @@ export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { add
 
   // Categories with money this period first, then the rest of the list.
   const categoryChips: [string, string][] = [
-    ["all", "All"],
+    ["all", "Any category"],
     ...byCategory.map((c) => [c.category, c.label] as [string, string]),
     ...active.filter((o) => !byCategory.some((c) => c.category === o.key)).map((o) => [o.key, o.label] as [string, string]),
   ];
 
   function exportList() {
     downloadCsv(
-      `expenses-${period}.csv`,
+      `expenses-${range.period === "custom" ? `${range.from}-to-${range.to}` : range.period}.csv`,
       ["Date", "Category", "Paid to", "Vendor bill no.", "Amount", "GST rate %", "GST", "Paid with", "Paid by", "Paid back on", "Event", "Status", "Added by", "Note"],
       list.map((x) => [
         x.spentOn,
@@ -89,34 +94,39 @@ export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { add
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PeriodPills value={period} onChange={setPeriod} />
-        {canAdd && !controlled && (
-          <Button variant="secondary" onClick={() => setAdding(true)} className="w-full sm:w-auto">
-            <Plus className="size-4" strokeWidth={2.5} /> Add expense
-          </Button>
-        )}
-      </div>
+      {(!sharedRange || (canAdd && !controlled)) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {!sharedRange && <DateRangeButton value={range} onChange={setOwnRange} />}
+          {canAdd && !controlled && (
+            <Button variant="secondary" onClick={() => setAdding(true)} className="w-full sm:w-auto">
+              <Plus className="size-4" strokeWidth={2.5} /> Add expense
+            </Button>
+          )}
+        </div>
+      )}
 
-      <div className={cn("grid grid-cols-2 gap-3", seesAll ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
-        <MoneyTile label={seesAll ? "Spent" : "You spent"} value={s ? formatMoneyShort(s.spent) : "…"} icon={Wallet} note={s ? `${s.count} expense${s.count === 1 ? "" : "s"}` : undefined} />
-        <MoneyTile
+      <div className="grid gap-3 sm:grid-cols-2">
+        <SummaryCard
+          label={seesAll ? "Total spent" : "You spent"}
+          value={s ? formatMoney(s.spent) : "…"}
+          icon={Wallet}
+          note={s ? [`${s.count} expense${s.count === 1 ? "" : "s"} on these dates`, seesAll && s.gst > 0 ? `${formatMoneyShort(s.gst)} GST your CA can claim` : null].filter(Boolean).join(" · ") : undefined}
+        />
+        <SummaryCard
           label="Waiting for approval"
-          value={s ? formatMoneyShort(s.pending) : "…"}
+          value={s ? formatMoney(s.pending) : "…"}
           icon={Clock}
-          note={s && s.pendingCount > 0 ? (seesAll ? `${s.pendingCount} to look at` : `${s.pendingCount} sent to the owner`) : undefined}
-          active={status === "pending"}
-          onClick={() => setStatus((v) => (v === "pending" ? "all" : "pending"))}
+          note={
+            s
+              ? [
+                  s.pendingCount > 0 ? (seesAll ? `${s.pendingCount} to look at` : `${s.pendingCount} sent to the owner`) : "Nothing waiting",
+                  s.toReimburse > 0 ? `${formatMoneyShort(s.toReimburse)} ${seesAll ? "to pay back to the team" : "owed back to you"}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : undefined
+          }
         />
-        <MoneyTile
-          label={seesAll ? "To pay back to the team" : "Owed back to you"}
-          value={s ? formatMoneyShort(s.toReimburse) : "…"}
-          icon={HandCoins}
-          tone={s && s.toReimburse > 0 ? "danger" : undefined}
-          active={who === "reimburse"}
-          onClick={() => setWho((v) => (v === "reimburse" ? "all" : "reimburse"))}
-        />
-        {seesAll && <MoneyTile label="GST on bills" value={s ? formatMoneyShort(s.gst) : "…"} icon={ReceiptText} note="Your CA can claim this" />}
       </div>
 
       {seesAll && category === "all" && byCategory.length > 1 && (
@@ -140,27 +150,40 @@ export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { add
         </Card>
       )}
 
-      <div className="space-y-3">
-        <Chips options={categoryChips} value={category} onChange={setCategory} label="Category" />
-        <Chips
-          options={[
-            ["all", "Anyone paid"],
-            ["business", "Business paid"],
-            ["reimburse", "To pay back"],
-          ]}
-          value={who}
-          onChange={setWho}
-          label="Who paid"
-          quiet
-        />
-        <div className="flex gap-2">
-          <SearchBox value={q} onChange={onSearch} placeholder="Paid to, vendor, bill number or note" />
-          <Button variant="secondary" onClick={exportList} disabled={!list.length} aria-label="Download as a spreadsheet" title="Download as a spreadsheet">
-            <Download className="size-4" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
-        </div>
-      </div>
+      <Toolbar
+        search={q}
+        onSearch={onSearch}
+        placeholder="Paid to, vendor, bill number or note"
+        filters={[
+          { label: "Category", options: categoryChips, value: category, onChange: setCategory },
+          {
+            label: "Who paid",
+            options: [
+              ["all", "Anyone"],
+              ["business", "Business paid"],
+              ["reimburse", "To pay back"],
+            ],
+            value: who,
+            onChange: (v) => setWho(v as Who),
+          },
+          {
+            label: "Approval",
+            options: [
+              ["all", "Any"],
+              ["pending", "Waiting for approval"],
+            ],
+            value: status,
+            onChange: (v) => setStatus(v as Status),
+          },
+        ]}
+        onRefresh={() => {
+          void expenses.refetch();
+          void summary.refetch();
+        }}
+        refreshing={expenses.isFetching}
+        onExport={exportList}
+        canExport={list.length > 0}
+      />
 
       {expenses.isPending && (
         <div className="flex justify-center py-12 text-brand">
@@ -170,9 +193,9 @@ export function ExpensesView({ adding: addingFromHeader, onAddingChange }: { add
       {expenses.isError && <Notice tone="danger">{errorMessage(expenses.error)}</Notice>}
       {expenses.data && list.length === 0 && (
         <Card>
-          <EmptyState icon={ReceiptText} title={filtered ? "No expenses here" : "Nothing spent in this period"}>
+          <EmptyState icon={ReceiptText} title={filtered ? "No expenses here" : "Nothing spent on these dates"}>
             {filtered
-              ? "Try another period, category or search."
+              ? "Try other dates, another filter, or clear the search."
               : canAdd
                 ? "Add what you spend on materials, helpers, travel and more, with a photo of the bill. Profit on each event comes from this."
                 : "Expenses the team adds show here."}

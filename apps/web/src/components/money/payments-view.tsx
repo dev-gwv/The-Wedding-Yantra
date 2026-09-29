@@ -1,35 +1,34 @@
 "use client";
 
-import { formatDate, formatMoney, formatMoneyShort } from "@wedding-yantra/core";
+import { formatDate, formatMoney, formatMoneyShort, formatPhone } from "@wedding-yantra/core";
 import { usePayments } from "@wedding-yantra/api-client/react";
 import type { DueItem, Payment, PaymentListQuery } from "@wedding-yantra/types";
-import { ChevronRight, Download, HandCoins, IndianRupee, Receipt, Search } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { OptionIcon, useOptionList } from "@/components/app/option-picker";
+import { IndianRupee, Receipt, Search } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useOptionList } from "@/components/app/option-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
-import { Button } from "@/components/ui/button";
-import { Card, EmptyState, Notice } from "@/components/ui/misc";
+import { Card, EmptyState, Notice, Pill } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { billUrl } from "@/lib/links";
-import { downloadCsv, periodRange, type Period } from "@/lib/periods";
-import { Chips, MoneyTile, PeriodPills, SearchBox } from "./list-kit";
+import { downloadCsv, rangeDates, type DateRange } from "@/lib/periods";
+import { MoneyTable, SummaryCard, tableDate, Toolbar, type Column } from "./list-kit";
 import { PaymentSheet } from "./payment-sheet";
+import { withoutName } from "./rows";
 
 /**
- * Money received, with its receipt number. Filter by period and payment mode, search by
- * name, receipt or reference, and download it for the accountant.
+ * Received: every rupee that came in on the chosen dates, with or without an invoice. Like a
+ * transactions page: two numbers, a search, a filter by payment mode, and one plain table.
  */
-export function PaymentsView() {
+export function PaymentsView({ range }: { range: DateRange }) {
   const { workspace } = useCurrentWorkspace();
   const { active } = useOptionList("payment_method");
-  const [period, setPeriod] = useState<Period>("month");
   const [method, setMethod] = useState("all");
   const [q, setQ] = useState("");
   const onSearch = useCallback((v: string) => setQ(v), []);
-  const base: PaymentListQuery = { ...periodRange(period), ...(q ? { q } : {}) };
+  const base: PaymentListQuery = { ...rangeDates(range), ...(q ? { q } : {}) };
   const all = usePayments(workspace.id, base);
   const [open, setOpen] = useState<Payment | null>(null);
 
@@ -37,53 +36,58 @@ export function PaymentsView() {
   const total = list.reduce((a, p) => a + p.amount, 0);
   const byMode = useMemo(() => {
     const m = new Map<string, { label: string; total: number }>();
-    for (const p of all.data ?? []) m.set(p.method, { label: p.methodLabel, total: (m.get(p.method)?.total ?? 0) + p.amount });
-    return [...m.entries()].sort((a, b) => b[1].total - a[1].total);
-  }, [all.data]);
-  // Modes that have money this period come first, then the rest of the list.
-  const modeChips: [string, string][] = [
-    ["all", "All modes"],
-    ...byMode.map(([key, v]) => [key, v.label] as [string, string]),
-    ...active.filter((o) => !byMode.some(([k]) => k === o.key)).map((o) => [o.key, o.label] as [string, string]),
-  ];
+    for (const p of list) m.set(p.method, { label: p.methodLabel, total: (m.get(p.method)?.total ?? 0) + p.amount });
+    return [...m.values()].sort((a, b) => b.total - a.total);
+  }, [list]);
+  const modes: [string, string][] = [["all", "Any mode"], ...active.map((o) => [o.key, o.label] as [string, string])];
 
   function exportList() {
     downloadCsv(
-      `payments-${period}.csv`,
-      ["Date", "Receipt", "From", "Invoice", "Mode", "Reference", "Amount", "Recorded by"],
-      list.map((p) => [p.paidOn, p.number, p.clientName, p.billNumber, p.methodLabel, p.reference, p.amount, p.recordedBy?.name]),
+      `received-${range.period === "custom" ? `${range.from}-to-${range.to}` : range.period}.csv`,
+      ["Date", "Client", "Amount", "Phone", "For", "Invoice", "Mode", "Receipt", "Reference", "Recorded by"],
+      list.map((p) => [p.paidOn, p.clientName, p.amount, p.clientPhone, forWhat(p), p.billNumber, p.methodLabel, p.number, p.reference, p.recordedBy?.name]),
     );
   }
 
+  const columns: Column<Payment>[] = [
+    { head: "Date", cell: (p) => <span className="whitespace-nowrap">{tableDate(p.paidOn)}</span> },
+    { head: "Client", cell: (p) => <ClientCell name={p.clientName ?? "Payment"} /> },
+    { head: "Amount", align: "right", cell: (p) => <span className="font-bold text-success">{money(p.amount)}</span> },
+    { head: "Contact", cell: (p) => <span className="whitespace-nowrap text-ink-muted">{p.clientPhone ? formatPhone(p.clientPhone) : "—"}</span> },
+    { head: "For", cell: (p) => <ForCell text={forWhat(p)} sub={p.billNumber} /> },
+    { head: "Mode", cell: (p) => <span className="whitespace-nowrap">{p.methodLabel}</span> },
+    { head: "Receipt", cell: (p) => <span className="whitespace-nowrap text-ink-muted">{p.number}</span> },
+    { head: "Status", cell: () => <Pill tone="success">Received</Pill> },
+  ];
+
   return (
     <div className="space-y-5">
-      <PeriodPills value={period} onChange={setPeriod} />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MoneyTile label="Received" value={all.data ? formatMoneyShort(total) : "…"} icon={IndianRupee} tone="success" note={method === "all" ? undefined : "In this mode"} />
-        <MoneyTile label="Payments" value={all.data ? String(list.length) : "…"} icon={Receipt} />
-        {byMode.slice(0, 2).map(([key, v]) => (
-          <MoneyTile
-            key={key}
-            label={`By ${v.label}`}
-            value={formatMoneyShort(v.total)}
-            icon={HandCoins}
-            active={method === key}
-            onClick={() => setMethod((cur) => (cur === key ? "all" : key))}
-          />
-        ))}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <SummaryCard
+          label="Total received"
+          value={all.data ? formatMoney(total) : "…"}
+          icon={IndianRupee}
+          tone="success"
+          note={method === "all" ? "All money in on these dates, advances included" : `Only ${modes.find(([k]) => k === method)?.[1] ?? "this mode"}`}
+        />
+        <SummaryCard
+          label="Number of payments"
+          value={all.data ? String(list.length) : "…"}
+          icon={Receipt}
+          note={byMode.length > 0 ? byMode.slice(0, 3).map((m) => `${m.label} ${formatMoneyShort(m.total)}`).join(" · ") : "Each one has its own receipt number"}
+        />
       </div>
 
-      <div className="space-y-3">
-        <Chips options={modeChips} value={method} onChange={setMethod} label="Payment mode" />
-        <div className="flex gap-2">
-          <SearchBox value={q} onChange={onSearch} placeholder="Name, receipt or reference" />
-          <Button variant="secondary" onClick={exportList} disabled={!list.length} aria-label="Download as a spreadsheet" title="Download as a spreadsheet">
-            <Download className="size-4" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
-        </div>
-      </div>
+      <Toolbar
+        search={q}
+        onSearch={onSearch}
+        placeholder="Name, phone, receipt or event"
+        filters={[{ label: "Payment mode", options: modes, value: method, onChange: setMethod }]}
+        onRefresh={() => void all.refetch()}
+        refreshing={all.isFetching}
+        onExport={exportList}
+        canExport={list.length > 0}
+      />
 
       {all.isPending && (
         <div className="flex justify-center py-16 text-brand">
@@ -93,22 +97,25 @@ export function PaymentsView() {
       {all.isError && <Notice tone="danger">{errorMessage(all.error)}</Notice>}
       {all.data && list.length === 0 && (
         <Card>
-          <EmptyState icon={IndianRupee} title="No payments here">
-            {q || method !== "all" ? "Try another period, mode or search." : "Money you record against invoices and bookings shows here, each with its receipt number."}
+          <EmptyState icon={IndianRupee} title="No payments on these dates">
+            {q || method !== "all" ? "Try other dates, another mode, or clear the search." : "Money you record against invoices and bookings shows here, each with its receipt number."}
           </EmptyState>
         </Card>
       )}
       {list.length > 0 && (
-        <>
-          <p className="text-sm text-ink-muted">
-            {list.length} payment{list.length === 1 ? "" : "s"} · {formatMoney(total)}
-          </p>
-          <Card className="divide-y divide-line overflow-hidden">
-            {list.map((p) => (
-              <PaymentListRow key={p.id} payment={p} onClick={() => setOpen(p)} />
-            ))}
-          </Card>
-        </>
+        <MoneyTable
+          label="Payments received"
+          rows={list}
+          columns={columns}
+          rowKey={(p) => p.id}
+          onOpen={setOpen}
+          mobile={(p) => ({
+            title: p.clientName ?? "Payment",
+            amount: <span className="text-success">{money(p.amount)}</span>,
+            sub: [formatDate(p.paidOn, { year: false }), p.methodLabel, forWhat(p)].filter(Boolean).join(" · "),
+            status: <Pill tone="success">Received</Pill>,
+          })}
+        />
       )}
 
       <PaymentSheet
@@ -122,21 +129,34 @@ export function PaymentsView() {
   );
 }
 
-function PaymentListRow({ payment, onClick }: { payment: Payment; onClick: () => void }) {
+const money = (n: number) => formatMoney(n, { paise: n % 1 !== 0 });
+
+/** What a payment was for: its event (without the client's name), or its invoice. */
+function forWhat(p: Payment): string {
+  return (p.clientName ? withoutName(p.eventTitle, p.clientName) : p.eventTitle) ?? (p.billNumber ? `Invoice ${p.billNumber}` : "Payment");
+}
+
+/** The client's name, with a small "View" so it's plain the row opens. */
+export function ClientCell({ name }: { name: string }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-cream">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-success-soft text-success">
-        <OptionIcon optionKey={payment.method} className="size-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold">{payment.clientName ?? "Payment"}</span>
-        <span className="block truncate text-sm text-ink-muted">
-          {[formatDate(payment.paidOn, { year: false }), payment.number, payment.methodLabel, payment.billNumber, payment.reference].filter(Boolean).join(" · ")}
+    <span className="block min-w-0">
+      <span className="block max-w-[14rem] truncate font-bold">{name}</span>
+      <span className="text-xs font-semibold text-brand-strong">View</span>
+    </span>
+  );
+}
+
+export function ForCell({ text, sub, tag }: { text: string; sub?: string | null; tag?: ReactNode }) {
+  return (
+    <span className="block min-w-0">
+      <span className="block max-w-[14rem] truncate">{text}</span>
+      {(sub || tag) && (
+        <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+          {sub}
+          {tag}
         </span>
-      </span>
-      <span className="shrink-0 font-bold tabular text-success">{formatMoney(payment.amount, { paise: payment.amount % 1 !== 0 })}</span>
-      <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
-    </button>
+      )}
+    </span>
   );
 }
 
@@ -169,7 +189,7 @@ export function RecordPaymentSheet({ open, onClose, dues }: { open: boolean; onC
                   <button type="button" onClick={() => setPicked(d)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-cream">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-bold">{d.clientName}</span>
-                      <span className="block truncate text-sm text-ink-muted">{[d.billNumber ?? "No invoice yet", d.eventTitle].filter(Boolean).join(" · ")}</span>
+                      <span className="block truncate text-sm text-ink-muted">{[d.billNumber ?? "Not invoiced yet", d.eventTitle].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className={cn("shrink-0 font-bold tabular", d.overdue && "text-danger")}>{formatMoney(d.due)}</span>
                   </button>

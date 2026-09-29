@@ -1,7 +1,8 @@
-import { localISODate } from "@wedding-yantra/core";
+import { formatDate, localISODate } from "@wedding-yantra/core";
 
 /** Time ranges for the money lists. Years are Indian financial years, April to March. */
 export const PERIODS = [
+  ["today", "Today"],
   ["month", "This month"],
   ["last_month", "Last month"],
   ["fy", "This year"],
@@ -18,6 +19,8 @@ export function periodRange(period: Period, today = new Date()): { from?: string
   const m = today.getMonth();
   const fyStart = m >= 3 ? y : y - 1;
   switch (period) {
+    case "today":
+      return { from: iso(y, m, today.getDate()), to: iso(y, m, today.getDate()) };
     case "month":
       return { from: iso(y, m, 1), to: iso(y, m + 1, 0) };
     case "last_month":
@@ -29,6 +32,53 @@ export function periodRange(period: Period, today = new Date()): { from?: string
     default:
       return {};
   }
+}
+
+/** A named period, or dates the owner picked. */
+export type DateRange = { period: Period } | { period: "custom"; from: string; to: string };
+
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** From and to for any range. */
+export function rangeDates(range: DateRange, today = new Date()): { from?: string; to?: string } {
+  return range.period === "custom" ? { from: range.from, to: range.to } : periodRange(range.period, today);
+}
+
+/** The button's words: "This month", or "1 Sep – 15 Sep 2026" for picked dates. */
+export function rangeName(range: DateRange): string {
+  if (range.period !== "custom") return PERIODS.find(([k]) => k === range.period)?.[1] ?? "";
+  return range.from === range.to ? formatDate(range.from) : `${formatDate(range.from, { year: range.from.slice(0, 4) !== range.to.slice(0, 4) })} – ${formatDate(range.to)}`;
+}
+
+/** "Showing records from 1 Sep 2026 to 30 Sep 2026" */
+export function rangeSentence(range: DateRange, today = new Date()): string {
+  const { from, to } = rangeDates(range, today);
+  if (!from || !to) return "Showing all records";
+  if (from === to) return `Showing records for ${formatDate(from)}`;
+  return `Showing records from ${formatDate(from)} to ${formatDate(to)}`;
+}
+
+/** Read the range from the page address: ?range=month, or ?from=…&to=… */
+export function rangeFromParams(params: URLSearchParams, fallback: Period = "month"): DateRange {
+  const from = params.get("from");
+  const to = params.get("to");
+  if (from && to && ISO.test(from) && ISO.test(to)) return from <= to ? { period: "custom", from, to } : { period: "custom", from: to, to: from };
+  const asked = params.get("range");
+  const period = PERIODS.find(([k]) => k === asked)?.[0];
+  return { period: period ?? fallback };
+}
+
+/** Put the range into the page address, keeping everything else there. */
+export function rangeToParams(range: DateRange, params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("range");
+  next.delete("from");
+  next.delete("to");
+  if (range.period === "custom") {
+    next.set("from", range.from);
+    next.set("to", range.to);
+  } else next.set("range", range.period);
+  return next;
 }
 
 /** "April 2026 to March 2027" style name for the financial year, for hints. */

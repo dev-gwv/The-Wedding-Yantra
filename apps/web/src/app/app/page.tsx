@@ -148,7 +148,7 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
         <div className="space-y-6">
           {home.money && home.money.toCollect > 0 && (
             <section>
-              <SectionHead title="To collect" href="/app/money" link="See all" />
+              <SectionHead title="To collect" href="/app/money?view=due" link="See all" />
               <Card className="divide-y divide-line overflow-hidden">
                 <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-4">
                   <span className="font-display text-2xl font-extrabold tabular">{formatMoney(home.money.toCollect)}</span>
@@ -260,12 +260,12 @@ function Numbers({ home }: { home: HomeSummary }) {
           note: home.sales.monthBookedValue ? formatMoneyShort(home.sales.monthBookedValue) : undefined,
           noteTone: "brand",
         },
-        { label: `Received in ${month}`, value: formatMoneyShort(home.money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money" },
+        { label: `Received in ${month}`, value: formatMoneyShort(home.money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?view=payments&range=month" },
         {
           label: "To collect",
           value: formatMoneyShort(home.money.toCollect),
           icon: Wallet,
-          href: "/app/money",
+          href: "/app/money?view=due",
           tone: home.money.overdue > 0 ? "danger" : undefined,
           note: home.money.overdue > 0 ? `${formatMoneyShort(home.money.overdue)} late` : undefined,
         },
