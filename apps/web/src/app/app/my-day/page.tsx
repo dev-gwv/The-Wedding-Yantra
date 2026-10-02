@@ -1,6 +1,6 @@
 "use client";
 
-import { dayReportText, formatClock, formatDate, formatDueDay, whatsappLink } from "@wedding-yantra/core";
+import { can, dayReportText, formatClock, formatDate, formatDueDay, whatsappLink } from "@wedding-yantra/core";
 import { useMoveAnyTask, useMyDay, useSetTaskDone, useSnoozeAnyTask } from "@wedding-yantra/api-client/react";
 import type { MyDay, TaskItem } from "@wedding-yantra/types";
 import {
@@ -10,6 +10,8 @@ import {
   Check,
   ChevronDown,
   CirclePause,
+  Plus,
+  Send,
   Copy,
   Eye,
   ListChecks,
@@ -54,6 +56,8 @@ export default function MyDayPage() {
   const day = useMyDay(workspace.id);
   const [open, setOpen] = useState<TaskItem | null>(null);
   const [wrap, setWrap] = useState(false);
+  const [adding, setAdding] = useState<"mine" | "give" | null>(null);
+  const gives = can(workspace.role, "tasks.manage");
 
   if (day.isPending) return <Splash />;
   if (day.isError) return <Notice tone="danger">{errorMessage(day.error)}</Notice>;
@@ -74,9 +78,19 @@ export default function MyDayPage() {
           </>
         }
         action={
-          <Button variant="secondary" onClick={() => setWrap(true)}>
-            <Sunset className="size-4" /> Done for the day
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setAdding("mine")}>
+              <Plus className="size-4" strokeWidth={2.5} /> Add task
+            </Button>
+            {gives && (
+              <Button variant="secondary" onClick={() => setAdding("give")}>
+                <Send className="size-4" /> Give a task
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setWrap(true)}>
+              <Sunset className="size-4" /> Done for the day
+            </Button>
+          </div>
         }
       />
       <PushNudge />
@@ -157,6 +171,12 @@ export default function MyDayPage() {
       </div>
 
       <TaskSheet open={open !== null} onClose={() => setOpen(null)} task={open ?? undefined} />
+      <TaskSheet
+        open={adding !== null}
+        onClose={() => setAdding(null)}
+        title={adding === "give" ? "Give a task" : "Add a task for yourself"}
+        pickAssignee={adding === "give"}
+      />
       <DayWrap open={wrap} onClose={() => setWrap(false)} day={d} tomorrow={tomorrow} name={me.user.name} />
     </>
   );

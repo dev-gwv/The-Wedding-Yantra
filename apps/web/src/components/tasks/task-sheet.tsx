@@ -37,6 +37,8 @@ export function TaskSheet({
   taskId,
   eventId,
   assigneeId,
+  title,
+  pickAssignee = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +49,10 @@ export function TaskSheet({
   eventId?: string;
   /** Start a new task for this person (from the People board) */
   assigneeId?: string;
+  /** The sheet's title for a new task, e.g. "Give a task" */
+  title?: string;
+  /** Giving a task: start with no one chosen, so the person is picked on purpose */
+  pickAssignee?: boolean;
 }) {
   const id = task?.id ?? taskId;
   const [editing, setEditing] = useState<TaskItem | null>(null);
@@ -55,10 +61,10 @@ export function TaskSheet({
     onClose();
   };
   return (
-    <Sheet open={open} onClose={close} title={id ? (editing ? "Change task" : "Task") : "New task"}>
+    <Sheet open={open} onClose={close} title={id ? (editing ? "Change task" : "Task") : (title ?? "New task")}>
       {open && id && !editing && <TaskView taskId={id} initial={task} onEdit={setEditing} onClose={close} />}
       {open && (!id || editing) && (
-        <TaskForm task={editing ?? undefined} eventId={eventId} assigneeId={assigneeId} onDone={editing ? () => setEditing(null) : close} onRemoved={close} />
+        <TaskForm task={editing ?? undefined} eventId={eventId} assigneeId={pickAssignee ? "" : assigneeId} onDone={editing ? () => setEditing(null) : close} onRemoved={close} />
       )}
     </Sheet>
   );
@@ -147,6 +153,8 @@ function TaskForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    // Giving a task: someone must be chosen (or an event, for anyone on it).
+    if (manage && !task && !assigneeId && !forEvent) return setErrors({ assigneeId: "Choose who does it" });
     if (repeat !== "none") return submitRepeat();
     const forSomeoneElse = manage && !!assigneeId && assigneeId !== me.user.id;
     const payload = {
@@ -332,7 +340,15 @@ function TaskForm({
 
         {manage && editable && (
           <SelectField label="Who does it" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} error={errors.assigneeId}>
-            {(eventChosen || (task && !task.assignee)) && <option value="">Anyone on the event</option>}
+            {eventChosen || (task && !task.assignee) ? (
+              <option value="">Anyone on the event</option>
+            ) : (
+              !assigneeId && (
+                <option value="" disabled>
+                  Choose who does it
+                </option>
+              )
+            )}
             {members.length === 0 && assigneeId && <option value={assigneeId}>{task?.assignee?.name ?? me.user.name ?? "You"}</option>}
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>

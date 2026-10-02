@@ -4,7 +4,7 @@ import { can } from "@wedding-yantra/core";
 import { CalendarDays, ChevronDown, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { MONEY_SECTIONS, moneySectionOf } from "@/components/money/money-page";
 import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
 import { cn } from "@/lib/cn";
@@ -50,48 +50,37 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="block truncate text-xs text-ink-muted">{workspace.businessTypeName}</span>
           </span>
         </Link>
-        <nav className="flex flex-col gap-1" aria-label="Main">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            // On a computer, Master data has its own place in this menu, so More doesn't claim its pages.
-            const active = href === "/app/more" ? isActive(pathname, href) && !inMasterData(pathname) : isActive(pathname, href);
+        <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1" aria-label="Main">
+          {NAV.filter((n) => n.href !== "/app/more").map(({ href, label, icon: Icon }) => {
+            const active = isActive(pathname, href);
             if (href === "/app/money" && can(workspace.role, "finance.view"))
               return <NavGroup key={href} label={label} icon={Icon} href={href} sections={MONEY_SECTIONS} current={moneySectionOf(pathname)} active={active} />;
-            if (href === "/app/more") {
-              return (
-                <Fragment key={href}>
-                  <NavGroup
-                    label="Master data"
-                    icon={Database}
-                    href="/app/masters"
-                    sections={masterSections(workspace.role)}
-                    current={masterSectionOf(pathname)}
-                    active={inMasterData(pathname)}
-                  />
-                  <NavLink href={href} label={label} icon={Icon} active={active} />
-                </Fragment>
-              );
-            }
             return <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
           })}
-        </nav>
-        <div className="mt-4 flex flex-col gap-1 border-t border-line pt-4">
-          <Link
-            href="/app/my-day"
-            aria-current={pathname.startsWith("/app/my-day") ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-              pathname.startsWith("/app/my-day") ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
-            )}
-          >
-            <Sun className="size-[18px] shrink-0" strokeWidth={2} />
-            My day
-          </Link>
+          <NavGroup
+            label="Master data"
+            icon={Database}
+            href="/app/masters"
+            sections={masterSections(workspace.role)}
+            current={masterSectionOf(pathname)}
+            active={inMasterData(pathname)}
+          />
+          <NavLink href="/app/my-day" label="My day" icon={Sun} active={pathname.startsWith("/app/my-day")} />
           <AlertBell
             label
             className={cn(
               "rounded-2xl px-3 py-2.5 text-sm font-semibold",
-              pathname.startsWith("/app/notifications") ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+              pathname.startsWith("/app/notifications") ? "bg-gradient-primary text-on-brand shadow-warm" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
             )}
+          />
+        </nav>
+        {/* More sits at the foot of the menu; on a computer, Master data and My day no longer count as More. */}
+        <div className="mt-3 border-t border-line pt-3">
+          <NavLink
+            href="/app/more"
+            label="More"
+            icon={Menu}
+            active={isActive(pathname, "/app/more") && !inMasterData(pathname) && !pathname.startsWith("/app/my-day") && !pathname.startsWith("/app/notifications")}
           />
         </div>
       </aside>

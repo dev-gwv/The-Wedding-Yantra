@@ -35,7 +35,7 @@ export function PageHeader({
         <h1 className="font-display text-[clamp(28px,4vw,38px)] font-extrabold leading-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-[15px] text-ink-muted">{subtitle}</p>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="max-w-full shrink-0">{action}</div>}
     </header>
   );
 }

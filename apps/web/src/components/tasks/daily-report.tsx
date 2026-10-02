@@ -111,7 +111,7 @@ export function DailyReport() {
   );
   const board = usePeopleBoard(workspace.id, manages);
   const [open, setOpen] = useState<TaskItem | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"mine" | "give" | null>(null);
   const today = day.data?.today ?? board.data?.today ?? localISODate();
 
   // Mine: anything sent back to fix, then late, then due today.
@@ -168,7 +168,7 @@ export function DailyReport() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setAdding(true)}
+                onClick={() => setAdding("mine")}
               >
                 <Plus className="size-4" strokeWidth={2.5} /> Add task
               </Button>
@@ -236,7 +236,7 @@ export function DailyReport() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setAdding(true)}
+                  onClick={() => setAdding("give")}
                 >
                   <Send className="size-4" /> Give a task
                 </Button>
@@ -433,7 +433,12 @@ export function DailyReport() {
         onClose={() => setOpen(null)}
         task={open ?? undefined}
       />
-      <TaskSheet open={adding} onClose={() => setAdding(false)} />
+      <TaskSheet
+        open={adding !== null}
+        onClose={() => setAdding(null)}
+        title={adding === "give" ? "Give a task" : "Add a task for yourself"}
+        pickAssignee={adding === "give"}
+      />
     </section>
   );
 }
