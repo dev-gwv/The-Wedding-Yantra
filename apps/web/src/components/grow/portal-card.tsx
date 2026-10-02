@@ -1,6 +1,6 @@
 "use client";
 
-import { portalMessage, whatsappLink } from "@wedding-yantra/core";
+import { can, portalMessage, whatsappLink, type Access } from "@wedding-yantra/core";
 import { useSharePortal, useStopPortal } from "@wedding-yantra/api-client/react";
 import type { Client } from "@wedding-yantra/types";
 import { Copy, ExternalLink, Globe, MessageCircle } from "lucide-react";
@@ -13,9 +13,17 @@ import { errorMessage } from "@/lib/errors";
 import { portalUrl } from "@/lib/links";
 
 /**
+ * Who may share or stop a client's page: people who manage clients and see both money and
+ * quotes, since the page shows the client's invoices and quotes.
+ */
+export function canSharePortal(who: Access): boolean {
+  return can(who, "clients.manage") && can(who, "finance.view") && can(who, "quotes.view");
+}
+
+/**
  * The client's own page: their event dates, quotes, bills and payments, always current.
- * For people who manage clients and see money (it shows their invoices), who share it on
- * WhatsApp and can stop sharing it.
+ * For people who may share it (see canSharePortal), who send it on WhatsApp and can stop
+ * sharing it.
  */
 export function PortalCard({ client, business }: { client: Client; business: string }) {
   const { workspace } = useCurrentWorkspace();
@@ -24,6 +32,7 @@ export function PortalCard({ client, business }: { client: Client; business: str
   const toast = useToast();
   const [confirmStop, setConfirmStop] = useState(false);
   const url = client.portalToken && typeof window !== "undefined" ? portalUrl(client.portalToken) : null;
+  if (!canSharePortal(workspace)) return null;
 
   async function turnOn() {
     try {

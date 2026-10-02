@@ -74,7 +74,7 @@ export default function InvoiceSettingsPage() {
 // ---------------------------------------------------------------------------
 
 function LookCard({ workspace }: { workspace: Workspace }) {
-  const editable = can(workspace, "workspace.update");
+  const editable = can(workspace, "bills.manage");
   const update = useUpdateWorkspace(workspace.id);
   const accounts = useBankAccounts(workspace.id);
   const texts = useSavedTexts(workspace.id);
@@ -162,7 +162,7 @@ function LookCard({ workspace }: { workspace: Workspace }) {
               </label>
             </div>
           </fieldset>
-          {!editable && <p className="text-sm text-ink-muted">Only the owner or a manager can change the look.</p>}
+          {!editable && <p className="text-sm text-ink-muted">Ask the owner for the Payments &amp; invoices screen to change how invoices look.</p>}
         </div>
         <div className="min-w-0">
           <p className="mb-2 text-sm font-semibold">Preview</p>
@@ -578,7 +578,7 @@ function SavedTextForm({ text, kind, onDone }: { text?: SavedText; kind: SavedTe
 // ---------------------------------------------------------------------------
 
 function NumberingCard({ workspace }: { workspace: Workspace }) {
-  const editable = can(workspace, "workspace.update");
+  const editable = can(workspace, "bills.manage");
   const update = useUpdateWorkspace(workspace.id);
   const toast = useToast();
   const [prefix, setPrefix] = useState(workspace.billPrefix);
@@ -615,6 +615,7 @@ function NumberingCard({ workspace }: { workspace: Workspace }) {
           </Button>
         )}
       </form>
+      {!editable && <p className="mt-3 text-sm text-ink-muted">Ask the owner for the Payments &amp; invoices screen to change invoice numbers.</p>}
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatDate, formatMoney, localISODate } from "@wedding-yantra/core";
+import { can, formatDate, formatMoney, isOwnerOrManager, localISODate } from "@wedding-yantra/core";
 import {
   useApi,
   useCreateExpense,
@@ -56,8 +56,13 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   const { workspace, me } = useCurrentWorkspace();
   const approver = can(workspace, "expenses.approve");
   const mine = !expense || expense.submittedBy?.id === me.user.id;
-  // Approvers change anything; others their own until approved. The accountant only looks.
-  const editable = approver || (mine && can(workspace, "expenses.submit") && expense?.status !== "approved");
+  // Below manager, an approver's own expense (added or paid by them) is checked by someone else.
+  const belowManager = !isOwnerOrManager(workspace.role);
+  const ownSaved = belowManager && (mine || expense?.paidBy?.id === me.user.id);
+  // Approvers change anything but their own once it's approved; others their own until approved. The accountant only looks.
+  const editable = approver
+    ? !ownSaved || expense?.status !== "approved"
+    : mine && can(workspace, "expenses.submit") && expense?.status !== "approved";
   const create = useCreateExpense(workspace.id);
   const update = useUpdateExpense(workspace.id);
   const review = useReviewExpense(workspace.id);
@@ -80,6 +85,9 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   const [receipt, setReceipt] = useState<UploadedFile | null>(expense?.receipt ?? null);
   const [method, setMethod] = useState<string | null>(expense?.method ?? null);
   const [paidBy, setPaidBy] = useState(expense?.paidBy?.id ?? "");
+  // Choosing yourself as the one who paid makes it your own too.
+  const ownOne = ownSaved || (belowManager && paidBy === me.user.id);
+  const approvesThis = approver && !ownOne;
   const [vendorId, setVendorId] = useState(expense?.vendorId ?? "");
   const [gstOpen, setGstOpen] = useState(!!expense && (expense.gstAmount > 0 || !!expense.vendorInvoiceNo));
   const [gstRate, setGstRate] = useState<number | null>(expense?.gstRate ?? null);
@@ -125,10 +133,10 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
     try {
       if (expense) {
         await update.mutateAsync({ ...(fields as Omit<Parameters<typeof update.mutateAsync>[0], "id">), id: expense.id });
-        toast(expense.status === "rejected" && !approver ? "Sent for approval again" : "Expense saved");
+        toast(expense.status === "rejected" && !approvesThis ? "Sent for approval again" : "Expense saved");
       } else {
         await create.mutateAsync(fields as Parameters<typeof create.mutateAsync>[0]);
-        toast(approver ? "Expense added" : "Sent to the owner for approval");
+        toast(approvesThis ? "Expense added" : "Sent for approval");
       }
       onDone();
     } catch (err) {
@@ -190,7 +198,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
           {expense.submittedBy?.name ? ` · added by ${expense.submittedBy.name}` : ""}
         </Notice>
       )}
-      {expense && approver && expense.status === "pending" && !rejecting && (
+      {expense && approvesThis && expense.status === "pending" && !rejecting && (
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" size="lg" onClick={() => decide(true)} loading={review.isPending} className="text-success">
             Approve {formatMoney(expense.amount)}
@@ -214,14 +222,14 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
               </>
             )}
           </p>
-          {approver && (
+          {approvesThis && (
             <Button variant={expense.reimbursedAt ? "ghost" : "secondary"} size="sm" onClick={() => payBack(!expense.reimbursedAt)} loading={reimburse.isPending}>
               {expense.reimbursedAt ? "Undo" : "Mark paid back"}
             </Button>
           )}
         </div>
       )}
-      {rejecting && (
+      {rejecting && approvesThis && (
         <div className="space-y-3 rounded-2xl bg-cream p-4">
           <TextField label="Why? (they'll see this)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add the bill photo" />
           <Button variant="secondary" onClick={() => decide(false)} loading={review.isPending}>
@@ -398,7 +406,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
       {errors._ && <Notice tone="danger">{errors._}</Notice>}
       {editable && (
         <Button type="submit" size="lg" loading={create.isPending || update.isPending} disabled={upload.isPending}>
-          {expense ? (expense.status === "rejected" && !approver ? "Send again" : "Save") : approver ? "Add expense" : "Send for approval"}
+          {expense ? (expense.status === "rejected" && !approvesThis ? "Send again" : "Save") : approvesThis ? "Add expense" : "Send for approval"}
         </Button>
       )}
 

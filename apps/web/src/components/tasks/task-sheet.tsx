@@ -28,6 +28,7 @@ import { useBusinessDay } from "@/lib/today";
 import { canEditTask } from "./task-row";
 import { PriorityPicker } from "./task-bits";
 import { TaskView } from "./task-view";
+import { useRunsWorkOf } from "./use-runs-work";
 
 /** Add a task, or open one: see it in full, move it along, or change it. */
 export function TaskSheet({
@@ -85,7 +86,8 @@ function TaskForm({
 }) {
   const { workspace, me } = useCurrentWorkspace();
   const manage = can(workspace, "tasks.manage");
-  const editable = !task || canEditTask(task, workspace, me.user.id);
+  const runsWork = useRunsWorkOf();
+  const editable = !task || canEditTask(task, workspace, me.user.id, runsWork);
   const day = useBusinessDay();
   const today = day();
   const create = useCreateTask(workspace.id);
@@ -447,7 +449,7 @@ function TaskForm({
           <span className="flex-1">
             {task.repeat.active ? `Repeats: ${task.repeat.label.toLowerCase()}.` : `Stopped repeating (${task.repeat.label.toLowerCase()}).`}
           </span>
-          {task.repeat.active && (manage || task.assignee?.id === me.user.id || task.createdBy?.id === me.user.id) && (
+          {task.repeat.active && ((manage && runsWork(task.assignee?.id)) || task.assignee?.id === me.user.id || task.createdBy?.id === me.user.id) && (
             <Button
               variant="ghost"
               size="sm"

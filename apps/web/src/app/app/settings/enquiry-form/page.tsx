@@ -21,7 +21,7 @@ export default function EnquiryFormPage() {
   const toggle = useSetLeadFormEnabled(workspace.id);
   const toast = useToast();
   const [qr, setQr] = useState<string | null>(null);
-  const editable = can(workspace, "workspace.update");
+  const editable = can(workspace, "leads.view_all");
   const url = form.data ? `${typeof window === "undefined" ? "" : window.location.origin}/f/${form.data.slug}` : "";
 
   useEffect(() => {

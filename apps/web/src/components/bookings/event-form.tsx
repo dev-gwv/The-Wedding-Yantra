@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatDate } from "@wedding-yantra/core";
+import { can, formatDate, leadScope } from "@wedding-yantra/core";
 import { useClashes, useCreateEvent, useUpdateEvent, useVenues } from "@wedding-yantra/api-client/react";
 import {
   EVENT_LABELS,
@@ -56,6 +56,8 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
       : [{ key: key(), name: "Wedding", date: "", startTime: "", venue: "" }],
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // The booking value is money: for those with Payments & invoices, or who see every lead and quote.
+  const seesMoney = can(workspace, "finance.view") || (can(workspace, "quotes.view") && leadScope(workspace) === "all");
   const venueList = useVenues(workspace.id, can(workspace, "events.view"));
   const venueNames = (venueList.data ?? []).map((v) => v.name);
   const fields = useEntityFields("event");
@@ -68,7 +70,16 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
   async function submit(e: FormEvent) {
     e.preventDefault();
     const functions = fns.map((f) => ({ name: f.name, date: f.date, startTime: f.startTime, venue: f.venue }));
-    const common = { title, eventType: (eventType || null) as EventType | null, value, venue, city, notes, functions, custom: customPayload(fields, custom) };
+    const common = {
+      title,
+      eventType: (eventType || null) as EventType | null,
+      ...(seesMoney ? { value } : {}),
+      venue,
+      city,
+      notes,
+      functions,
+      custom: customPayload(fields, custom),
+    };
     const payload = event
       ? common
       : { ...common, ...(clientMode === "pick" ? { clientId } : { newClient: { name: newClient.name, phone: newClient.phone } }) };
@@ -136,7 +147,9 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
             </option>
           ))}
         </SelectField>
-        <TextField label="Booking value (₹)" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ""))} error={errors.value} />
+        {seesMoney && (
+          <TextField label="Booking value (₹)" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ""))} error={errors.value} />
+        )}
         <TextField
           label="Main venue"
           value={venue}

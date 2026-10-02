@@ -398,7 +398,9 @@ export async function setMemberAccess(
       const message = target.role === "owner" ? "The owner already sees everything" : "Freelancers see only the events they're booked on. Make them Staff to give them screens.";
       throw new AppError(400, "VALIDATION_ERROR", message, { extraAreas: message });
     }
-    const useless = extras.find((a) => areaGives(target.role, a).length === 0);
+    // Screens saved earlier stay saved (they come back if the role goes back up); new ones must be usable.
+    const saved = cleanAreas(target.extra_areas);
+    const useless = extras.find((a) => !saved.includes(a) && areaGives(target.role, a).length === 0);
     if (useless) {
       const message = `${AREA_INFO[useless].label} needs the ${ROLE_INFO[areaNeeds(useless)].label} role`;
       throw new AppError(400, "VALIDATION_ERROR", message, { extraAreas: message });

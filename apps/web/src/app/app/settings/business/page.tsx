@@ -88,7 +88,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     <form onSubmit={submit} noValidate>
       {!editable && (
         <div className="mb-4">
-          <Notice>Only the owner or a manager can change these details.</Notice>
+          <Notice>Ask the owner to add the Business settings screen for you.</Notice>
         </div>
       )}
       {editable && (!workspace.phone || !workspace.address) && (

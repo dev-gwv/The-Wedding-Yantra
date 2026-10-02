@@ -153,7 +153,12 @@ export function AccessCard({ employee: e, onChangeRole }: { employee: Employee; 
         )}
 
         {owner && hasScreens(e) && (
-          <ExtraScreens key={`${e.role}|${e.department}|${e.departmentOn}|${e.extraAreas.join()}`} employee={e} who={firstName(e.name) || "this person"} deptName={deptName} />
+          <ExtraScreens
+            key={`${e.role}|${e.department}|${e.departmentOn}|${e.savedExtraAreas.join()}`}
+            employee={e}
+            who={firstName(e.name) || "this person"}
+            deptName={deptName}
+          />
         )}
 
         {e.role !== "owner" && (
@@ -169,7 +174,7 @@ export function AccessCard({ employee: e, onChangeRole }: { employee: Employee; 
           <Notice>
             <div className="flex flex-wrap items-center gap-3">
               <span className="min-w-0 flex-1">
-                {e.name ?? first} is Staff in {deptName}. Make them a Manager so they can give tasks and run every lead?
+                {e.name ?? first} is Staff in {deptName}. Make them a Manager so they can give tasks{deptScreens.includes("leads") ? " and run every lead" : ""}?
               </span>
               <Button size="sm" variant="secondary" onClick={() => void makeManager()} loading={update.isPending}>
                 Make them a Manager
@@ -190,13 +195,17 @@ function ExtraScreens({ employee: e, who, deptName }: { employee: Employee; who:
   const { workspace } = useCurrentWorkspace();
   const save = useSaveMemberAccess(workspace.id, e.id);
   const toast = useToast();
-  const [extras, setExtras] = useState<Area[]>(e.extraAreas);
+  // Every extra the owner switched on, including ones unused for now (kept for when they count again).
+  const [extras, setExtras] = useState<Area[]>(e.savedExtraAreas);
   // On their role's usual access, the screens it gives are already theirs.
   const fromRole = e.accessSource === "role" ? areasOf([...ROLE_GRANTS[e.role]]) : [];
   const shown = AREAS.filter((a) => !e.departmentAreas.includes(a));
+  const base = e.accessSource === "department" && deptName ? deptName : "their role";
 
   async function toggle(area: Area, on: boolean) {
     const before = extras;
+    // The whole saved list with this one changed, so extras their department covers for now,
+    // or that their role can't use now, stay saved: they count again if things change.
     const next = cleanAreas(on ? [...extras, area] : extras.filter((a) => a !== area));
     setExtras(next);
     try {
@@ -212,7 +221,7 @@ function ExtraScreens({ employee: e, who, deptName }: { employee: Employee; who:
   return (
     <div>
       <p className="text-xs font-semibold text-ink-muted">Extra screens</p>
-      <p className="text-sm text-ink-muted">Switch on a screen for {who} only, on top of what {deptName ?? "their role"} gives.</p>
+      <p className="text-sm text-ink-muted">Switch on a screen for {who} only, on top of what {base} gives.</p>
       <div className="mt-2 divide-y divide-line rounded-2xl border border-line">
         {shown.map((a) => {
           const usable = areaGives(e.role, a).length > 0;

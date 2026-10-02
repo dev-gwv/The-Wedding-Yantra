@@ -1,6 +1,6 @@
 "use client";
 
-import { can, canManageMember, firstName, formatDate, formatMoney, formatPhone, ROLE_INFO, whatsappLink } from "@wedding-yantra/core";
+import { can, canManageMember, firstName, formatDate, formatMoney, formatPhone, ROLE_INFO, teamScope, whatsappLink } from "@wedding-yantra/core";
 import { useEmployee } from "@wedding-yantra/api-client/react";
 import { EMPLOYMENT_TYPE_LABELS, type Employee } from "@wedding-yantra/types";
 import { ListChecks, Lock, MessageCircle, Pencil, Phone, UserMinus } from "lucide-react";
@@ -40,6 +40,9 @@ export default function EmployeePage() {
   const e = employee.data;
   const editable = can(workspace, "members.hr");
   const manageable = !e.isYou && !e.leftAt && can(workspace, "members.manage") && canManageMember(workspace.role, e.role);
+  // A department's manager runs the work of the people in their department only.
+  const scope = teamScope(workspace);
+  const runsTheirWork = e.isYou || scope === "all" || (scope === "department" && !!workspace.department && e.department === workspace.department);
   const name = e.name ?? "New member";
 
   return (
@@ -73,7 +76,7 @@ export default function EmployeePage() {
               </a>
             </>
           )}
-          {!e.leftAt && (e.isYou || can(workspace, "tasks.manage")) && (
+          {!e.leftAt && runsTheirWork && (
             <Link href={`/app/tasks/people/${e.userId}`} className={buttonClass({ variant: "secondary" })}>
               <ListChecks className="size-4" /> Tasks and updates
             </Link>

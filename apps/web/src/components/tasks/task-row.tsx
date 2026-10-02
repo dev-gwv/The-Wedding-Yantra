@@ -1,6 +1,6 @@
 "use client";
 
-import { can, daysBetween, formatClock, formatDueDay, type Access } from "@wedding-yantra/core";
+import { can, daysBetween, formatClock, formatDueDay, teamScope, type Access } from "@wedding-yantra/core";
 import { useSetTaskDone } from "@wedding-yantra/api-client/react";
 import type { TaskItem } from "@wedding-yantra/types";
 import { Check, ListChecks, MessageSquare, Paperclip, Repeat, ShieldCheck } from "lucide-react";
@@ -11,20 +11,31 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
 import { PriorityMark, StatusPill } from "./task-bits";
+import { useRunsWorkOf, type RunsWorkOf } from "./use-runs-work";
 
-/** Whoever it's for or made it, owners and managers, or anyone on its event when it's for nobody. Same rule as the API. */
-export function canTick(task: TaskItem, role: Access, userId: string) {
-  return can(role, "tasks.manage") || task.assignee?.id === userId || task.createdBy?.id === userId || task.assignee === null;
+/**
+ * Whether this person runs a task as a manager: the owner and managers of the whole team run
+ * every task; a department's manager runs the tasks for their own people, and the ones they
+ * gave. Same rule as the API.
+ */
+export function managesTask(task: TaskItem, role: Access, userId: string, runsWork: RunsWorkOf) {
+  if (!can(role, "tasks.manage")) return false;
+  return teamScope(role) === "all" || task.createdBy?.id === userId || runsWork(task.assignee?.id);
 }
 
-/** Whoever gave it, or an owner or manager: they approve, send back and cancel. */
-export function isBoss(task: TaskItem, role: Access, userId: string) {
-  return can(role, "tasks.manage") || task.createdBy?.id === userId;
+/** Whoever it's for or made it, a manager who runs it, or anyone on its event when it's for nobody. Same rule as the API. */
+export function canTick(task: TaskItem, role: Access, userId: string, runsWork: RunsWorkOf) {
+  return managesTask(task, role, userId, runsWork) || task.assignee?.id === userId || task.createdBy?.id === userId || task.assignee === null;
 }
 
-/** Owners and managers change any task; everyone else the ones they added. */
-export function canEditTask(task: TaskItem, role: Access, userId: string) {
-  return can(role, "tasks.manage") || task.createdBy?.id === userId;
+/** Whoever gave it, or a manager who runs it: they approve, send back and cancel. */
+export function isBoss(task: TaskItem, role: Access, userId: string, runsWork: RunsWorkOf) {
+  return managesTask(task, role, userId, runsWork) || task.createdBy?.id === userId;
+}
+
+/** Managers change the tasks they run; everyone else the ones they added. */
+export function canEditTask(task: TaskItem, role: Access, userId: string, runsWork: RunsWorkOf) {
+  return managesTask(task, role, userId, runsWork) || task.createdBy?.id === userId;
 }
 
 /** One task: a big round tick on the left, what and when on the right. */
@@ -46,12 +57,13 @@ export function TaskRow({
   const { workspace, me } = useCurrentWorkspace();
   const setDone = useSetTaskDone(workspace.id);
   const toast = useToast();
+  const runsWork = useRunsWorkOf();
   // The tick shows at once; it stops overriding as soon as the refreshed task arrives.
   const [pending, setPending] = useState<{ done: boolean; was: boolean } | null>(null);
   const done = pending && pending.was === task.done ? pending.done : task.done;
-  const tickable = canTick(task, workspace, me.user.id) && task.status !== "cancelled";
+  const tickable = canTick(task, workspace, me.user.id, runsWork) && task.status !== "cancelled";
   // A task that needs a check is handed in, not ticked: the tick opens it.
-  const handIn = task.needsCheck && !isBoss(task, workspace, me.user.id) && task.status !== "done";
+  const handIn = task.needsCheck && !isBoss(task, workspace, me.user.id, runsWork) && task.status !== "done";
 
   async function toggle() {
     if (handIn || task.status === "review") return onOpen?.(task);

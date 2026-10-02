@@ -19,7 +19,7 @@ type Access = {
   departmentLabel: string | null;
   departmentOn: boolean;
 };
-type Member = Access & { id: string; userId: string; name: string | null; extraAreas: string[]; departmentAreas: string[] };
+type Member = Access & { id: string; userId: string; name: string | null; extraAreas: string[]; departmentAreas: string[]; savedExtraAreas: string[] };
 type Person = { token: string; id: string; userId: string };
 type Invitation = { id: string; department: string | null; departmentLabel: string | null };
 type Item = { id: string; name: string; unit: string; price: number };
@@ -447,6 +447,23 @@ describe("what the review found", () => {
     const { rows } = await t.db.query<{ id: string }>(`SELECT id FROM task_comments WHERE task_id = $1`, [onEvent.body.data.id]);
     expect((await get(b, mona.token, `/tasks/${onEvent.body.data.id}`)).status).toBe(200);
     expect((await call(t.app, "DELETE", `/workspaces/${ws}/tasks/${onEvent.body.data.id}/comments/${rows[0]!.id}`, { token: mona.token })).status).toBe(403);
+  });
+
+  it("keeps a saved extra screen when the role goes down, so it comes back when the role goes up", async () => {
+    const b = await business("954");
+    const { owner, ws, mona } = b;
+    await b.access(mona, { department: "sales", extraAreas: ["team"] });
+    const role = (to: string) => call(t.app, "PATCH", `/workspaces/${ws}/members/${mona.id}`, { token: owner, body: { role: to } });
+    expect((await role("staff")).status).toBe(200);
+    // The owner switches on Payments; Team stays saved though Staff can't use it.
+    const saved = await b.access(mona, { extraAreas: ["team", "money"] });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.savedExtraAreas).toEqual(["money", "team"]);
+    expect(saved.body.data.extraAreas).toEqual(["money"]);
+    // A new screen the role can't use is still refused.
+    expect((await b.access(mona, { extraAreas: ["team", "money", "settings"] })).status).toBe(400);
+    expect((await role("manager")).status).toBe(200);
+    expect((await b.me(mona.token)).permissions).toContain("members.invite");
   });
 
   it("treats a blank department as none, keeps a hidden department on a re-sent invite, and leaves the UPI ID with the business profile", async () => {

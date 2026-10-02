@@ -3,12 +3,12 @@
 import { can, leadScope } from "@wedding-yantra/core";
 import { useLeads, useSaveStages } from "@wedding-yantra/api-client/react";
 import { saveStagesInput, type PipelineStage, type StageKind } from "@wedding-yantra/types";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Lock, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
-import { Card, Notice, PageHeader, Pill } from "@/components/ui/misc";
+import { Card, EmptyState, Notice, PageHeader, Pill } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage, validate } from "@/lib/errors";
@@ -26,12 +26,20 @@ const toRows = (stages: PipelineStage[]): Row[] =>
 
 export default function StagesPage() {
   const { workspace } = useCurrentWorkspace();
-  const leads = useLeads(workspace.id, {}, leadScope(workspace) !== "none");
+  const seesLeads = leadScope(workspace) !== "none";
+  const leads = useLeads(workspace.id, {}, seesLeads);
   return (
     <>
       <BackLink href="/app/more" label="More" />
       <PageHeader title="Sales stages" subtitle="The steps every lead moves through, from first enquiry to booked." />
-      {leads.isPending && (
+      {!seesLeads && (
+        <Card>
+          <EmptyState icon={Lock} title="Leads aren't on your screens">
+            Ask the owner to add Leads & follow-ups for you.
+          </EmptyState>
+        </Card>
+      )}
+      {seesLeads && leads.isPending && (
         <div className="flex justify-center py-16 text-brand">
           <Spinner />
         </div>
@@ -46,7 +54,7 @@ function StagesEditor({ stages }: { stages: PipelineStage[] }) {
   const { workspace } = useCurrentWorkspace();
   const save = useSaveStages(workspace.id);
   const toast = useToast();
-  const editable = can(workspace, "workspace.update");
+  const editable = can(workspace, "leads.view_all");
   const [rows, setRows] = useState<Row[]>(() => toRows(stages));
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +136,7 @@ function StagesEditor({ stages }: { stages: PipelineStage[] }) {
           </Button>
         </>
       ) : (
-        <Notice>Only the owner or a manager can change stages.</Notice>
+        <Notice>Only the owner, and managers with Leads &amp; follow-ups, change the stages.</Notice>
       )}
     </div>
   );

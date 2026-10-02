@@ -12,7 +12,7 @@ import { CustomFieldList } from "@/components/app/custom-fields";
 import { useOptionList } from "@/components/app/option-picker";
 import { EventCard } from "@/components/bookings/event-card";
 import { QuoteRow } from "@/components/bookings/quote-row";
-import { PortalCard } from "@/components/grow/portal-card";
+import { canSharePortal, PortalCard } from "@/components/grow/portal-card";
 import { BillRow } from "@/components/money/rows";
 import { ClientFormSheet } from "@/components/sales/client-form-sheet";
 import { LeadCard } from "@/components/sales/lead-card";
@@ -95,8 +95,8 @@ export default function ClientPage() {
 
           <MasterDetails client={c} />
 
-          {/* The client's page shows their invoices, so sharing it needs Payments & invoices too. */}
-          {can(workspace, "clients.manage") && can(workspace, "finance.view") && <PortalCard client={c} business={workspace.name} />}
+          {/* The client's page shows their invoices and quotes, so sharing it needs Payments & invoices and Quotes too. */}
+          {canSharePortal(workspace) && <PortalCard client={c} business={workspace.name} />}
 
           {events.data && events.data.length > 0 && (
             <section>

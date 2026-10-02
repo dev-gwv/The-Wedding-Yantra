@@ -2,6 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "@wedding-yantra/api-client/react";
+import { ROLE_GRANTS } from "@wedding-yantra/core";
+import type { WorkspaceSummary } from "@wedding-yantra/types";
 import { CloudOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, type ReactNode } from "react";
@@ -14,8 +16,24 @@ import { Splash } from "@/components/ui/spinner";
 import { errorMessage } from "@/lib/errors";
 import { ACCESS_KEY, CACHE_KEY, setWorkspaceId, useWorkspaceId } from "@/lib/session";
 
-/** What each business let this person do when this device last looked, to notice a screen taken away. */
+/**
+ * An older API (during a deploy) sends no access details: the person keeps their role's
+ * usual grants, so screens don't break and nothing looks taken away.
+ */
+function withAccess(w: WorkspaceSummary): WorkspaceSummary {
+  const sent: Partial<WorkspaceSummary> = w;
+  return {
+    ...w,
+    permissions: sent.permissions ?? [...(ROLE_GRANTS[w.role] ?? [])],
+    areas: sent.areas ?? [],
+    accessSource: sent.accessSource ?? "role",
+    department: sent.department ?? null,
+    departmentLabel: sent.departmentLabel ?? null,
+    departmentOn: sent.departmentOn ?? false,
+  };
+}
 
+/** What each business let this person do when this device last looked, to notice a screen taken away. */
 function savedAccess(): Record<string, string[]> {
   try {
     const saved: unknown = JSON.parse(window.localStorage.getItem(ACCESS_KEY) ?? "{}");
@@ -31,7 +49,9 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const workspaces = me.data?.workspaces;
+  const sentWorkspaces = me.data?.workspaces;
+  const workspaces = useMemo(() => sentWorkspaces?.map(withAccess), [sentWorkspaces]);
+  const meData = useMemo(() => (me.data && workspaces ? { ...me.data, workspaces } : undefined), [me.data, workspaces]);
 
   // An alert tapped on the phone names its business (?ws=): open that one.
   useEffect(() => {
@@ -86,7 +106,7 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
       </EmptyState>
     );
   }
-  if (!me.data || !workspace) return <Splash />;
+  if (!meData || !workspace) return <Splash />;
 
   const switchTo = (id: string) => {
     setWorkspaceId(id);
@@ -95,7 +115,7 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
   };
 
   return (
-    <WorkspaceContext.Provider value={{ me: me.data, workspace, switchTo }}>
+    <WorkspaceContext.Provider value={{ me: meData, workspace, switchTo }}>
       <AppShell>{children}</AppShell>
     </WorkspaceContext.Provider>
   );

@@ -139,7 +139,7 @@ function LeadView({ lead }: { lead: Lead }) {
           <FollowUpBadge at={lead.nextFollowUpAt} state={lead.followUpState} />
           {lead.stageKind === "won" && <Pill tone="success">Booked</Pill>}
           {lead.stageKind === "lost" && lead.lostReason && <Pill>Lost · {LOST_LABELS[lead.lostReason]}</Pill>}
-          {lead.clientId && (
+          {lead.clientId && can(workspace, "clients.view") && (
             <Link href={`/app/clients/${lead.clientId}`} className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
               <UserRoundCheck className="size-3.5" /> View client
             </Link>

@@ -1,14 +1,16 @@
 "use client";
 
-import { can } from "@wedding-yantra/core";
+import { can, leadScope } from "@wedding-yantra/core";
 import { useClient, useLead } from "@wedding-yantra/api-client/react";
 import { EVENT_LABELS } from "@wedding-yantra/types";
+import { FileText } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { QuoteEditor } from "@/components/bookings/quote-editor";
-import { Notice, PageHeader } from "@/components/ui/misc";
+import { ButtonLink } from "@/components/ui/button";
+import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 
@@ -23,7 +25,35 @@ function NewQuote() {
   const client = useClient(workspace.id, clientId ?? "");
 
   if (!can(workspace, "quotes.manage")) return <Notice>Making quotes isn&apos;t on your screens. Ask the owner if you need it.</Notice>;
-  if (!leadId && !clientId) return <Notice tone="danger">Open a lead or client first, then make a quote from there.</Notice>;
+  if (!leadId && !clientId) {
+    const seesLeads = leadScope(workspace) !== "none";
+    const seesClients = can(workspace, "clients.view");
+    return (
+      <>
+        <PageHeader title="New quote" />
+        <Card>
+          <EmptyState
+            icon={FileText}
+            title="Choose who the quote is for"
+            action={
+              (seesLeads || seesClients) && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {seesLeads && <ButtonLink href="/app/leads">Open a lead</ButtonLink>}
+                  {seesClients && (
+                    <ButtonLink href="/app/clients" variant={seesLeads ? "secondary" : undefined}>
+                      Open a client
+                    </ButtonLink>
+                  )}
+                </div>
+              )
+            }
+          >
+            Open the lead or client, then tap Make a quote.
+          </EmptyState>
+        </Card>
+      </>
+    );
+  }
   const loading = (leadId && lead.isPending) || (clientId && !leadId && client.isPending);
   if (loading) return <Splash />;
 

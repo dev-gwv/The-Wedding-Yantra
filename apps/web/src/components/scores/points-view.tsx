@@ -26,6 +26,9 @@ function bandTone(board: Leaderboard, band: string) {
 
 const first = (name: string | null) => name?.split(/\s+/)[0] ?? "Team member";
 
+/** Whose points the viewer may open: their own, and the people whose work they run. */
+const opens = (r: LeaderboardRow, myId: string) => r.canOpen || r.user.id === myId;
+
 export function PointsView({ month, current }: { month: string; current: boolean }) {
   const { workspace, me } = useCurrentWorkspace();
   const board = useLeaderboard(workspace.id, month);
@@ -43,7 +46,7 @@ export function PointsView({ month, current }: { month: string; current: boolean
   const b = board.data;
   const ranked = b.rows.filter((r) => r.rank !== null);
   const unranked = b.rows.filter((r) => r.rank === null);
-  const open = (r: LeaderboardRow) => (manager || r.user.id === me.user.id ? setPerson(r) : undefined);
+  const open = (r: LeaderboardRow) => (opens(r, me.user.id) ? setPerson(r) : undefined);
 
   return (
     <div className="space-y-6">
@@ -58,7 +61,7 @@ export function PointsView({ month, current }: { month: string; current: boolean
         </Card>
       ) : (
         <>
-          {ranked.length >= 2 && <Podium board={b} onOpen={open} />}
+          {ranked.length >= 2 && <Podium board={b} myId={me.user.id} onOpen={open} />}
           <Card className="overflow-hidden">
             <ul className="divide-y divide-line">
               {ranked.map((r) => (
@@ -66,7 +69,12 @@ export function PointsView({ month, current }: { month: string; current: boolean
                   <button
                     type="button"
                     onClick={() => open(r)}
-                    className={cn("flex w-full items-center gap-3 px-4 py-3 text-left sm:px-5", (manager || r.user.id === me.user.id) && "hover:bg-cream", r.user.id === me.user.id && "bg-sun-50/60")}
+                    disabled={!opens(r, me.user.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-3 text-left disabled:cursor-default sm:px-5",
+                      opens(r, me.user.id) && "hover:bg-cream",
+                      r.user.id === me.user.id && "bg-sun-50/60",
+                    )}
                   >
                     <span className="w-7 shrink-0 text-center font-display text-lg font-extrabold text-ink-muted tabular">{r.rank}</span>
                     <Avatar name={r.user.name} className="size-9 text-xs" />
@@ -155,7 +163,7 @@ function MyCard({ board, onOpen }: { board: Leaderboard; onOpen: () => void }) {
   );
 }
 
-function Podium({ board, onOpen }: { board: Leaderboard; onOpen: (r: LeaderboardRow) => void }) {
+function Podium({ board, myId, onOpen }: { board: Leaderboard; myId: string; onOpen: (r: LeaderboardRow) => void }) {
   const top = board.rows.filter((r) => r.rank !== null).slice(0, 3);
   // Second, first, third: the winner in the middle.
   const order = [top[1], top[0], top[2]].filter(Boolean) as LeaderboardRow[];
@@ -172,7 +180,13 @@ function Podium({ board, onOpen }: { board: Leaderboard; onOpen: (r: Leaderboard
           const s = style(r);
           const Icon = s.icon;
           return (
-            <button key={r.user.id} type="button" onClick={() => onOpen(r)} className="flex w-full max-w-[9.5rem] flex-col items-center text-center">
+            <button
+              key={r.user.id}
+              type="button"
+              onClick={() => onOpen(r)}
+              disabled={!opens(r, myId)}
+              className="flex w-full max-w-[9.5rem] flex-col items-center text-center disabled:cursor-default"
+            >
               <Icon className={cn("mb-1 size-5", r === top[0] ? "text-brand" : "text-ink-muted")} />
               <Avatar name={r.user.name} className={cn("text-xs", r === top[0] ? "size-14" : "size-11")} />
               <span className="mt-1.5 w-full truncate text-sm font-bold">{first(r.user.name)}</span>
@@ -236,7 +250,8 @@ function LedgerSheet({ person, month, onClose }: { person: LeaderboardRow | null
   const toast = useToast();
   const [note, setNote] = useState("");
   const [giving, setGiving] = useState(false);
-  const canRecognise = can(workspace, "team.review") && !mine;
+  // Only the people whose work they run.
+  const canRecognise = can(workspace, "team.review") && !mine && !!person?.canOpen;
 
   function close() {
     setNote("");

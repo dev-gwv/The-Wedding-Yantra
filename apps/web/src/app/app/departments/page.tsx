@@ -25,6 +25,26 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 
+/** Who the owner said "Not now" to, about moving them to Accountant. Kept on this device. */
+const notNowKey = (workspaceId: string) => `wy.move-accountant-dismissed.${workspaceId}`;
+
+function readNotNow(workspaceId: string): string[] {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(notNowKey(workspaceId)) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveNotNow(workspaceId: string, ids: string[]) {
+  try {
+    window.localStorage.setItem(notNowKey(workspaceId), JSON.stringify(ids));
+  } catch {
+    // Storage blocked: it's hidden until the page is opened again.
+  }
+}
+
 /**
  * How the team is organised: each department with its screens and the people in it. A
  * department decides which screens its people see; their role decides how much they can do
@@ -42,7 +62,7 @@ export default function DepartmentsPage() {
   const [name, setName] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [choosing, setChoosing] = useState<string | null>(null);
-  const [notNow, setNotNow] = useState<string[]>([]);
+  const [notNow, setNotNow] = useState<string[]>(() => readNotNow(workspace.id));
 
   if (!sees) {
     return (
@@ -74,6 +94,12 @@ export default function DepartmentsPage() {
   const waiting = owner ? members.filter(onUsualAccess) : [];
   const accountantDept = all.find((o) => o.key === "accountant" && !o.archived);
   const viewOnly = owner && accountantDept ? members.filter((m) => m.role === "accountant" && !notNow.includes(m.id)) : [];
+
+  function dismiss(memberId: string) {
+    const next = [...notNow.filter((id) => id !== memberId), memberId];
+    setNotNow(next);
+    saveNotNow(workspace.id, next);
+  }
 
   async function addIt(e: FormEvent) {
     e.preventDefault();
@@ -127,7 +153,7 @@ export default function DepartmentsPage() {
         <>
           {waiting.length > 0 && <TurnOnCard people={waiting} areasOf={areasOf} />}
           {accountantDept &&
-            viewOnly.map((m) => <MoveToAccountant key={m.id} member={m} department={accountantDept} onNotNow={() => setNotNow((ids) => [...ids, m.id])} />)}
+            viewOnly.map((m) => <MoveToAccountant key={m.id} member={m} department={accountantDept} onNotNow={() => dismiss(m.id)} />)}
 
           <div className="grid gap-4 md:grid-cols-2">
             {live.map(card)}
