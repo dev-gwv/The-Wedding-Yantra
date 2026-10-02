@@ -45,12 +45,12 @@ export const AREA_INFO: Record<Area, AreaInfo> = {
   },
   team: {
     label: "Team",
-    opens: "Inviting people, changing roles, and running everyone's tasks. For managers.",
+    opens: "Inviting people, changing roles, and running everyone's tasks.",
     permissions: ["members.invite", "members.manage"],
   },
   settings: {
     label: "Business settings",
-    opens: "The business profile, your lists, your own fields and points rules. For managers.",
+    opens: "The business profile, your lists, your own fields and points rules.",
     permissions: ["workspace.update"],
   },
 };

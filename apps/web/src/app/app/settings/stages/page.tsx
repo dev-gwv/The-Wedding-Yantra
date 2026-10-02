@@ -1,6 +1,6 @@
 "use client";
 
-import { can } from "@wedding-yantra/core";
+import { can, leadScope } from "@wedding-yantra/core";
 import { useLeads, useSaveStages } from "@wedding-yantra/api-client/react";
 import { saveStagesInput, type PipelineStage, type StageKind } from "@wedding-yantra/types";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
@@ -26,7 +26,7 @@ const toRows = (stages: PipelineStage[]): Row[] =>
 
 export default function StagesPage() {
   const { workspace } = useCurrentWorkspace();
-  const leads = useLeads(workspace.id);
+  const leads = useLeads(workspace.id, {}, leadScope(workspace) !== "none");
   return (
     <>
       <BackLink href="/app/more" label="More" />

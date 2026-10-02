@@ -430,11 +430,12 @@ function useSalesMutation<TInput, TResult>(workspaceId: string, fn: (input: TInp
   });
 }
 
-export function useLeads(workspaceId: string, query: LeadListQuery = {}) {
+export function useLeads(workspaceId: string, query: LeadListQuery = {}, enabled = true) {
   const api = useApi();
   return useQuery({
     queryKey: queryKeys.leads(workspaceId, query),
     queryFn: () => api.leads.list(workspaceId, query),
+    enabled,
   });
 }
 

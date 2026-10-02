@@ -1,4 +1,4 @@
-import { AREA_INFO, AREAS, ROLE_INFO, ROLES, TRIAL_DAYS } from "@wedding-yantra/core";
+import { AREA_INFO, areaNeeds, AREAS, ROLE_INFO, ROLES, TRIAL_DAYS } from "@wedding-yantra/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/site-header";
@@ -221,7 +221,10 @@ export default function HelpPage() {
               {AREAS.map((area) => (
                 <div key={area} className="flex flex-col gap-0.5 py-3 sm:flex-row sm:gap-4">
                   <dt className="w-32 shrink-0 font-bold">{AREA_INFO[area].label}</dt>
-                  <dd className="text-ink-muted">{AREA_INFO[area].opens}</dd>
+                  <dd className="text-ink-muted">
+                    {AREA_INFO[area].opens}
+                    {areaNeeds(area) === "manager" && " For managers."}
+                  </dd>
                 </div>
               ))}
             </dl>

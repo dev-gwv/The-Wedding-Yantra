@@ -26,7 +26,7 @@ function LeadsScreen() {
   const view: View = params.get("view") === "pipeline" ? "pipeline" : "follow-ups";
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search.trim());
-  const leads = useLeads(workspace.id, q ? { q } : {});
+  const leads = useLeads(workspace.id, q ? { q } : {}, leadScope(workspace) !== "none");
   const [adding, setAdding] = useState(false);
 
   const setParam = (key: string, value: string | null) => {
