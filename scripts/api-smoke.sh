@@ -111,8 +111,10 @@ BILL="$(api POST "/api/v1/workspaces/$WS_ID/bills" \
 expect "the bill is numbered for the financial year and rounded to the rupee" \
   '.success and (.data.number | test("^INV/[0-9]{2}-[0-9]{2}/0001$")) and .data.total == 25000 and .data.due == 25000' "$BILL"
 BILL_ID="$(echo "$BILL" | jq -r '.data.id')"
+# Money in and out on the bill's own date, so the monthly report below finds all three in one month.
+BILL_DATE="$(echo "$BILL" | jq -r '.data.issueDate')"
 expect "money received is recorded against the bill" '.success and .data.number == "R-0001"' \
-  "$(api POST "/api/v1/workspaces/$WS_ID/payments" "{\"billId\":\"$BILL_ID\",\"amount\":25000,\"paidOn\":\"2026-09-25\",\"method\":\"upi\"}" "$TOKEN")"
+  "$(api POST "/api/v1/workspaces/$WS_ID/payments" "{\"billId\":\"$BILL_ID\",\"amount\":25000,\"paidOn\":\"$BILL_DATE\",\"method\":\"upi\"}" "$TOKEN")"
 expect "a fully paid bill leaves nothing to collect" '.success and .data.toCollect == 0' \
   "$(api GET "/api/v1/workspaces/$WS_ID/money" "" "$TOKEN")"
 # A tiny JPEG: the upload folder must be writable and files must come back byte for byte.
@@ -123,7 +125,7 @@ PHOTO_PATH="$(echo "$PHOTO" | jq -r '.data.path')"
 [ "$(curl -fsS "$BASE$PHOTO_PATH" | base64 | tr -d '\n')" = "$PHOTO_B64" ] || die "the uploaded photo did not come back intact"
 echo "  ok: the photo is served back through its signed link"
 EXPENSE="$(api POST "/api/v1/workspaces/$WS_ID/expenses" \
-  "{\"eventId\":\"$EVENT_ID\",\"category\":\"materials\",\"amount\":5000,\"spentOn\":\"2026-09-25\",\"receiptFileId\":\"$(echo "$PHOTO" | jq -r '.data.id')\"}" "$TOKEN")"
+  "{\"eventId\":\"$EVENT_ID\",\"category\":\"materials\",\"amount\":5000,\"spentOn\":\"$BILL_DATE\",\"receiptFileId\":\"$(echo "$PHOTO" | jq -r '.data.id')\"}" "$TOKEN")"
 expect "an owner's expense counts straight away" '.success and .data.status == "approved" and .data.receipt != null' "$EXPENSE"
 expect "profit on the event is revenue before GST minus expenses" '.success and .data.spent == 5000 and .data.profit == 20000' \
   "$(api GET "/api/v1/workspaces/$WS_ID/events/$EVENT_ID/money" "" "$TOKEN")"
