@@ -26,7 +26,7 @@ export default function EmployeePage() {
   const employee = useEmployee(workspace.id, id);
   const [editing, setEditing] = useState(false);
   const [managing, setManaging] = useState<null | "role" | "remove">(null);
-  const back = can(workspace.role, "members.view") ? <BackLink href="/app/team" label="Employees" /> : <BackLink href="/app/more" label="More" />;
+  const back = can(workspace, "members.view") ? <BackLink href="/app/team" label="Employees" /> : <BackLink href="/app/more" label="More" />;
 
   if (employee.isPending) return <Splash />;
   if (employee.isError)
@@ -37,8 +37,8 @@ export default function EmployeePage() {
       </>
     );
   const e = employee.data;
-  const editable = can(workspace.role, "members.hr");
-  const manageable = !e.isYou && !e.leftAt && can(workspace.role, "members.manage") && canManageMember(workspace.role, e.role);
+  const editable = can(workspace, "members.hr");
+  const manageable = !e.isYou && !e.leftAt && can(workspace, "members.manage") && canManageMember(workspace.role, e.role);
   const name = e.name ?? "New member";
 
   return (
@@ -72,7 +72,7 @@ export default function EmployeePage() {
               </a>
             </>
           )}
-          {!e.leftAt && (e.isYou || can(workspace.role, "tasks.manage")) && (
+          {!e.leftAt && (e.isYou || can(workspace, "tasks.manage")) && (
             <Link href={`/app/tasks/people/${e.userId}`} className={buttonClass({ variant: "secondary" })}>
               <ListChecks className="size-4" /> Tasks and updates
             </Link>

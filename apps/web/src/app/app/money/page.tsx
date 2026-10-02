@@ -25,7 +25,7 @@ function TransactionsScreen() {
   const { workspace } = useCurrentWorkspace();
   const params = useSearchParams();
   const router = useRouter();
-  const allowed = can(workspace.role, "finance.view");
+  const allowed = can(workspace, "finance.view");
   const [range, setRange] = useMoneyRange();
   const [recording, setRecording] = useState(false);
   const overview = useMoneyOverview(workspace.id, allowed);
@@ -47,7 +47,7 @@ function TransactionsScreen() {
         section="transactions"
         dates={{ range, onChange: setRange }}
         action={
-          can(workspace.role, "payments.record") ? (
+          can(workspace, "payments.record") ? (
             <Button onClick={() => setRecording(true)}>
               <Plus className="size-4" strokeWidth={2.5} /> Record payment
             </Button>

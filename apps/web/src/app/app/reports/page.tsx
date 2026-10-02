@@ -23,7 +23,7 @@ const money = (n: number) => formatMoney(n, { paise: n % 1 !== 0 });
 /** A month of the business in plain numbers, and the spreadsheets the CA asks for. */
 export default function ReportsPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "finance.view");
+  const allowed = can(workspace, "finance.view");
   const [month, setMonth] = useState(() => monthOf(new Date()));
   const report = useMonthReport(workspace.id, month, allowed);
 

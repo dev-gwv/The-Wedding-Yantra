@@ -36,7 +36,7 @@ export function TasksScreen({ tab: page }: { tab: Tab }) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const manage = can(workspace.role, "tasks.manage");
+  const manage = can(workspace, "tasks.manage");
   const asked = params.get("view");
   // Old links (?view=team) go to their own page now.
   const moved = page === "mine" && manage && (asked === "team" || asked === "given") ? asked : null;
@@ -53,7 +53,7 @@ export function TasksScreen({ tab: page }: { tab: Tab }) {
   }, [moved, params, router]);
   if (moved) return <Splash />;
 
-  if (!can(workspace.role, "tasks.work")) {
+  if (!can(workspace, "tasks.work")) {
     return (
       <>
         <BackLink href="/app/more" label="More" />
@@ -383,7 +383,7 @@ function TeamTasks({ params, setParams, onOpen, onAddFor }: { params: Params; se
 /** Rules that make a task on each of their days. */
 function Repeats({ scope, today }: { scope: "mine" | "team"; today: string }) {
   const { workspace, me } = useCurrentWorkspace();
-  const manage = can(workspace.role, "tasks.manage");
+  const manage = can(workspace, "tasks.manage");
   const rules = useTaskRepeats(workspace.id, scope);
   const stop = useStopTaskRepeat(workspace.id);
   const toast = useToast();

@@ -20,7 +20,7 @@ export default function VenuePage() {
   const { id } = useParams<{ id: string }>();
   const { workspace } = useCurrentWorkspace();
   const venue = useVenue(workspace.id, id);
-  const manage = can(workspace.role, "events.manage");
+  const manage = can(workspace, "events.manage");
   const update = useUpdateVenue(workspace.id);
   const toast = useToast();
   const [editing, setEditing] = useState(false);

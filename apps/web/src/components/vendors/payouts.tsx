@@ -46,8 +46,8 @@ export function PayoutRow({ p, show, onOpen, onPay }: { p: Payout; show: "all" |
 /** What this event owes vendors and helpers. Paid ones are already in its expenses. */
 export function EventPayouts({ eventId, cancelled }: { eventId: string; cancelled: boolean }) {
   const { workspace } = useCurrentWorkspace();
-  const sees = can(workspace.role, "finance.view");
-  const manage = can(workspace.role, "expenses.approve");
+  const sees = can(workspace, "finance.view");
+  const manage = can(workspace, "expenses.approve");
   const list = usePayouts(workspace.id, { eventId }, sees);
   const [sheet, setSheet] = useState<{ p?: Payout } | null>(null);
   const [paying, setPaying] = useState<Payout | null>(null);

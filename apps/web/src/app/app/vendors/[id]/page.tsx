@@ -20,7 +20,7 @@ export default function VendorPage() {
   const { id } = useParams<{ id: string }>();
   const { workspace } = useCurrentWorkspace();
   const vendor = useVendor(workspace.id, id);
-  const manage = can(workspace.role, "expenses.approve");
+  const manage = can(workspace, "expenses.approve");
   const update = useUpdateVendor(workspace.id);
   const toast = useToast();
   const [editing, setEditing] = useState(false);

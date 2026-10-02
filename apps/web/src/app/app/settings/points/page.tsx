@@ -30,7 +30,7 @@ export default function PointSettingsPage() {
 
 function Form({ initial }: { initial: PointSettings }) {
   const { workspace } = useCurrentWorkspace();
-  const owner = can(workspace.role, "workspace.update");
+  const owner = can(workspace, "workspace.update");
   const save = useSavePointRules(workspace.id);
   const toast = useToast();
   const [rules, setRules] = useState(initial.rules.map((r) => ({ ...r, text: String(r.points) })));

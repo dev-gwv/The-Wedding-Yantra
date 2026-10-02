@@ -21,7 +21,7 @@ export default function EnquiryFormPage() {
   const toggle = useSetLeadFormEnabled(workspace.id);
   const toast = useToast();
   const [qr, setQr] = useState<string | null>(null);
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const url = form.data ? `${typeof window === "undefined" ? "" : window.location.origin}/f/${form.data.slug}` : "";
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function EnquiryFormPage() {
             </div>
           </Card>
 
-          {can(workspace.role, "leads.view_all") && (
+          {can(workspace, "leads.view_all") && (
             <Link href="/app/partners" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
               <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand">
                 <Handshake className="size-5" />

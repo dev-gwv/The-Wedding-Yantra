@@ -30,8 +30,8 @@ export function ExpensesView({
   range: sharedRange,
 }: { adding?: boolean; onAddingChange?: (adding: boolean) => void; range?: DateRange } = {}) {
   const { workspace } = useCurrentWorkspace();
-  const seesAll = can(workspace.role, "finance.view");
-  const canAdd = can(workspace.role, "expenses.submit");
+  const seesAll = can(workspace, "finance.view");
+  const canAdd = can(workspace, "expenses.submit");
   const { active } = useOptionList("expense_category");
   const [ownRange, setOwnRange] = useState<DateRange>({ period: "month" });
   const range = sharedRange ?? ownRange;
@@ -224,7 +224,7 @@ export function ExpensesView({
 /** Expenses on an event page: add one, see what's been spent. */
 export function EventExpenses({ eventId }: { eventId: string }) {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "expenses.submit") || can(workspace.role, "finance.view");
+  const allowed = can(workspace, "expenses.submit") || can(workspace, "finance.view");
   const expenses = useExpenses(workspace.id, { eventId }, allowed);
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState<Expense | null>(null);
@@ -234,7 +234,7 @@ export function EventExpenses({ eventId }: { eventId: string }) {
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-extrabold">Expenses</h2>
-        {can(workspace.role, "expenses.submit") && (
+        {can(workspace, "expenses.submit") && (
           <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
             <Plus className="size-4" strokeWidth={2.5} /> Add expense
           </Button>

@@ -18,7 +18,7 @@ import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 export default function RepliesPage() {
   const { me, workspace } = useCurrentWorkspace();
   const templates = useTemplates(workspace.id);
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const [editing, setEditing] = useState<WhatsAppTemplate | "new" | null>(null);
   const sample = { name: "Neha Kapoor", business: workspace.name, eventDate: "2026-12-05", myName: me.user.name };
 

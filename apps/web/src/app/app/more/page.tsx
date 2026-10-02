@@ -92,40 +92,40 @@ export default function MorePage() {
         <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
       </Link>
 
-      {(leadScope(workspace.role) !== "none" || can(workspace.role, "clients.view")) && (
+      {(leadScope(workspace) !== "none" || can(workspace, "clients.view")) && (
         <>
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
-            {can(workspace.role, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
-            {can(workspace.role, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
-            {can(workspace.role, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
-            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
-            {can(workspace.role, "leads.view_all") && <Row href="/app/partners" icon={Handshake} label="Partner QR codes" />}
-            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
-            {leadScope(workspace.role) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
-            {(can(workspace.role, "catalogue.manage") || can(workspace.role, "quotes.view")) && (
+            {can(workspace, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
+            {can(workspace, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
+            {can(workspace, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
+            {leadScope(workspace) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
+            {can(workspace, "leads.view_all") && <Row href="/app/partners" icon={Handshake} label="Partner QR codes" />}
+            {leadScope(workspace) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
+            {leadScope(workspace) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
+            {(can(workspace, "catalogue.manage") || can(workspace, "quotes.view")) && (
               <Row href="/app/services" icon={Package} label="Services and packages" />
             )}
           </Card>
         </>
       )}
 
-      {can(workspace.role, "tasks.work") && (
+      {can(workspace, "tasks.work") && (
         <>
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Work</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             <Row href="/app/my-day" icon={Sun} label="My day" />
             <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
             <Row href="/app/deliverables" icon={Package} label="Deliverables" />
-            {eventScope(workspace.role) === "all" && <Row href="/app/inventory" icon={Boxes} label="Stock" />}
+            {eventScope(workspace) === "all" && <Row href="/app/inventory" icon={Boxes} label="Stock" />}
             <Row href="/app/time-off" icon={CalendarOff} label="Days off" />
-            {can(workspace.role, "expenses.submit") && !can(workspace.role, "finance.view") && (
+            {can(workspace, "expenses.submit") && !can(workspace, "finance.view") && (
               <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
             )}
-            <Row href="/app/scores" icon={Trophy} label={can(workspace.role, "team.review") ? "Team scores and points" : "My points and score"} />
-            {can(workspace.role, "workspace.update") && <Row href="/app/settings/points" icon={Award} label="Points rules" />}
-            {can(workspace.role, "team.review") && <Row href="/app/summary" icon={MessageSquareText} label="Daily summary" />}
-            {can(workspace.role, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
+            <Row href="/app/scores" icon={Trophy} label={can(workspace, "team.review") ? "Team scores and points" : "My points and score"} />
+            {can(workspace, "workspace.update") && <Row href="/app/settings/points" icon={Award} label="Points rules" />}
+            {can(workspace, "team.review") && <Row href="/app/summary" icon={MessageSquareText} label="Daily summary" />}
+            {can(workspace, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
           </Card>
         </>
       )}
@@ -133,15 +133,15 @@ export default function MorePage() {
       <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         <Row href="/app/settings/business" icon={Building2} label="Business profile" />
-        {can(workspace.role, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
-        {can(workspace.role, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: relations, communities, payment modes and more" />}
-        {can(workspace.role, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
-        {can(workspace.role, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
-        {can(workspace.role, "events.view") && <Row href="/app/venues" icon={MapPin} label="Venues" />}
-        {can(workspace.role, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
+        {can(workspace, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
+        {can(workspace, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: relations, communities, payment modes and more" />}
+        {can(workspace, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
+        {can(workspace, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
+        {can(workspace, "events.view") && <Row href="/app/venues" icon={MapPin} label="Venues" />}
+        {can(workspace, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
         <Row href="/app/notifications?tab=settings" icon={Bell} label="Alerts: what reaches you, and when" />
         <Row href="/app/team" icon={Users} label="Employees" />
-        {can(workspace.role, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
+        {can(workspace, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
         {me.workspaces.length > 1 && (
           <Row onClick={() => setSwitching(true)} icon={ArrowLeftRight} label="Switch business" />
         )}

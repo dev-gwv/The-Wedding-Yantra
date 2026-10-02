@@ -51,7 +51,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
   const router = useRouter();
   // Opened from the setup list on Home: go back there once the step is done.
   const fromSetup = useSearchParams().get("from") === "setup";
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const [values, setValues] = useState({
     name: workspace.name,
     city: workspace.city,

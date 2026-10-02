@@ -17,7 +17,7 @@ import { BillRow } from "./rows";
 /** The money side of an event: what's billed, received and still due. Money roles only. */
 export function EventMoneyCard({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "finance.view");
+  const allowed = can(workspace, "finance.view");
   const money = useEventMoney(workspace.id, event.id, allowed);
   const [recording, setRecording] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
@@ -81,12 +81,12 @@ export function EventMoneyCard({ event }: { event: WeddingEvent }) {
           <p className="text-ink-muted">No booking value yet. Make an invoice, or add the value to the event.</p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          {can(workspace.role, "payments.record") && (
+          {can(workspace, "payments.record") && (
             <Button variant="secondary" onClick={() => setRecording(true)}>
               <IndianRupee className="size-4" /> Money received
             </Button>
           )}
-          {can(workspace.role, "bills.manage") && (
+          {can(workspace, "bills.manage") && (
             <ButtonLink href={`/app/bills/new?eventId=${event.id}`} variant="secondary">
               <FilePlus2 className="size-4" /> {billed ? "Another invoice" : "Make invoice"}
             </ButtonLink>

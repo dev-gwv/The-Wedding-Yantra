@@ -66,7 +66,7 @@ export function DueView() {
   const [q, setQ] = useState("");
   const onSearch = useCallback((v: string) => setQ(v), []);
   const [receiving, setReceiving] = useState<DueItem | null>(null);
-  const canRecord = can(workspace.role, "payments.record");
+  const canRecord = can(workspace, "payments.record");
   const today = localISODate();
   const week = localISODate(new Date(), 7);
 

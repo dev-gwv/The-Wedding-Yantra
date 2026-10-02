@@ -20,7 +20,7 @@ import { errorMessage } from "@/lib/errors";
  */
 export default function DepartmentsPage() {
   const { workspace } = useCurrentWorkspace();
-  const role = workspace.role;
+  const role = workspace;
   const sees = can(role, "members.view");
   const editable = can(role, "workspace.update");
   const options = useOptions(workspace.id);

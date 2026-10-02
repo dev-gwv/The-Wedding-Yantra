@@ -45,7 +45,7 @@ import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 export default function InvoiceSettingsPage() {
   const { workspace } = useCurrentWorkspace();
   const details = useWorkspace(workspace.id);
-  const allowed = can(workspace.role, "bills.manage") || can(workspace.role, "finance.view");
+  const allowed = can(workspace, "bills.manage") || can(workspace, "finance.view");
   return (
     <>
       <BackLink href="/app/more" label="More" />
@@ -74,7 +74,7 @@ export default function InvoiceSettingsPage() {
 // ---------------------------------------------------------------------------
 
 function LookCard({ workspace }: { workspace: Workspace }) {
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const update = useUpdateWorkspace(workspace.id);
   const accounts = useBankAccounts(workspace.id);
   const texts = useSavedTexts(workspace.id);
@@ -308,7 +308,7 @@ function sampleBill(workspace: Workspace, bank: BankAccount | null, terms: strin
 
 function BankAccountsCard() {
   const { workspace } = useCurrentWorkspace();
-  const editable = can(workspace.role, "bills.manage");
+  const editable = can(workspace, "bills.manage");
   const accounts = useBankAccounts(workspace.id);
   const [open, setOpen] = useState<BankAccount | "new" | null>(null);
   const live = (accounts.data ?? []).filter((a) => !a.archived);
@@ -451,7 +451,7 @@ function BankAccountForm({ account, onDone }: { account?: BankAccount; onDone: (
 
 function SavedTextsCard() {
   const { workspace } = useCurrentWorkspace();
-  const editable = can(workspace.role, "bills.manage");
+  const editable = can(workspace, "bills.manage");
   const texts = useSavedTexts(workspace.id);
   const [open, setOpen] = useState<SavedText | SavedTextKind | null>(null);
   return (
@@ -578,7 +578,7 @@ function SavedTextForm({ text, kind, onDone }: { text?: SavedText; kind: SavedTe
 // ---------------------------------------------------------------------------
 
 function NumberingCard({ workspace }: { workspace: Workspace }) {
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const update = useUpdateWorkspace(workspace.id);
   const toast = useToast();
   const [prefix, setPrefix] = useState(workspace.billPrefix);

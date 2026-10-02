@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 /** Outstanding: payments clients still owe, as of today. */
 export default function OutstandingPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "finance.view");
+  const allowed = can(workspace, "finance.view");
   const overview = useMoneyOverview(workspace.id, allowed);
   const [recording, setRecording] = useState(false);
   if (!allowed) return <MoneyLocked section="outstanding" />;
@@ -23,7 +23,7 @@ export default function OutstandingPage() {
         section="outstanding"
         subtitle="Payments due from clients as of today: unpaid invoice balances, and booked events not yet invoiced"
         action={
-          can(workspace.role, "payments.record") ? (
+          can(workspace, "payments.record") ? (
             <Button onClick={() => setRecording(true)}>
               <Plus className="size-4" strokeWidth={2.5} /> Record payment
             </Button>

@@ -82,9 +82,9 @@ export function LeadFormSheet({
 
 function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => void }) {
   const { workspace } = useCurrentWorkspace();
-  const canAssign = can(workspace.role, "leads.assign");
+  const canAssign = can(workspace, "leads.assign");
   // Naming a client as the referrer needs the client list, which staff don't see.
-  const canPickClient = can(workspace.role, "clients.view");
+  const canPickClient = can(workspace, "clients.view");
   const [referrer, setReferrer] = useState<PersonRef | null>(lead?.referredByClient ?? null);
   const team = useTeam(canAssign ? workspace.id : null);
   const create = useCreateLead(workspace.id);

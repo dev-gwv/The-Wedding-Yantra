@@ -84,8 +84,8 @@ function TaskForm({
   onRemoved: () => void;
 }) {
   const { workspace, me } = useCurrentWorkspace();
-  const manage = can(workspace.role, "tasks.manage");
-  const editable = !task || canEditTask(task, workspace.role, me.user.id);
+  const manage = can(workspace, "tasks.manage");
+  const editable = !task || canEditTask(task, workspace, me.user.id);
   const day = useBusinessDay();
   const today = day();
   const create = useCreateTask(workspace.id);
@@ -93,7 +93,7 @@ function TaskForm({
   const remove = useDeleteTask(workspace.id);
   const team = useTeam(manage && editable ? workspace.id : null);
   // Coming events to hang the task on (freelancers get only theirs).
-  const events = useEvents(workspace.id, { from: today, status: "confirmed" }, editable && !eventId && eventScope(workspace.role) !== "none");
+  const events = useEvents(workspace.id, { from: today, status: "confirmed" }, editable && !eventId && eventScope(workspace) !== "none");
   const toast = useToast();
 
   const [title, setTitle] = useState(task?.title ?? "");

@@ -16,8 +16,8 @@ import { errorMessage } from "@/lib/errors";
 /** What the business owns, and what's out at events right now. */
 export default function InventoryPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = eventScope(workspace.role) === "all";
-  const manage = can(workspace.role, "events.manage");
+  const allowed = eventScope(workspace) === "all";
+  const manage = can(workspace, "events.manage");
   const items = useInventory(workspace.id, {}, allowed);
   const [sheet, setSheet] = useState<{ item?: InventoryItem } | null>(null);
 

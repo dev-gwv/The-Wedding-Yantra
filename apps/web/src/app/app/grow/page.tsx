@@ -16,7 +16,7 @@ import { errorMessage } from "@/lib/errors";
 /** Happy clients bring the next ones: who to ask for a review, and who sends work your way. */
 export default function GrowPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "clients.manage");
+  const allowed = can(workspace, "clients.manage");
   const grow = useGrow(workspace.id, allowed);
 
   return (
@@ -45,11 +45,11 @@ export default function GrowPage() {
 function Grow({ data }: { data: GrowSummary }) {
   const { referrals } = data;
   const { workspace } = useCurrentWorkspace();
-  const partners = usePartners(workspace.id, can(workspace.role, "leads.view_all"));
+  const partners = usePartners(workspace.id, can(workspace, "leads.view_all"));
   const sent = (partners.data ?? []).reduce((a, p) => ({ n: a.n + 1, enquiries: a.enquiries + p.enquiries, booked: a.booked + p.booked }), { n: 0, enquiries: 0, booked: 0 });
   return (
     <div className="space-y-8">
-      {can(workspace.role, "leads.view_all") && (
+      {can(workspace, "leads.view_all") && (
         <Link href="/app/partners" className="flex items-center gap-4 rounded-3xl border border-sun-300/60 bg-gradient-to-br from-cream to-surface p-5 shadow-soft hover:border-sun-300">
           <IconSquare icon={Handshake} />
           <div className="min-w-0 flex-1">

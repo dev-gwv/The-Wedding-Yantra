@@ -78,7 +78,7 @@ function PaymentForm({
   const update = useUpdatePayment(workspace.id);
   const remove = useDeletePayment(workspace.id);
   const toast = useToast();
-  const canEdit = can(workspace.role, "payments.record");
+  const canEdit = can(workspace, "payments.record");
   const [amount, setAmount] = useState(payment ? String(payment.amount) : due > 0 ? String(due) : "");
   const [paidOn, setPaidOn] = useState(() => payment?.paidOn ?? localISODate());
   const [method, setMethod] = useState<string>(payment?.method ?? "upi");

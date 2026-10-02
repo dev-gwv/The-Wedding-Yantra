@@ -38,7 +38,7 @@ function ServicesAndPackages() {
   const params = useSearchParams();
   const router = useRouter();
   const tab: Tab = params.get("tab") === "packages" ? "packages" : "services";
-  const editable = can(workspace.role, "catalogue.manage");
+  const editable = can(workspace, "catalogue.manage");
   const items = useCatalogue(workspace.id, true);
   const packages = usePackages(workspace.id, true);
   const [editing, setEditing] = useState<{ service?: CatalogueItem; category?: string | null } | null>(null);
@@ -133,7 +133,7 @@ function ServicesList({
 
   return (
     <div className="space-y-6">
-      {can(workspace.role, "workspace.update") && <ConfirmPrices />}
+      {can(workspace, "workspace.update") && <ConfirmPrices />}
       {groups.map((g) => (
         <section key={g.key ?? "none"}>
           <div className="mb-2 flex items-center justify-between gap-3">

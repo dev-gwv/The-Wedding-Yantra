@@ -29,7 +29,7 @@ interface Tile {
  */
 export default function MastersPage() {
   const { workspace } = useCurrentWorkspace();
-  const role = workspace.role;
+  const role = workspace;
   const clients = useClients(workspace.id, "", false, can(role, "clients.view"));
   const vendors = useVendors(workspace.id, can(role, "finance.view"));
   const team = useTeam(can(role, "members.view") ? workspace.id : null);

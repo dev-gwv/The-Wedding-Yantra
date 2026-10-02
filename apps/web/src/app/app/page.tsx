@@ -1,6 +1,6 @@
 "use client";
 
-import { can, eventScope, firstName, formatMoney, formatMoneyShort, greeting, leadScope, todayIn, type Role } from "@wedding-yantra/core";
+import { can, eventScope, firstName, formatMoney, formatMoneyShort, greeting, leadScope, todayIn, type Access } from "@wedding-yantra/core";
 import { useHome } from "@wedding-yantra/api-client/react";
 import type { HomeSummary } from "@wedding-yantra/types";
 import {
@@ -70,12 +70,12 @@ export default function HomePage() {
           </button>
         </Notice>
       )}
-      {home.data && <HomeContent home={home.data} role={workspace.role} />}
+      {home.data && <HomeContent home={home.data} role={workspace} />}
     </>
   );
 }
 
-function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
+function HomeContent({ home, role }: { home: HomeSummary; role: Access }) {
   const { workspace } = useCurrentWorkspace();
   // Setup steps are the owner's and manager's job; others never see a to-do they can't do.
   const showSetup = can(role, "workspace.update") && home.setupDone < home.setupTotal;
@@ -190,7 +190,7 @@ function SectionHead({ title, href, link }: { title: string; href: string; link:
 }
 
 /** The everyday things, one tap from Home. */
-function QuickActions({ role }: { role: Role }) {
+function QuickActions({ role }: { role: Access }) {
   const router = useRouter();
   const [adding, setAdding] = useState<"lead" | "expense" | null>(null);
   const actions: { label: string; icon: LucideIcon; onClick?: () => void; href?: string }[] = [

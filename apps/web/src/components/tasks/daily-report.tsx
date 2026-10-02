@@ -96,7 +96,7 @@ const byId = (list: TaskItem[]) => [
  */
 export function DailyReport() {
   const { workspace } = useCurrentWorkspace();
-  const role = workspace.role;
+  const role = workspace;
   const manages = can(role, "tasks.manage");
   const day = useMyDay(workspace.id, can(role, "tasks.work"));
   const given = useTasks(

@@ -30,7 +30,7 @@ export function PointsView({ month, current }: { month: string; current: boolean
   const { workspace, me } = useCurrentWorkspace();
   const board = useLeaderboard(workspace.id, month);
   const [person, setPerson] = useState<LeaderboardRow | null>(null);
-  const manager = can(workspace.role, "team.review");
+  const manager = can(workspace, "team.review");
 
   if (board.isPending) {
     return (
@@ -190,7 +190,7 @@ function HowPointsWork({ penaltiesOn }: { penaltiesOn: boolean }) {
   const { workspace } = useCurrentWorkspace();
   const [open, setOpen] = useState(false);
   const rules = usePointRules(workspace.id);
-  const owner = can(workspace.role, "workspace.update");
+  const owner = can(workspace, "workspace.update");
   return (
     <section>
       <div className="flex flex-wrap items-center gap-4">
@@ -236,7 +236,7 @@ function LedgerSheet({ person, month, onClose }: { person: LeaderboardRow | null
   const toast = useToast();
   const [note, setNote] = useState("");
   const [giving, setGiving] = useState(false);
-  const canRecognise = can(workspace.role, "team.review") && !mine;
+  const canRecognise = can(workspace, "team.review") && !mine;
 
   function close() {
     setNote("");

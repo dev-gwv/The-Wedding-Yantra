@@ -1,4 +1,4 @@
-import { can, type Role } from "@wedding-yantra/core";
+import { can, type Access } from "@wedding-yantra/core";
 import { CalendarCheck, ListChecks, Send, UsersRound, type LucideIcon } from "lucide-react";
 
 export type TaskSection = "mine" | "given" | "team" | "summary";
@@ -11,7 +11,7 @@ export interface TaskSectionLink {
 }
 
 /** The parts of Team Task Management in the side menu, for the people who give tasks. */
-export function taskSections(role: Role): TaskSectionLink[] {
+export function taskSections(role: Access): TaskSectionLink[] {
   const list: (TaskSectionLink & { show: boolean })[] = [
     { key: "mine", label: "My tasks", href: "/app/tasks", icon: ListChecks, show: true },
     { key: "given", label: "Given by me", href: "/app/tasks/given", icon: Send, show: can(role, "tasks.manage") },

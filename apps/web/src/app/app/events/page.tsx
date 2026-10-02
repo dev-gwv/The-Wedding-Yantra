@@ -24,7 +24,7 @@ function EventsScreen() {
   const pathname = usePathname();
   const view = (["calendar", "past"].includes(params.get("view") ?? "") ? params.get("view") : "upcoming") as View;
   // Freelancers see the events they're booked on.
-  const allowed = eventScope(workspace.role) !== "none";
+  const allowed = eventScope(workspace) !== "none";
 
   if (!allowed) {
     return (
@@ -46,7 +46,7 @@ function EventsScreen() {
       <PageHeader
         title="Events"
         action={
-          can(workspace.role, "events.manage") && (
+          can(workspace, "events.manage") && (
             <ButtonLink href="/app/events/new">
               <Plus className="size-4" strokeWidth={2.5} /> New event
             </ButtonLink>
@@ -111,7 +111,7 @@ function ListView({ past }: { past: boolean }) {
         <EmptyState icon={CalendarDays} title={past ? "No past events yet" : "No upcoming events"}>
           {past
             ? "Events you've finished will be kept here."
-            : eventScope(workspace.role) === "own"
+            : eventScope(workspace) === "own"
               ? "When the owner puts you on an event's team, it shows here with the time to reach."
               : "When a client accepts a quote, the event appears here by itself. You can also add one yourself."}
         </EmptyState>
@@ -145,7 +145,7 @@ function CalendarView() {
   const [selected, setSelected] = useState(() => localISODate(now));
   // Who's off, for whoever plans the team.
   const lastDay = `${month}-${String(new Date(cursor.y, cursor.m + 1, 0).getDate()).padStart(2, "0")}`;
-  const off = useTimeOff(workspace.id, { from: `${month}-01`, to: lastDay }, can(workspace.role, "tasks.manage"));
+  const off = useTimeOff(workspace.id, { from: `${month}-01`, to: lastDay }, can(workspace, "tasks.manage"));
 
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();

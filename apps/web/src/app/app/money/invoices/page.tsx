@@ -12,14 +12,14 @@ import { Splash } from "@/components/ui/spinner";
 function InvoicesScreen() {
   const { workspace } = useCurrentWorkspace();
   const [range, setRange] = useMoneyRange();
-  if (!can(workspace.role, "finance.view")) return <MoneyLocked section="invoices" />;
+  if (!can(workspace, "finance.view")) return <MoneyLocked section="invoices" />;
   return (
     <>
       <MoneyPageHeader
         section="invoices"
         dates={{ range, onChange: setRange }}
         action={
-          can(workspace.role, "bills.manage") ? (
+          can(workspace, "bills.manage") ? (
             <ButtonLink href="/app/bills/new">
               <Plus className="size-4" strokeWidth={2.5} /> New invoice
             </ButtonLink>

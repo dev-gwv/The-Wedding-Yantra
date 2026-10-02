@@ -31,7 +31,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
 /** Who did what, and when. For owners and managers. */
 export default function ActivityPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "team.review");
+  const allowed = can(workspace, "team.review");
   const [person, setPerson] = useState<string | undefined>(undefined);
   const team = useTeam(allowed ? workspace.id : null);
   const feed = useActivity(workspace.id, person, allowed);

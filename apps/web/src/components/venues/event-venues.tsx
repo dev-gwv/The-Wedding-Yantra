@@ -16,7 +16,7 @@ export const venueFor = (event: WeddingEvent, name: string | null) =>
 export function EventVenues({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
   if (event.venues.length === 0) return null;
-  const opens = can(workspace.role, "events.view");
+  const opens = can(workspace, "events.view");
   return (
     <section>
       <h2 className="mb-3 font-display text-lg font-extrabold">{event.venues.length === 1 ? "Venue" : "Venues"}</h2>

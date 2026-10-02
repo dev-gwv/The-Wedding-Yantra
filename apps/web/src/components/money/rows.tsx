@@ -94,7 +94,7 @@ export function DueRow({ item, onReceived }: { item: DueItem; onReceived?: (item
         <a href={reminder} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "secondary", size: "sm" })}>
           <MessageCircle className="size-4" /> Remind
         </a>
-        {onReceived && can(workspace.role, "payments.record") && (
+        {onReceived && can(workspace, "payments.record") && (
           <Button variant="secondary" size="sm" onClick={() => onReceived(item)}>
             Money received
           </Button>

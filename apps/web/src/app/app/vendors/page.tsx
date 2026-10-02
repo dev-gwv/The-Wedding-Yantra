@@ -21,8 +21,8 @@ import { errorMessage } from "@/lib/errors";
 /** Who you hire for events, and what you still owe them. */
 export default function VendorsPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "finance.view");
-  const manage = can(workspace.role, "expenses.approve");
+  const allowed = can(workspace, "finance.view");
+  const manage = can(workspace, "expenses.approve");
   const [archived, setArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);

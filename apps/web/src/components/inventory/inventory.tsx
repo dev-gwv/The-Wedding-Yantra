@@ -306,9 +306,9 @@ function BookingRow({ b, crew, manage, onBack }: { b: InventoryBooking; crew: bo
 /** Stock this event needs: set aside, out, back. Shown once the business keeps stock. */
 export function EventStock({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
-  const sees = eventScope(workspace.role) === "all";
-  const manage = can(workspace.role, "events.manage");
-  const crew = can(workspace.role, "tasks.work");
+  const sees = eventScope(workspace) === "all";
+  const manage = can(workspace, "events.manage");
+  const crew = can(workspace, "tasks.work");
   const items = useInventory(workspace.id, {}, sees);
   const list = useInventoryBookings(workspace.id, { eventId: event.id }, sees);
   const [adding, setAdding] = useState(false);

@@ -19,8 +19,8 @@ import { useBusinessDay } from "@/lib/today";
 /** Days people are off, so nobody is put on an event they can't work. */
 export default function TimeOffPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "tasks.work");
-  const manage = can(workspace.role, "tasks.manage");
+  const allowed = can(workspace, "tasks.work");
+  const manage = can(workspace, "tasks.manage");
   const day = useBusinessDay();
   const today = day();
   const list = useTimeOff(workspace.id, { from: day(-30) }, allowed);
@@ -86,7 +86,7 @@ function OffList({ title, items, today, muted }: { title: string; items: TimeOff
   const { workspace, me } = useCurrentWorkspace();
   const remove = useRemoveTimeOff(workspace.id);
   const toast = useToast();
-  const manage = can(workspace.role, "tasks.manage");
+  const manage = can(workspace, "tasks.manage");
 
   async function removeIt(o: TimeOff) {
     try {
@@ -137,7 +137,7 @@ function OffList({ title, items, today, muted }: { title: string; items: TimeOff
 
 function AddForm({ onDone }: { onDone: () => void }) {
   const { workspace, me } = useCurrentWorkspace();
-  const manage = can(workspace.role, "tasks.manage");
+  const manage = can(workspace, "tasks.manage");
   const team = useTeam(manage ? workspace.id : null);
   const add = useAddTimeOff(workspace.id);
   const toast = useToast();

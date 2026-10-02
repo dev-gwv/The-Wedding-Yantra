@@ -38,7 +38,7 @@ function QuoteView({ quote, business }: { quote: Quote; business: Workspace }) {
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [confirmAccept, setConfirmAccept] = useState(false);
-  const canManage = can(workspace.role, "quotes.manage");
+  const canManage = can(workspace, "quotes.manage");
   const open = quote.status === "draft" || quote.status === "sent";
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/q/${quote.shareToken}`;
   const first = quote.customerName.split(" ")[0];

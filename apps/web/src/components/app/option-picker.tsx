@@ -177,7 +177,7 @@ export function OptionPills({
           ))}
       </div>
       {error && <p className="mt-1.5 text-sm text-danger">{error}</p>}
-      {can(workspace.role, "workspace.update") && (
+      {can(workspace, "workspace.update") && (
         <Link href="/app/settings/lists" className="mt-2 inline-block text-xs font-semibold text-ink-muted hover:text-brand-strong">
           Rename, reorder or hide {OPTION_LIST_INFO[list].title.toLowerCase()}
         </Link>

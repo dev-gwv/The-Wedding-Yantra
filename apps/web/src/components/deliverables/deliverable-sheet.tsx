@@ -54,7 +54,7 @@ export function DeliverableSheet({
 
 function Form({ deliverable: d, event, existing, onDone }: { deliverable?: Deliverable; event?: DeliverableEvent; existing: string[]; onDone: () => void }) {
   const { workspace } = useCurrentWorkspace();
-  const manage = can(workspace.role, "events.manage");
+  const manage = can(workspace, "events.manage");
   const team = useTeam(manage ? workspace.id : null);
   const create = useCreateDeliverable(workspace.id);
   const update = useUpdateDeliverable(workspace.id);

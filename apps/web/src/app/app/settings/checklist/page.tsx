@@ -25,7 +25,7 @@ const toRows = (items: ChecklistItem[]): Row[] => items.map((i) => ({ key: i.id,
 
 export default function ChecklistPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "tasks.work");
+  const allowed = can(workspace, "tasks.work");
   const checklist = useChecklist(workspace.id, allowed);
   return (
     <>
@@ -50,7 +50,7 @@ function ChecklistEditor({ items }: { items: ChecklistItem[] }) {
   const { workspace } = useCurrentWorkspace();
   const save = useSaveChecklist(workspace.id);
   const toast = useToast();
-  const editable = can(workspace.role, "tasks.manage");
+  const editable = can(workspace, "tasks.manage");
   const [rows, setRows] = useState<Row[]>(() => toRows(items));
   const [error, setError] = useState<string | null>(null);
 

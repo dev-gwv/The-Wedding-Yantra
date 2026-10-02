@@ -20,7 +20,7 @@ function NewBill() {
     quoteId: params.get("quoteId") ?? undefined,
   };
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "bills.manage");
+  const allowed = can(workspace, "bills.manage");
   const draft = useBillDraft(workspace.id, query, allowed);
   const router = useRouter();
   const toast = useToast();

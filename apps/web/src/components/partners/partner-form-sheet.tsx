@@ -28,7 +28,7 @@ function PartnerForm({ partner, onSaved }: { partner?: Partner; onSaved: (p: Par
   const { workspace } = useCurrentWorkspace();
   const create = useCreatePartner(workspace.id);
   const update = useUpdatePartner(workspace.id);
-  const vendors = useVendors(workspace.id, can(workspace.role, "finance.view"));
+  const vendors = useVendors(workspace.id, can(workspace, "finance.view"));
   const [v, setV] = useState({
     name: partner?.name ?? "",
     label: partner?.label ?? "",

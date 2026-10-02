@@ -45,7 +45,7 @@ export function SavedTextField({
   placeholder?: string;
 }) {
   const { workspace } = useCurrentWorkspace();
-  const manage = can(workspace.role, "bills.manage");
+  const manage = can(workspace, "bills.manage");
   const saved = (useSavedTexts(workspace.id).data ?? []).filter((t) => t.kind === kind);
   const add = useAddSavedText(workspace.id);
   const toast = useToast();

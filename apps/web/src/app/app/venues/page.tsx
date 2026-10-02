@@ -19,8 +19,8 @@ import { errorMessage } from "@/lib/errors";
 /** Where your events happen: address, Maps link, contact and rules, kept once. */
 export default function VenuesPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "events.view");
-  const manage = can(workspace.role, "events.manage");
+  const allowed = can(workspace, "events.view");
+  const manage = can(workspace, "events.manage");
   const [archived, setArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string | null>(null);

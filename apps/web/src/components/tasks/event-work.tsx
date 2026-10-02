@@ -21,7 +21,7 @@ import { TaskSheet } from "./task-sheet";
 /** Who works the event, what they do there and when they must reach. */
 export function EventTeamCard({ event }: { event: WeddingEvent }) {
   const { workspace, me } = useCurrentWorkspace();
-  const manage = can(workspace.role, "tasks.manage");
+  const manage = can(workspace, "tasks.manage");
   const [editing, setEditing] = useState(false);
   if (!manage && event.team.length === 0) return null;
 
@@ -198,8 +198,8 @@ function TeamForm({ event, onDone }: { event: WeddingEvent; onDone: () => void }
 /** The event's checklist and any other tasks for it, with progress. */
 export function EventTasks({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
-  const works = can(workspace.role, "tasks.work");
-  const manage = can(workspace.role, "tasks.manage");
+  const works = can(workspace, "tasks.work");
+  const manage = can(workspace, "tasks.manage");
   const tasks = useTasks(workspace.id, { eventId: event.id }, works);
   const checklist = useChecklist(workspace.id, manage);
   const apply = useApplyChecklist(workspace.id);

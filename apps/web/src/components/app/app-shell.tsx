@@ -54,12 +54,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1" aria-label="Main">
           {NAV.filter((n) => n.href !== "/app/more").map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
-            if (href === "/app/money" && can(workspace.role, "finance.view"))
+            if (href === "/app/money" && can(workspace, "finance.view"))
               return <NavGroup key={href} label={label} icon={Icon} href={href} sections={MONEY_SECTIONS} current={moneySectionOf(pathname)} active={active} />;
             const link = <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
-            if (href !== "/app/events" || !can(workspace.role, "tasks.work")) return link;
+            if (href !== "/app/events" || !can(workspace, "tasks.work")) return link;
             // Tasks come right after Events: a group for those who give tasks, one link for everyone else.
-            const tasks = taskSections(workspace.role);
+            const tasks = taskSections(workspace);
             return (
               <Fragment key={href}>
                 {link}
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             label="Master data"
             icon={Database}
             href="/app/masters"
-            sections={masterSections(workspace.role)}
+            sections={masterSections(workspace)}
             current={masterSectionOf(pathname)}
             active={inMasterData(pathname)}
           />

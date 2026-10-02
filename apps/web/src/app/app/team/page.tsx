@@ -23,13 +23,13 @@ type Share = { name: string; phone: string; role: Role; token: string };
 export default function TeamPage() {
   const { workspace } = useCurrentWorkspace();
   const myRole = workspace.role;
-  const team = useTeam(can(myRole, "members.view") ? workspace.id : null);
+  const team = useTeam(can(workspace, "members.view") ? workspace.id : null);
   const [inviting, setInviting] = useState(false);
   const [share, setShare] = useState<Share | null>(null);
   const [tab, setTab] = useState<"team" | "left">("team");
   const [dept, setDept] = useState("all");
 
-  if (!can(myRole, "members.view")) {
+  if (!can(workspace, "members.view")) {
     return (
       <>
         <BackLink href="/app/more" label="More" />
@@ -43,7 +43,7 @@ export default function TeamPage() {
     );
   }
 
-  const canInvite = can(myRole, "members.invite");
+  const canInvite = can(workspace, "members.invite");
   const members = team.data?.members ?? [];
   const invitations = team.data?.invitations ?? [];
   const former = team.data?.former ?? [];

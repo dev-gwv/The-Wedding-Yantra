@@ -10,6 +10,8 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type {
+  DepartmentAccessInput,
+  MemberAccessInput,
   NotificationPrefs,
   RecogniseInput,
   SavePointSettingsInput,
@@ -121,6 +123,7 @@ export const queryKeys = {
   home: (id: string) => ["workspace", id, "home"] as const,
   team: (id: string) => ["workspace", id, "team"] as const,
   employee: (id: string, memberId: string) => ["workspace", id, "team", "member", memberId] as const,
+  departmentAccess: (id: string) => ["workspace", id, "team", "department-access"] as const,
   invitation: (token: string) => ["invitation", token] as const,
   /** Everything about leads in one business; invalidate this after any lead change. */
   sales: (id: string) => ["workspace", id, "sales"] as const,
@@ -346,6 +349,51 @@ export function useEmployee(workspaceId: string, memberId: string) {
 export function useSaveEmployeeDetails(workspaceId: string, memberId: string) {
   const api = useApi();
   return useTeamMutation(workspaceId, (input: EmployeeDetailsInput) => api.team.saveDetails(workspaceId, memberId, input));
+}
+
+/**
+ * After access changes, everything someone sees may change: refresh their own access (me),
+ * the business, the team and every screen's data.
+ */
+function useAccessMutation<TInput, TResult>(workspaceId: string, fn: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.me });
+      void qc.invalidateQueries({ queryKey: queryKeys.workspace(workspaceId) });
+    },
+  });
+}
+
+/** Every department's screens. */
+export function useDepartmentAccess(workspaceId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.departmentAccess(workspaceId ?? ""),
+    queryFn: () => api.team.departmentAccess(workspaceId!),
+    enabled: !!workspaceId,
+  });
+}
+
+/** The owner: someone's department and extra screens. */
+export function useSaveMemberAccess(workspaceId: string, memberId: string) {
+  const api = useApi();
+  return useAccessMutation(workspaceId, (input: MemberAccessInput) => api.team.saveAccess(workspaceId, memberId, input));
+}
+
+/** The owner: a department's screens; `areas: null` puts back its starting screens. */
+export function useSetDepartmentScreens(workspaceId: string) {
+  const api = useApi();
+  return useAccessMutation(workspaceId, ({ key, areas }: { key: string; areas: DepartmentAccessInput["areas"] | null }) =>
+    areas === null ? api.team.resetDepartmentAccess(workspaceId, key) : api.team.setDepartmentAccess(workspaceId, key, { areas }),
+  );
+}
+
+/** The owner: turn on department screens for people placed before departments decided screens. */
+export function useApplyDepartmentScreens(workspaceId: string) {
+  const api = useApi();
+  return useAccessMutation(workspaceId, (memberIds: string[]) => api.team.applyDepartments(workspaceId, memberIds));
 }
 
 // ---- Invitations ------------------------------------------------------------

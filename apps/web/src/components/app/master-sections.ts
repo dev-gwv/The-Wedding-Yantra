@@ -1,4 +1,4 @@
-import { can, type Role } from "@wedding-yantra/core";
+import { can, type Access } from "@wedding-yantra/core";
 import { Building2, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
 
 export type MasterKey = "clients" | "employees" | "departments" | "vendors" | "venues" | "services" | "lists";
@@ -13,7 +13,7 @@ export interface MasterSection {
 }
 
 /** The records under Master data that this role may open, in the side menu and on the tiles. */
-export function masterSections(role: Role): MasterSection[] {
+export function masterSections(role: Access): MasterSection[] {
   const all: (MasterSection & { show: boolean })[] = [
     { key: "clients", label: "Clients", href: "/app/clients", icon: UsersRound, paths: ["/app/clients"], show: can(role, "clients.view") },
     {

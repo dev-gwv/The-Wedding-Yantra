@@ -43,7 +43,7 @@ export function DeliverableRow({ d, showEvent, onOpen }: { d: Deliverable; showE
 /** What this event owes the client: photos, the film, the album, a song mix. */
 export function EventDeliverables({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
-  const manage = can(workspace.role, "events.manage");
+  const manage = can(workspace, "events.manage");
   const list = useDeliverables(workspace.id, { eventId: event.id });
   const [sheet, setSheet] = useState<{ d?: Deliverable } | null>(null);
   const items = list.data ?? [];

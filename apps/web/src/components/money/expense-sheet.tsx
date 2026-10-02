@@ -54,17 +54,17 @@ export function ExpenseSheet({
 function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?: string; onDone: () => void }) {
   const api = useApi();
   const { workspace, me } = useCurrentWorkspace();
-  const approver = can(workspace.role, "expenses.approve");
+  const approver = can(workspace, "expenses.approve");
   const mine = !expense || expense.submittedBy?.id === me.user.id;
   // Approvers change anything; others their own until approved. The accountant only looks.
-  const editable = approver || (mine && can(workspace.role, "expenses.submit") && expense?.status !== "approved");
+  const editable = approver || (mine && can(workspace, "expenses.submit") && expense?.status !== "approved");
   const create = useCreateExpense(workspace.id);
   const update = useUpdateExpense(workspace.id);
   const review = useReviewExpense(workspace.id);
   const remove = useDeleteExpense(workspace.id);
   const upload = useUploadFile(workspace.id);
   const reimburse = useReimburseExpense(workspace.id);
-  const events = useEvents(workspace.id, {}, !eventId && !expense?.eventId && can(workspace.role, "events.view"));
+  const events = useEvents(workspace.id, {}, !eventId && !expense?.eventId && can(workspace, "events.view"));
   // Owners and managers pick a vendor from their list and note who paid from their pocket.
   const vendors = useVendors(workspace.id, approver);
   const team = useTeam(approver ? workspace.id : null);

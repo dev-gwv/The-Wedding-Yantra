@@ -13,7 +13,7 @@ import { errorMessage } from "@/lib/errors";
 
 export default function MessagesPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "clients.manage");
+  const allowed = can(workspace, "clients.manage");
   const list = useBroadcasts(workspace.id);
 
   return (

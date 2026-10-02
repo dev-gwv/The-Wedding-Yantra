@@ -17,7 +17,7 @@ import { errorMessage } from "@/lib/errors";
 /** The owner's plan: the trial, what's used, and choosing what to pay for. */
 export default function BillingPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "billing.manage");
+  const allowed = can(workspace, "billing.manage");
   const billing = useBilling(workspace.id, allowed);
 
   return (

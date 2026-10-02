@@ -18,7 +18,7 @@ import { useBusinessDay } from "@/lib/today";
 export function ReviewCard({ event }: { event: WeddingEvent }) {
   const { workspace } = useCurrentWorkspace();
   const today = useBusinessDay();
-  const allowed = can(workspace.role, "clients.manage");
+  const allowed = can(workspace, "clients.manage");
   const details = useWorkspace(allowed ? workspace.id : null);
   const request = useRequestReview(workspace.id);
   const toast = useToast();

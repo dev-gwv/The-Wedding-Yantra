@@ -1,4 +1,7 @@
 import type {
+  DepartmentAccess,
+  DepartmentAccessInput,
+  MemberAccessInput,
   BillListQuery,
   BillListSummary,
   BankAccount,
@@ -278,6 +281,20 @@ export function createApiClient(options: ApiClientOptions) {
       /** The owner only */
       saveDetails: (workspaceId: string, memberId: string, input: EmployeeDetailsInput) =>
         request<Employee>("PUT", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}/details`, input),
+      /** The owner only: someone's department (its screens turn on) and extra screens */
+      saveAccess: (workspaceId: string, memberId: string, input: MemberAccessInput) =>
+        request<Employee>("PUT", `${ws(workspaceId)}/members/${encodeURIComponent(memberId)}/access`, input),
+      /** Every department's screens */
+      departmentAccess: (workspaceId: string) => request<DepartmentAccess[]>("GET", `${ws(workspaceId)}/departments/access`),
+      /** The owner only: a department's screens */
+      setDepartmentAccess: (workspaceId: string, key: string, input: DepartmentAccessInput) =>
+        request<DepartmentAccess>("PUT", `${ws(workspaceId)}/departments/${encodeURIComponent(key)}/access`, input),
+      /** The owner only: back to the department's starting screens */
+      resetDepartmentAccess: (workspaceId: string, key: string) =>
+        request<DepartmentAccess>("DELETE", `${ws(workspaceId)}/departments/${encodeURIComponent(key)}/access`),
+      /** The owner only: turn on department screens for people placed before departments decided screens */
+      applyDepartments: (workspaceId: string, memberIds: string[]) =>
+        request<{ applied: number }>("POST", `${ws(workspaceId)}/departments/apply`, { memberIds }),
     },
     leads: {
       list: (workspaceId: string, query: LeadListQuery = {}) =>

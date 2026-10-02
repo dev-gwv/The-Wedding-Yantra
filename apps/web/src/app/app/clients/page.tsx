@@ -20,11 +20,11 @@ export default function ClientsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search.trim());
-  const canView = can(workspace.role, "clients.view");
+  const canView = can(workspace, "clients.view");
   const [archived, setArchived] = useState(false);
   const clients = useClients(workspace.id, q, archived);
   const [adding, setAdding] = useState(false);
-  const canManage = can(workspace.role, "clients.manage");
+  const canManage = can(workspace, "clients.manage");
   const relations = useOptionList("relation");
 
   if (!canView) {

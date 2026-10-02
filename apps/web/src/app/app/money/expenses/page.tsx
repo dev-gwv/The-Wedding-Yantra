@@ -13,14 +13,14 @@ function ExpensesScreen() {
   const { workspace } = useCurrentWorkspace();
   const [range, setRange] = useMoneyRange();
   const [adding, setAdding] = useState(false);
-  if (!can(workspace.role, "finance.view")) return <MoneyLocked section="expenses" />;
+  if (!can(workspace, "finance.view")) return <MoneyLocked section="expenses" />;
   return (
     <>
       <MoneyPageHeader
         section="expenses"
         dates={{ range, onChange: setRange }}
         action={
-          can(workspace.role, "expenses.submit") ? (
+          can(workspace, "expenses.submit") ? (
             <Button onClick={() => setAdding(true)}>
               <Plus className="size-4" strokeWidth={2.5} /> Add expense
             </Button>

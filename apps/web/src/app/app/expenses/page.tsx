@@ -10,7 +10,7 @@ import { Card, EmptyState, PageHeader } from "@/components/ui/misc";
 /** Expenses for the team: add what you spend with a bill photo, and see if it's approved. */
 export default function ExpensesPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "expenses.submit") || can(workspace.role, "finance.view");
+  const allowed = can(workspace, "expenses.submit") || can(workspace, "finance.view");
   return (
     <>
       <BackLink href="/app/more" label="More" />

@@ -25,7 +25,7 @@ import { errorMessage } from "@/lib/errors";
 export default function PersonTasksPage() {
   const { id } = useParams<{ id: string }>();
   const { workspace, me } = useCurrentWorkspace();
-  const manages = can(workspace.role, "tasks.manage");
+  const manages = can(workspace, "tasks.manage");
   const query = usePersonTasks(workspace.id, id);
   const [open, setOpen] = useState<{ task?: TaskItem; taskId?: string } | null>(
     null,

@@ -30,9 +30,9 @@ export default function ClientPage() {
   const [editing, setEditing] = useState(false);
   const relations = useOptionList("relation");
   const c = client.data;
-  const quotes = useQuotes(workspace.id, { clientId: id }, can(workspace.role, "quotes.view"));
-  const events = useEvents(workspace.id, { clientId: id }, can(workspace.role, "events.view"));
-  const bills = useBills(workspace.id, { clientId: id }, can(workspace.role, "finance.view"));
+  const quotes = useQuotes(workspace.id, { clientId: id }, can(workspace, "quotes.view"));
+  const events = useEvents(workspace.id, { clientId: id }, can(workspace, "events.view"));
+  const bills = useBills(workspace.id, { clientId: id }, can(workspace, "finance.view"));
 
   return (
     <>
@@ -72,22 +72,22 @@ export default function ClientPage() {
                   </a>
                 </>
               )}
-              {can(workspace.role, "quotes.manage") && (
+              {can(workspace, "quotes.manage") && (
                 <ButtonLink href={`/app/quotes/new?clientId=${c.id}`} variant="secondary">
                   <FileText className="size-4" /> Make a quote
                 </ButtonLink>
               )}
-              {can(workspace.role, "bills.manage") && (
+              {can(workspace, "bills.manage") && (
                 <ButtonLink href={`/app/bills/new?clientId=${c.id}`} variant="secondary">
                   <FilePlus2 className="size-4" /> Make invoice
                 </ButtonLink>
               )}
-              {can(workspace.role, "clients.manage") && (
+              {can(workspace, "clients.manage") && (
                 <Button variant="secondary" onClick={() => setEditing(true)}>
                   <Pencil className="size-4" /> Edit
                 </Button>
               )}
-              {can(workspace.role, "clients.manage") && <ArchiveButton client={c} />}
+              {can(workspace, "clients.manage") && <ArchiveButton client={c} />}
             </div>
             <CustomFieldList entity="client" values={c.custom} className="mt-5" />
             {c.notes && <p className="mt-5 whitespace-pre-line rounded-2xl bg-cream p-4">{c.notes}</p>}
@@ -95,7 +95,7 @@ export default function ClientPage() {
 
           <MasterDetails client={c} />
 
-          {can(workspace.role, "clients.manage") && <PortalCard client={c} business={workspace.name} />}
+          {can(workspace, "clients.manage") && <PortalCard client={c} business={workspace.name} />}
 
           {events.data && events.data.length > 0 && (
             <section>

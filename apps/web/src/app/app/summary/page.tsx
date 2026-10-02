@@ -24,7 +24,7 @@ const moveDay = (iso: string, by: number) => {
 /** The day in a few lines, ready to send on WhatsApp to yourself or the team group. */
 export default function SummaryPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "team.review");
+  const allowed = can(workspace, "team.review");
   const today = useBusinessDay()();
   const [date, setDate] = useState(today);
   const summary = useDailySummary(workspace.id, date, allowed);

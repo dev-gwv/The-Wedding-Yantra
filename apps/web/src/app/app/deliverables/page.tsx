@@ -20,8 +20,8 @@ type View = "open" | "delivered";
 /** Everything owed to clients across events: what's late, what's due this week, what's next. */
 export default function DeliverablesPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = eventScope(workspace.role) !== "none";
-  const everyone = can(workspace.role, "events.manage");
+  const allowed = eventScope(workspace) !== "none";
+  const everyone = can(workspace, "events.manage");
   const [view, setView] = useState<View>("open");
   const [mine, setMine] = useState(!everyone);
   const list = useDeliverables(workspace.id, { status: view, ...(mine && { mine: "true" as const }) }, allowed);

@@ -18,7 +18,7 @@ import { errorMessage } from "@/lib/errors";
 /** Collaborations: each partner has their own QR code, and their enquiries are credited to them. */
 export default function PartnersPage() {
   const { workspace } = useCurrentWorkspace();
-  const allowed = can(workspace.role, "leads.view_all");
+  const allowed = can(workspace, "leads.view_all");
   const [archived, setArchived] = useState(false);
   const partners = usePartners(workspace.id, allowed, archived);
   const [adding, setAdding] = useState(false);

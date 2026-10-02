@@ -223,7 +223,7 @@ function LeadView({ lead }: { lead: Lead }) {
         </ol>
       </section>
 
-      {can(workspace.role, "leads.delete") && (
+      {can(workspace, "leads.delete") && (
         <div className="border-t border-line pt-6">
           {confirmDelete ? (
             <div className="flex flex-wrap items-center gap-3">
@@ -276,7 +276,7 @@ function LeadView({ lead }: { lead: Lead }) {
 /** The lead's quotes and, once booked, its event. */
 function QuotesAndEvent({ lead }: { lead: Lead }) {
   const { workspace } = useCurrentWorkspace();
-  const canView = can(workspace.role, "quotes.view");
+  const canView = can(workspace, "quotes.view");
   const quotes = useQuotes(workspace.id, { leadId: lead.id }, canView);
   if (!canView && !lead.eventId) return null;
 
@@ -284,7 +284,7 @@ function QuotesAndEvent({ lead }: { lead: Lead }) {
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-extrabold">Quotes</h2>
-        {can(workspace.role, "quotes.manage") && lead.stageKind !== "lost" && (
+        {can(workspace, "quotes.manage") && lead.stageKind !== "lost" && (
           <ButtonLink href={`/app/quotes/new?leadId=${lead.id}`} variant={quotes.data?.length ? "secondary" : "primary"} size="sm">
             <FileText className="size-4" /> Make a quote
           </ButtonLink>
@@ -321,7 +321,7 @@ function Details({ lead }: { lead: Lead }) {
       lead.partner ? (
         <span>
           {SOURCE_LABELS[lead.source]} ·{" "}
-          {can(workspace.role, "leads.view_all") ? (
+          {can(workspace, "leads.view_all") ? (
             <Link href={`/app/partners/${lead.partner.id}`} className="text-brand-strong hover:text-brand-deep">
               via {lead.partner.name}
             </Link>
@@ -339,7 +339,7 @@ function Details({ lead }: { lead: Lead }) {
     ["Email", lead.email],
     [
       "Referred by",
-      referrer && can(workspace.role, "clients.view") ? (
+      referrer && can(workspace, "clients.view") ? (
         <Link href={`/app/clients/${referrer.id}`} className="text-brand-strong hover:text-brand-deep">
           {referrer.name}
         </Link>

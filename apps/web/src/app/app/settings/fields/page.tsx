@@ -67,7 +67,7 @@ function Section({ entity, fields }: { entity: CustomFieldEntity; fields: Custom
   const { workspace } = useCurrentWorkspace();
   const save = useSaveCustomFields(workspace.id);
   const toast = useToast();
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const [rows, setRows] = useState<Row[]>(() => toRows(fields));
   const [error, setError] = useState<string | null>(null);
   const section = SECTIONS[entity];

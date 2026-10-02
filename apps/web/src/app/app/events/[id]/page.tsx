@@ -47,7 +47,7 @@ function EventView({ event }: { event: WeddingEvent }) {
   const toast = useToast();
   const router = useRouter();
   const [confirm, setConfirm] = useState<"cancel" | "delete" | null>(null);
-  const manage = can(workspace.role, "events.manage");
+  const manage = can(workspace, "events.manage");
 
   async function setStatus(status: WeddingEvent["status"], message: string) {
     try {
@@ -204,7 +204,7 @@ function EventView({ event }: { event: WeddingEvent }) {
             {/* Buttons drop below the name on a phone instead of squeezing it */}
             <div className="flex min-w-48 flex-1 items-center gap-3">
               <UserRound className="size-5 shrink-0 text-ink-muted" />
-              {can(workspace.role, "clients.view") ? (
+              {can(workspace, "clients.view") ? (
                 <Link href={`/app/clients/${event.clientId}`} className="min-w-0 font-bold hover:text-brand-strong">
                   {event.clientName}
                   {event.clientPhone && <span className="block text-sm font-normal text-ink-muted tabular">{formatPhone(event.clientPhone)}</span>}

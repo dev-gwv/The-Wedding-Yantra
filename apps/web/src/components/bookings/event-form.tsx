@@ -56,7 +56,7 @@ export function EventForm({ event, onSaved }: { event?: WeddingEvent; onSaved: (
       : [{ key: key(), name: "Wedding", date: "", startTime: "", venue: "" }],
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const venueList = useVenues(workspace.id, can(workspace.role, "events.view"));
+  const venueList = useVenues(workspace.id, can(workspace, "events.view"));
   const venueNames = (venueList.data ?? []).map((v) => v.name);
   const fields = useEntityFields("event");
   const [custom, setCustom] = useState(() => toDraft(event?.custom));

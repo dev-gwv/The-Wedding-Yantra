@@ -163,7 +163,7 @@ export function MoneyLocked({ section }: { section: MoneySection }) {
 /** What's still owed to vendors and helpers, under the lists it relates to. */
 export function ToPayVendorsLink() {
   const { workspace } = useCurrentWorkspace();
-  const overview = useMoneyOverview(workspace.id, can(workspace.role, "finance.view"));
+  const overview = useMoneyOverview(workspace.id, can(workspace, "finance.view"));
   const toPay = overview.data?.toPay ?? 0;
   if (toPay <= 0) return null;
   return (

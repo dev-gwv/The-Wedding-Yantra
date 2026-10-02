@@ -57,7 +57,7 @@ export default function MyDayPage() {
   const [open, setOpen] = useState<TaskItem | null>(null);
   const [wrap, setWrap] = useState(false);
   const [adding, setAdding] = useState<"mine" | "give" | null>(null);
-  const gives = can(workspace.role, "tasks.manage");
+  const gives = can(workspace, "tasks.manage");
 
   if (day.isPending) return <Splash />;
   if (day.isError) return <Notice tone="danger">{errorMessage(day.error)}</Notice>;

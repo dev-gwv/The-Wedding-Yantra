@@ -168,7 +168,7 @@ export function BillEditor({
   const [trackDeliverables, setTrackDeliverables] = useState(true);
 
   // Money received with it (new invoices only)
-  const canRecord = !bill && can(workspace.role, "payments.record");
+  const canRecord = !bill && can(workspace, "payments.record");
   const [paid, setPaid] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payOn, setPayOn] = useState(localISODate());

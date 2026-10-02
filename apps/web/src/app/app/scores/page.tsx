@@ -25,7 +25,7 @@ const shift = (m: string, by: number) => {
 /** Points and the month's board first; the four measures, worked out from the work itself, second. */
 export default function ScoresPage() {
   const { workspace } = useCurrentWorkspace();
-  const everyone = can(workspace.role, "team.review");
+  const everyone = can(workspace, "team.review");
   const thisMonth = useBusinessDay()().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
   const [tab, setTab] = useState<"points" | "measures">("points");

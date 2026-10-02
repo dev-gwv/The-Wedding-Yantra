@@ -36,7 +36,7 @@ function LeadsScreen() {
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   };
 
-  if (leadScope(workspace.role) === "none") {
+  if (leadScope(workspace) === "none") {
     return (
       <>
         <PageHeader title="Leads" />

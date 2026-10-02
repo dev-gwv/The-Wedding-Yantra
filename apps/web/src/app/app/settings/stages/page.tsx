@@ -46,7 +46,7 @@ function StagesEditor({ stages }: { stages: PipelineStage[] }) {
   const { workspace } = useCurrentWorkspace();
   const save = useSaveStages(workspace.id);
   const toast = useToast();
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const [rows, setRows] = useState<Row[]>(() => toRows(stages));
   const [error, setError] = useState<string | null>(null);
 

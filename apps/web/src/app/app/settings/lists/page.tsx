@@ -22,7 +22,7 @@ export default function ListsPage() {
     <>
       <BackLink href="/app/more" label="More" />
       <PageHeader title="Your lists" subtitle="Name things your way. Renaming changes old records too; hiding keeps them as they were." />
-      {!can(workspace.role, "workspace.update") && <Notice>Only the owner or a manager can change these lists.</Notice>}
+      {!can(workspace, "workspace.update") && <Notice>Only the owner or a manager can change these lists.</Notice>}
       {options.isPending && (
         <div className="flex justify-center py-16 text-brand">
           <Spinner />
@@ -46,7 +46,7 @@ export default function ListsPage() {
 
 function ListCard({ list, options }: { list: OptionList; options: CustomOption[] }) {
   const { workspace } = useCurrentWorkspace();
-  const editable = can(workspace.role, "workspace.update");
+  const editable = can(workspace, "workspace.update");
   const add = useAddOption(workspace.id);
   const update = useUpdateOption(workspace.id);
   const reorder = useReorderOptions(workspace.id);
