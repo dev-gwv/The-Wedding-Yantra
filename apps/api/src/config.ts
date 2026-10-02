@@ -17,6 +17,26 @@ export interface Config {
   otpDevEcho: boolean;
   /** Sign-in codes one IP address may request per 15 minutes. */
   otpMaxPerIp: number;
+  /** Sign-in codes one phone number may get per day (India time), so nobody floods a number. */
+  otpMaxPerPhoneDay: number;
+  /** Sign-in codes sent to everyone together per day: a ceiling on the SMS bill if a bot gets through. */
+  otpMaxGlobalDay: number;
+  /**
+   * Which X-Forwarded-For hops to believe when working out a caller's IP address: a hop
+   * count (1 = the one reverse proxy on the VPS), proxy addresses/CIDRs, or true/false.
+   * `true` believes anyone, so a caller could pick their own IP and dodge the per-IP limits.
+   */
+  trustProxy: boolean | number | string | string[];
+  /** Requests per minute from one IP address. Off in tests. */
+  rateLimit: {
+    enabled: boolean;
+    /** Writes to /api/v1/auth/* (sign-in codes, account changes) */
+    authPerMinute: number;
+    /** /api/v1/public/* reads: enquiry form, quote, invoice and client links */
+    publicPerMinute: number;
+    /** /api/v1/public/* writes: submitting the enquiry form, accepting a quote */
+    publicPostPerMinute: number;
+  };
   /** How sign-in codes reach people, tried in order. Empty: not delivered (development). */
   otp: {
     providers: OtpProvider[];
@@ -90,6 +110,37 @@ function otpConfig(env: NodeJS.ProcessEnv): Config["otp"] {
   return { providers: [...new Set(providers)] as OtpProvider[], whatsapp, msg91, twoFactor };
 }
 
+/**
+ * TRUST_PROXY: "1" (hops, the default), "2", "true", "false", or a comma list of proxy
+ * addresses/CIDRs such as "10.0.0.0/8,172.16.0.0/12".
+ */
+export function parseTrustProxy(value: string | undefined): Config["trustProxy"] {
+  const v = (value ?? "").trim();
+  if (!v) return 1;
+  if (v.toLowerCase() === "true") return true;
+  if (v.toLowerCase() === "false") return false;
+  if (/^\d+$/.test(v)) return Number(v);
+  const list = v.split(",").map((s) => s.trim()).filter(Boolean);
+  return list.length === 1 ? list[0]! : list;
+}
+
+/**
+ * What Fastify needs. A hop count becomes a function that trusts the nearest `hops`
+ * addresses (the proxy that connected, and any before it): Fastify 5.12+ treats a bare
+ * number as "trust nothing", which would give every caller the proxy's own IP address.
+ */
+export function fastifyTrustProxy(value: Config["trustProxy"]): boolean | string | string[] | ((address: string, hop: number) => boolean) {
+  if (typeof value !== "number") return value;
+  const hops = value;
+  return (_address, hop) => hop < hops;
+}
+
+/** A whole number from the environment, or the fallback when it's unset or not a number. */
+function count(value: string | undefined, fallback: number): number {
+  const n = Number(value);
+  return value !== undefined && value.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
 /** PUSH_VAPID_SUBJECT, else the web app's address, else a placeholder that still validates. */
 function pushSubject(env: NodeJS.ProcessEnv): string {
   if (env.PUSH_VAPID_SUBJECT) return env.PUSH_VAPID_SUBJECT;
@@ -117,6 +168,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     corsPreviewPattern: env.CORS_VERCEL_PREVIEW_PATTERN ? new RegExp(env.CORS_VERCEL_PREVIEW_PATTERN) : null,
     otpDevEcho: env.AUTH_OTP_DEV_ECHO === "true",
     otpMaxPerIp: Number(env.AUTH_OTP_MAX_PER_IP ?? 20),
+    otpMaxPerPhoneDay: count(env.AUTH_OTP_MAX_PER_PHONE_DAY, 10),
+    otpMaxGlobalDay: count(env.AUTH_OTP_MAX_GLOBAL_DAY, 2000),
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    rateLimit: {
+      // Tests make hundreds of calls from one address, so the limiter is off there unless asked for.
+      enabled: env.RATE_LIMIT_ENABLED ? env.RATE_LIMIT_ENABLED === "true" : (env.NODE_ENV ?? "development") !== "test",
+      authPerMinute: count(env.RATE_LIMIT_AUTH_PER_MIN, 20),
+      publicPerMinute: count(env.RATE_LIMIT_PUBLIC_PER_MIN, 60),
+      publicPostPerMinute: count(env.RATE_LIMIT_PUBLIC_POST_PER_MIN, 10),
+    },
     otp: otpConfig(env),
     pushSubject: pushSubject(env),
     uploadsDir: env.UPLOADS_DIR ?? "uploads",

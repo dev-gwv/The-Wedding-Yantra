@@ -268,6 +268,33 @@ export function createApiClient(options: ApiClientOptions) {
       get: (id: string) => request<Workspace>("GET", ws(id)),
       update: (id: string, input: UpdateWorkspaceInput) => request<Workspace>("PATCH", ws(id), input),
       home: (id: string) => request<HomeSummary>("GET", `${ws(id)}/home`),
+      /**
+       * The owner only: every record of the business as one JSON file. Resolves to a Blob;
+       * where `File` exists it is a File named as the server suggests
+       * (wedding-yantra-<business>-<date>.json), so `(blob as File).name` is the file name.
+       */
+      exportData: async (id: string): Promise<Blob> => {
+        const token = await options.getToken();
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        let res: Response;
+        try {
+          res = await doFetch(`${base}/api/v1${ws(id)}/export`, { method: "GET", headers });
+        } catch {
+          throw new ApiRequestError(0, { code: "NETWORK_ERROR", message: "Can't reach Wedding Yantra. Check your internet and try again." });
+        }
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as ApiResponse<never> | null;
+          if (res.status === 401 && token) options.onUnauthorized?.();
+          throw new ApiRequestError(
+            res.status,
+            payload && !payload.success ? payload.error : { code: "BAD_RESPONSE", message: `Unexpected response (${res.status})` },
+          );
+        }
+        const blob = await res.blob();
+        const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1];
+        return name && typeof File !== "undefined" ? new File([blob], name, { type: blob.type || "application/json" }) : blob;
+      },
     },
     team: {
       get: (workspaceId: string) => request<Team>("GET", `${ws(workspaceId)}/team`),

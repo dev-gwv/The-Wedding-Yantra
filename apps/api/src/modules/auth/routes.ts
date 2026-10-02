@@ -18,6 +18,8 @@ export function authRoutes(app: FastifyInstance, deps: { db: Db; config: Config;
         ip: request.ip,
         echo: config.otpDevEcho,
         maxPerIp: config.otpMaxPerIp,
+        maxPerPhoneDay: config.otpMaxPerPhoneDay,
+        maxGlobalDay: config.otpMaxGlobalDay,
         production: config.nodeEnv === "production",
       }),
     );

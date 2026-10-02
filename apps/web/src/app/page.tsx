@@ -223,14 +223,23 @@ export default function HomePage() {
       <footer className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-ink-muted sm:flex-row sm:px-6">
         <Logo className="[&_svg]:size-7 [&>span:last-child]:text-base" />
         <span>Made in India for wedding businesses.</span>
-        <span className="flex gap-5">
+        <nav aria-label="Site" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
           <Link href="/help" className="font-semibold text-brand-strong hover:text-brand-deep">
             Help
+          </Link>
+          <Link href="/privacy" className="font-semibold text-brand-strong hover:text-brand-deep">
+            Privacy
+          </Link>
+          <Link href="/terms" className="font-semibold text-brand-strong hover:text-brand-deep">
+            Terms
+          </Link>
+          <Link href="/refunds" className="font-semibold text-brand-strong hover:text-brand-deep">
+            Refunds
           </Link>
           <Link href="/login" className="font-semibold text-brand-strong hover:text-brand-deep">
             Sign in
           </Link>
-        </span>
+        </nav>
       </footer>
     </div>
   );

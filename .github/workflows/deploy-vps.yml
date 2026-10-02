@@ -50,10 +50,12 @@ env:
   API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
 
 jobs:
+  # Nothing reaches the VPS unless the API builds AND its tests pass against a real
+  # Postgres (the same tests as the CI workflow's api-smoke job). `deploy` needs this job.
   verify:
-    name: Verify API builds
+    name: Verify API builds and tests pass
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16-alpine
@@ -90,6 +92,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run lint typecheck build --filter=@wedding-yantra/api...
+      - name: Create test database
+        run: PGPASSWORD=wy psql -h 127.0.0.1 -U wy -d wy -c "CREATE DATABASE wy_test"
+      - name: Unit tests (shared business rules)
+        run: pnpm --filter @wedding-yantra/core test
+      - name: API integration tests (auth, teams, tenant isolation)
+        run: pnpm --filter @wedding-yantra/api test
+        env:
+          TEST_DATABASE_URL: postgres://wy:wy@127.0.0.1:5432/wy_test
       - name: Smoke test against real Postgres (migrations must apply cleanly)
         run: bash scripts/api-smoke.sh
         env:

@@ -5,6 +5,7 @@ import { formatPhone } from "@wedding-yantra/core";
 import { queryKeys, useApi, useRequestOtp, useUpdateMe, useVerifyOtp } from "@wedding-yantra/api-client/react";
 import { otpRequestInput, otpVerifyInput, updateMeInput } from "@wedding-yantra/types";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { AuthScreen } from "@/components/app/auth-screen";
@@ -133,6 +134,17 @@ function LoginFlow() {
             Get code
           </Button>
           <p className="text-center text-sm text-ink-muted">New here? The same step creates your account.</p>
+          <p className="text-center text-xs text-ink-subtle">
+            By continuing you agree to the{" "}
+            <Link href="/terms" className="font-semibold underline underline-offset-2 hover:text-ink">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="font-semibold underline underline-offset-2 hover:text-ink">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </form>
       )}
 

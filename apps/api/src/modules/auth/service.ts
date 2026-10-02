@@ -32,16 +32,41 @@ const hashCode = (phone: string, code: string) => sha256(`${phone}:${code}`);
 export async function requestOtp(
   db: Db,
   sender: OtpSender,
-  input: { phone: string; ip: string; echo: boolean; maxPerIp: number; production?: boolean },
+  input: {
+    phone: string;
+    ip: string;
+    echo: boolean;
+    maxPerIp: number;
+    /** Codes one number may get per day (India time); 0 means no daily cap. */
+    maxPerPhoneDay?: number;
+    /** Codes sent to everyone together per day, so a bot can't run up the SMS bill; 0 means no cap. */
+    maxGlobalDay?: number;
+    production?: boolean;
+  },
 ): Promise<OtpRequestResult> {
-  const { rows } = await db.query<{ by_phone: string; by_ip: string }>(
-    `SELECT count(*) FILTER (WHERE phone = $1)        AS by_phone,
-            count(*) FILTER (WHERE requested_ip = $2) AS by_ip
-       FROM otp_codes
-      WHERE created_at > now() - interval '15 minutes'`,
+  // "Today" is the calendar day in India, so "try again tomorrow" means what it says.
+  // Old codes are cleared after a day (cleanupAuth), so these counts stay cheap.
+  const { rows } = await db.query<{ by_phone: string; by_ip: string; phone_today: string; all_today: string }>(
+    `WITH since AS (
+       SELECT now() - interval '15 minutes' AS recent,
+              date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata' AS today
+     )
+     SELECT count(*) FILTER (WHERE phone = $1 AND created_at > since.recent)        AS by_phone,
+            count(*) FILTER (WHERE requested_ip = $2 AND created_at > since.recent) AS by_ip,
+            count(*) FILTER (WHERE phone = $1 AND created_at >= since.today)        AS phone_today,
+            count(*) FILTER (WHERE created_at >= since.today)                       AS all_today
+       FROM otp_codes, since
+      WHERE created_at >= least(since.recent, since.today)`,
     [input.phone, input.ip],
   );
-  if (Number(rows[0]?.by_phone) >= OTP_MAX_PER_PHONE || Number(rows[0]?.by_ip) >= input.maxPerIp) {
+  const counts = rows[0];
+  if (input.maxGlobalDay && Number(counts?.all_today) >= input.maxGlobalDay) {
+    throw new AppError(429, "SIGN_IN_BUSY", "Sign-in is busy right now. Please try again in a while.");
+  }
+  if (input.maxPerPhoneDay && Number(counts?.phone_today) >= input.maxPerPhoneDay) {
+    throw new AppError(429, "TOO_MANY_REQUESTS", "Too many codes for this number today. Try again tomorrow.");
+  }
+  if (Number(counts?.by_phone) >= OTP_MAX_PER_PHONE || Number(counts?.by_ip) >= input.maxPerIp) {
     throw new AppError(429, "TOO_MANY_REQUESTS", "Too many codes requested. Please wait 15 minutes and try again.");
   }
 

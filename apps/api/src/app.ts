@@ -1,8 +1,9 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
-import type { Config } from "./config.js";
+import { fastifyTrustProxy, type Config } from "./config.js";
 import type { Db } from "./db.js";
 import { AppError, fail } from "./lib/http.js";
+import { registerRateLimit } from "./lib/rate-limit.js";
 import { localFileStore } from "./lib/storage.js";
 import { registerAuth } from "./modules/auth/guard.js";
 import { createOtpSender, type OtpSender } from "./modules/auth/otp-sender.js";
@@ -16,6 +17,7 @@ import { invoicingRoutes } from "./modules/invoicing/routes.js";
 import { optionRoutes } from "./modules/options/routes.js";
 import { fileRoutes } from "./modules/files/routes.js";
 import { deliverableRoutes } from "./modules/deliverables/routes.js";
+import { exportRoutes } from "./modules/export/routes.js";
 import { growRoutes } from "./modules/grow/routes.js";
 import { inventoryRoutes } from "./modules/inventory/routes.js";
 import { vendorRoutes } from "./modules/vendors/routes.js";
@@ -79,8 +81,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
   const app = Fastify({
     logger: deps.logger === false ? false : { level: config.logLevel },
-    // Running behind the shared reverse proxy: trust X-Forwarded-* headers.
-    trustProxy: true,
+    // Behind the reverse proxy on the VPS: believe only the hop(s) it adds to
+    // X-Forwarded-For (TRUST_PROXY), so a caller can't pick their own IP address.
+    trustProxy: fastifyTrustProxy(config.trustProxy),
     bodyLimit: 1_048_576,
   });
 
@@ -134,6 +137,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.addHook("onClose", async () => pusher.stop());
 
+  // Per-IP budgets, checked before anything touches the database.
+  const { rateLimit } = config;
+  if (rateLimit.enabled) {
+    registerRateLimit(app, {
+      rules: [
+        { name: "public-post", limit: rateLimit.publicPostPerMinute, matches: (m, p) => m !== "GET" && m !== "HEAD" && p.startsWith("/api/v1/public/") },
+        { name: "public", limit: rateLimit.publicPerMinute, matches: (_m, p) => p.startsWith("/api/v1/public/") },
+        // Sign-in and account changes. GET /auth/me is left out: the apps read it on every screen,
+        // and a whole office or mobile network can share one address.
+        { name: "auth", limit: rateLimit.authPerMinute, matches: (m, p) => m !== "GET" && m !== "HEAD" && p.startsWith("/api/v1/auth/") },
+      ],
+    });
+  }
+
   registerAuth(app, db);
   healthRoutes(app, { db, config });
 
@@ -164,6 +181,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       broadcastRoutes(v1, { db });
       notificationRoutes(v1, { db, pusher, publicKey: web.publicKey });
       billingRoutes(v1, { db, config, gateway });
+      exportRoutes(v1, { db });
     },
     { prefix: "/api/v1" },
   );

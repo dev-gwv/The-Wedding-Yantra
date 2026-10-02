@@ -1305,6 +1305,12 @@ export function useCheckout(workspaceId: string) {
   return useMutation({ mutationFn: (input: CheckoutInput) => api.billing.checkout(workspaceId, input) });
 }
 
+/** The owner only: downloads every record of the business as one JSON file (see `workspaces.exportData`). */
+export function useExportData(workspaceId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: () => api.workspaces.exportData(workspaceId) });
+}
+
 // ---- Grow: the client's own page, reviews and referrals -----------------------------
 
 /** Turns on a client's page and returns its link. */

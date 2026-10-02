@@ -1,9 +1,9 @@
 "use client";
 
 import { BILLING_PERIODS, can, daysLeft, formatDate, formatMoney, PLAN_INFO, PLANS, TRIAL_DAYS, type BillingPeriod, type Plan } from "@wedding-yantra/core";
-import { useBilling, useCheckout } from "@wedding-yantra/api-client/react";
+import { useBilling, useCheckout, useExportData } from "@wedding-yantra/api-client/react";
 import type { BillingOverview } from "@wedding-yantra/types";
-import { Check, Lock, Sparkles } from "lucide-react";
+import { Check, Download, Lock, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -82,10 +82,51 @@ function Billing({ b }: { b: BillingOverview }) {
         </div>
       </section>
 
+      <DownloadData />
+
       <p className="text-xs text-ink-subtle">
         Business ID <span className="tabular">{workspace.id}</span>: quote it if you pay by UPI or bank transfer.
       </p>
     </div>
+  );
+}
+
+/** Everything the business has saved, as one file the owner keeps. */
+function DownloadData() {
+  const { workspace } = useCurrentWorkspace();
+  const exportData = useExportData(workspace.id);
+  const toast = useToast();
+
+  async function download() {
+    try {
+      const blob = await exportData.mutateAsync();
+      const today = new Date().toLocaleDateString("en-CA");
+      const name = typeof File !== "undefined" && blob instanceof File ? blob.name : `wedding-yantra-data-${today}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("Saved your data");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h3 className="font-display text-lg font-extrabold">Your data</h3>
+        <p className="text-sm text-ink-muted">Enquiries, clients, events, quotes, invoices, payments and more, in one file you keep.</p>
+      </div>
+      <Button variant="secondary" onClick={download} loading={exportData.isPending} className="shrink-0">
+        {!exportData.isPending && <Download className="size-4" />}
+        Download all my data
+      </Button>
+    </Card>
   );
 }
 
