@@ -34,7 +34,9 @@ export default function DeliverablesPage() {
         <BackLink href="/app/more" label="More" />
         <PageHeader title="Deliverables" />
         <Card>
-          <EmptyState icon={Lock} title="Your role doesn't include events" />
+          <EmptyState icon={Lock} title="Deliverables aren't on your screens">
+            Ask the owner to add Events & calendar for you.
+          </EmptyState>
         </Card>
       </>
     );

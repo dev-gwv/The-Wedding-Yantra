@@ -22,7 +22,7 @@ function NewQuote() {
   const lead = useLead(workspace.id, leadId ?? "");
   const client = useClient(workspace.id, clientId ?? "");
 
-  if (!can(workspace, "quotes.manage")) return <Notice>Only the owner or a manager can make quotes.</Notice>;
+  if (!can(workspace, "quotes.manage")) return <Notice>Making quotes isn&apos;t on your screens. Ask the owner if you need it.</Notice>;
   if (!leadId && !clientId) return <Notice tone="danger">Open a lead or client first, then make a quote from there.</Notice>;
   const loading = (leadId && lead.isPending) || (clientId && !leadId && client.isPending);
   if (loading) return <Splash />;

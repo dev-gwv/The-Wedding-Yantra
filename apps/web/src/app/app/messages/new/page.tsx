@@ -1,21 +1,38 @@
 "use client";
 
 import { useBroadcastAudience, useCreateBroadcast } from "@wedding-yantra/api-client/react";
-import { BROADCAST_AUDIENCE_INFO, BROADCAST_AUDIENCES, BROADCAST_PRESETS, renderTemplate, type BroadcastAudience } from "@wedding-yantra/core";
+import { BROADCAST_AUDIENCE_INFO, BROADCAST_AUDIENCES, BROADCAST_PRESETS, can, renderTemplate, type BroadcastAudience } from "@wedding-yantra/core";
 import { broadcastInput } from "@wedding-yantra/types";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
-import { Card, Notice, PageHeader } from "@/components/ui/misc";
+import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
+/** Lists drawn from leads, not clients: only someone who sees every lead may use them. */
+const FROM_LEADS: ReadonlySet<BroadcastAudience> = new Set(["lost_enquiries"]);
+
 export default function NewMessagePage() {
+  const { workspace } = useCurrentWorkspace();
+  if (!can(workspace, "clients.manage")) {
+    return (
+      <>
+        <BackLink href="/app/messages" label="Messages" />
+        <PageHeader title="New message" />
+        <Card>
+          <EmptyState icon={Lock} title="Messages to clients aren't on your screens">
+            Ask the owner if you need them.
+          </EmptyState>
+        </Card>
+      </>
+    );
+  }
   return (
     <Suspense fallback={<Splash />}>
       <NewMessage />
@@ -27,7 +44,10 @@ function NewMessage() {
   const { workspace } = useCurrentWorkspace();
   const router = useRouter();
   const presetId = useSearchParams().get("preset");
-  const start = BROADCAST_PRESETS.find((p) => p.id === presetId) ?? null;
+  const usable = (a: BroadcastAudience) => !FROM_LEADS.has(a) || can(workspace, "leads.view_all");
+  const audiences = BROADCAST_AUDIENCES.filter(usable);
+  const presets = BROADCAST_PRESETS.filter((p) => usable(p.audience));
+  const start = presets.find((p) => p.id === presetId) ?? null;
   const create = useCreateBroadcast(workspace.id);
   const [preset, setPreset] = useState<string | null>(start?.id ?? null);
   const [title, setTitle] = useState(start ? `${start.label} ${start.id === "season_offer" || start.id === "win_back" ? "message" : "wishes"}` : "");
@@ -38,7 +58,7 @@ function NewMessage() {
   const chosen = useBroadcastAudience(workspace.id, audience);
 
   function pick(id: string) {
-    const p = BROADCAST_PRESETS.find((x) => x.id === id)!;
+    const p = presets.find((x) => x.id === id)!;
     setPreset(p.id);
     setTitle(`${p.label} ${p.id === "season_offer" || p.id === "win_back" ? "message" : "wishes"}`);
     setMessage(p.message);
@@ -84,7 +104,7 @@ function NewMessage() {
           <Card className="p-5 sm:p-6">
             <h2 className="font-display text-lg font-extrabold">Occasion</h2>
             <div className="mt-3 flex flex-wrap gap-2">
-              {BROADCAST_PRESETS.map((p) => (
+              {presets.map((p) => (
                 <button
                   key={p.id}
                   type="button"
@@ -104,7 +124,7 @@ function NewMessage() {
           <Card className="p-5 sm:p-6">
             <h2 className="font-display text-lg font-extrabold">Who gets it</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {BROADCAST_AUDIENCES.map((a) => (
+              {audiences.map((a) => (
                 <AudienceOption key={a} audience={a} selected={audience === a} onPick={() => setAudience(a)} />
               ))}
             </div>
@@ -151,6 +171,7 @@ function NewMessage() {
             <div className="mt-3 rounded-2xl rounded-tl-sm bg-success-soft p-4 text-[15px] leading-relaxed whitespace-pre-line text-ink">{preview}</div>
           </Card>
           {errors._ && <Notice tone="danger">{errors._}</Notice>}
+          {chosen.isError && <Notice tone="danger">{errorMessage(chosen.error)}</Notice>}
           {count === 0 && <Notice tone="warning">Nobody fits this list yet. Pick another list, or add clients with a mobile number.</Notice>}
           <Button size="lg" onClick={submit} loading={create.isPending} disabled={count === 0}>
             {count ? `Make the list: ${count} ${count === 1 ? "person" : "people"}` : "Make the list"}

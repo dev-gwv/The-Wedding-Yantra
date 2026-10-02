@@ -27,7 +27,9 @@ export default function InventoryPage() {
         <BackLink href="/app/more" label="More" />
         <PageHeader title="Stock" />
         <Card>
-          <EmptyState icon={Lock} title="Your role doesn't include stock" />
+          <EmptyState icon={Lock} title="Stock isn't on your screens">
+            Ask the owner to add Events & calendar for you.
+          </EmptyState>
         </Card>
       </>
     );

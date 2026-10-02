@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatMoneyShort } from "@wedding-yantra/core";
+import { can, formatMoneyShort, type Access, type Permission } from "@wedding-yantra/core";
 import { useMoneyOverview } from "@wedding-yantra/api-client/react";
 import { ArrowLeftRight, BarChart3, Check, ChevronDown, ChevronRight, FileText, Lock, ReceiptIndianRupee, ReceiptText, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -16,14 +16,19 @@ import { DateRangeButton } from "./list-kit";
 export type MoneySection = "transactions" | "outstanding" | "invoices" | "quotes" | "expenses" | "reports";
 
 /** The parts of Payments and invoices, in the side menu and the phone's title switcher. */
-export const MONEY_SECTIONS: { key: MoneySection; label: string; href: string; icon: LucideIcon; also?: string[] }[] = [
-  { key: "transactions", label: "Transactions", href: "/app/money", icon: ArrowLeftRight },
-  { key: "outstanding", label: "Outstanding", href: "/app/money/outstanding", icon: Wallet, also: ["/app/money/to-collect"] },
-  { key: "invoices", label: "Invoices", href: "/app/money/invoices", icon: ReceiptIndianRupee, also: ["/app/bills"] },
-  { key: "quotes", label: "Quotes", href: "/app/money/quotes", icon: FileText, also: ["/app/quotes"] },
-  { key: "expenses", label: "Expenses", href: "/app/money/expenses", icon: ReceiptText },
-  { key: "reports", label: "Reports", href: "/app/reports", icon: BarChart3 },
+export const MONEY_SECTIONS: { key: MoneySection; label: string; href: string; icon: LucideIcon; also?: string[]; /** What it takes to open it */ needs: Permission }[] = [
+  { key: "transactions", label: "Transactions", href: "/app/money", icon: ArrowLeftRight, needs: "finance.view" },
+  { key: "outstanding", label: "Outstanding", href: "/app/money/outstanding", icon: Wallet, also: ["/app/money/to-collect"], needs: "finance.view" },
+  { key: "invoices", label: "Invoices", href: "/app/money/invoices", icon: ReceiptIndianRupee, also: ["/app/bills"], needs: "finance.view" },
+  { key: "quotes", label: "Quotes", href: "/app/money/quotes", icon: FileText, also: ["/app/quotes"], needs: "quotes.view" },
+  { key: "expenses", label: "Expenses", href: "/app/money/expenses", icon: ReceiptText, needs: "finance.view" },
+  { key: "reports", label: "Reports", href: "/app/reports", icon: BarChart3, needs: "finance.view" },
 ];
+
+/** The parts this person can open. */
+export function moneySections(who: Access) {
+  return MONEY_SECTIONS.filter((s) => can(who, s.needs));
+}
 
 /** Which part of Payments and invoices a page belongs to, if any. */
 export function moneySectionOf(pathname: string): MoneySection | null {
@@ -75,10 +80,16 @@ export function useMoneyRange(): [DateRange, (r: DateRange) => void] {
 
 /** On a phone there's no side menu: the page title opens the list of sections. */
 function SectionSwitcher({ current }: { current: MoneySection }) {
+  const { workspace } = useCurrentWorkspace();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useDismiss(box, open, () => setOpen(false));
   const label = MONEY_SECTIONS.find((s) => s.key === current)?.label ?? "";
+  const sections = moneySections(workspace);
+  // Nowhere else to go: just the title.
+  if (!sections.some((s) => s.key !== current)) {
+    return <h1 className="font-display text-[clamp(28px,4vw,38px)] font-extrabold leading-tight lg:hidden">{label}</h1>;
+  }
   return (
     <div ref={box} className="relative lg:hidden">
       <button
@@ -93,7 +104,7 @@ function SectionSwitcher({ current }: { current: MoneySection }) {
       </button>
       {open && (
         <div role="menu" className="absolute left-0 top-full z-30 mt-2 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-soft">
-          {MONEY_SECTIONS.map(({ key, label: text, href, icon: Icon }) => (
+          {sections.map(({ key, label: text, href, icon: Icon }) => (
             <Link
               key={key}
               href={href}
@@ -146,14 +157,15 @@ export function MoneyPageHeader({
   );
 }
 
-/** For roles that don't see money: the same message on every section. */
+/** For people whose screens don't include this section. */
 export function MoneyLocked({ section }: { section: MoneySection }) {
+  const quotes = section === "quotes";
   return (
     <>
       <MoneyPageHeader section={section} />
       <Card>
-        <EmptyState icon={Lock} title="Payments and invoices aren't part of your role">
-          The owner, managers and the accountant see invoices, payments and expenses.
+        <EmptyState icon={Lock} title={quotes ? "Quotes aren't on your screens" : "Payments and invoices aren't on your screens"}>
+          {quotes ? "Ask the owner to add Quotes & prices for you." : "Ask the owner to add them for you."}
         </EmptyState>
       </Card>
     </>

@@ -15,6 +15,7 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { writeCustom } from "../fields/service.js";
 import { venuesNamed } from "../venues/service.js";
+import { quoteScopeSql } from "./quotes.js";
 
 /** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
@@ -31,8 +32,11 @@ function scopeSql(ctx: MemberContext, add: (v: unknown) => string, alias = "e"):
 const requireManage = (ctx: MemberContext) => {
   if (!can(ctx, "events.manage")) throw forbidden("Only the owner or a manager can change events");
 };
-/** Booking values are money: staff see the dates and venues, not what the job is worth. */
-const seesMoney = (ctx: MemberContext) => can(ctx, "quotes.view") || can(ctx, "finance.view");
+/**
+ * Booking values are money: staff see the dates and venues, not what the job is worth.
+ * Quotes show them too, but not to someone who sees only their own leads.
+ */
+const seesMoney = (ctx: MemberContext) => can(ctx, "finance.view") || (can(ctx, "quotes.view") && leadScope(ctx) === "all");
 
 interface SummaryRow {
   id: string;
@@ -192,12 +196,15 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
     notes: f.notes,
   }));
 
+  // Only a quote they may open: staff who see only their own leads see only their quotes.
+  const quoteParams: unknown[] = [eventId];
   const quote = can(ctx, "quotes.view")
     ? (
         await db.query<{ id: string; number: number }>(
-          `SELECT id, number FROM quotes WHERE event_id = $1 AND deleted_at IS NULL AND status = 'accepted'
-            ORDER BY accepted_at DESC LIMIT 1`,
-          [eventId],
+          `SELECT q.id, q.number FROM quotes q LEFT JOIN leads l ON l.id = q.lead_id
+            WHERE q.event_id = $1 AND q.deleted_at IS NULL AND q.status = 'accepted' AND ${quoteScopeSql(ctx, quoteParams)}
+            ORDER BY q.accepted_at DESC LIMIT 1`,
+          quoteParams,
         )
       ).rows[0]
     : undefined;
@@ -362,8 +369,10 @@ export async function updateEvent(
     ];
     const sets: string[] = [];
     const values: unknown[] = [eventId];
+    // Someone who can't see the booking value doesn't wipe it: their form sends it blank.
+    const keepValue = !seesMoney(ctx);
     for (const [key, column] of map) {
-      if (input[key] === undefined) continue;
+      if (input[key] === undefined || (key === "value" && keepValue)) continue;
       values.push(input[key]);
       sets.push(`${column} = $${values.length}`);
     }

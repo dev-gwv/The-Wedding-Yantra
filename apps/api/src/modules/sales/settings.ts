@@ -6,8 +6,9 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { listStages } from "./leads.js";
 
+/** Sales stages, editing quick replies and the form switch belong to whoever runs every lead. */
 const requireSettings = (ctx: MemberContext) => {
-  if (!can(ctx, "workspace.update")) throw forbidden("Only the owner or a manager can change sales settings");
+  if (!can(ctx, "leads.view_all")) throw forbidden("Ask the owner: this needs every lead on the Leads screen");
 };
 
 // ---- Sales stages -----------------------------------------------------------

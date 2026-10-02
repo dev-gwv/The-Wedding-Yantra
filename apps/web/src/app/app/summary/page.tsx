@@ -93,7 +93,7 @@ function Summary({ s, businessName, onSent }: { s: DailySummary; businessName: s
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {s.received && <Stat label="Money received" value={formatMoney(s.received.total)} note={`${s.received.count} payment${s.received.count === 1 ? "" : "s"}`} />}
-        <Stat label="New enquiries" value={String(s.newLeads)} note={s.booked ? `${s.booked} booked` : undefined} />
+        {s.newLeads !== null && <Stat label="New enquiries" value={String(s.newLeads)} note={s.booked ? `${s.booked} booked` : undefined} />}
         <Stat label="Tasks done" value={String(s.tasksDone)} />
         <Stat label="Tasks late" value={String(lateTotal)} tone={lateTotal > 0 ? "danger" : undefined} />
       </div>
@@ -117,8 +117,8 @@ function Summary({ s, businessName, onSent }: { s: DailySummary; businessName: s
       <section>
         <h3 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Tomorrow, {formatDate(s.tomorrow.date, { year: false })}</h3>
         <Card className="divide-y divide-line overflow-hidden">
-          {s.tomorrow.events.length === 0 && <p className="px-5 py-4 text-sm text-ink-muted">No events.</p>}
-          {s.tomorrow.events.map((e) => (
+          {s.tomorrow.events?.length === 0 && <p className="px-5 py-4 text-sm text-ink-muted">No events.</p>}
+          {(s.tomorrow.events ?? []).map((e) => (
             <div key={e.title} className="flex items-start gap-3 px-5 py-3.5">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cream text-brand-strong">
                 <CalendarDays className="size-5" />

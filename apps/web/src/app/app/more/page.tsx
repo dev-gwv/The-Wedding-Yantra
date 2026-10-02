@@ -57,6 +57,8 @@ export default function MorePage() {
   const api = useApi();
   const queryClient = useQueryClient();
   const [switching, setSwitching] = useState(false);
+  // The price list opens for anyone who quotes, sells or makes invoices.
+  const readsPrices = can(workspace, "leads.work") || can(workspace, "quotes.view") || can(workspace, "bills.manage") || can(workspace, "catalogue.manage");
 
   async function signOut() {
     // This phone stops getting this person's alerts.
@@ -76,7 +78,8 @@ export default function MorePage() {
         <div className="min-w-0">
           <p className="truncate font-display text-lg font-extrabold">{workspace.name}</p>
           <p className="truncate text-sm text-ink-muted">
-            {workspace.businessTypeName} · You are {ROLE_INFO[workspace.role].label.toLowerCase()}
+            {workspace.businessTypeName} · You&apos;re {ROLE_INFO[workspace.role].label}
+            {workspace.role !== "owner" && workspace.departmentLabel && ` in ${workspace.departmentLabel}`}
           </p>
         </div>
       </Card>
@@ -92,20 +95,20 @@ export default function MorePage() {
         <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
       </Link>
 
-      {(leadScope(workspace) !== "none" || can(workspace, "clients.view")) && (
+      {(leadScope(workspace) !== "none" || can(workspace, "clients.view") || readsPrices) && (
         <>
           <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
           <Card className="mb-6 divide-y divide-line overflow-hidden">
             {can(workspace, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
+            {/* Without the money, Quotes isn't under Payments and invoices. */}
+            {can(workspace, "quotes.view") && !can(workspace, "finance.view") && <Row href="/app/money/quotes" icon={FileText} label="Quotes" />}
             {can(workspace, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
             {can(workspace, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
             {leadScope(workspace) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
             {can(workspace, "leads.view_all") && <Row href="/app/partners" icon={Handshake} label="Partner QR codes" />}
             {leadScope(workspace) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
             {leadScope(workspace) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
-            {(can(workspace, "catalogue.manage") || can(workspace, "quotes.view")) && (
-              <Row href="/app/services" icon={Package} label="Services and packages" />
-            )}
+            {readsPrices && <Row href="/app/services" icon={Package} label="Services and packages" />}
           </Card>
         </>
       )}

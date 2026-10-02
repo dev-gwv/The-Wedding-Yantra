@@ -81,7 +81,10 @@ const FAQ: [string, string][] = [
     "No. Without one, your invoices simply don't charge GST. Add your GSTIN later and the next invoices show CGST and SGST, or IGST for other states.",
   ],
   ["Does it work on my phone?", "Yes. It's made for the phone first. Add it to your home screen and it opens like any other app."],
-  ["Can my team use it?", "Yes. Staff see their own day and tasks, freelancers see only the events they're booked on, and your accountant sees the money, read-only."],
+  [
+    "Can my team use it?",
+    "Yes. Each person's department decides which screens they see: Sales gets leads and quotes, your accountant gets payments and invoices. Their role decides how much they can change there. Freelancers see only the events they're booked on.",
+  ],
   [
     "Is my data safe?",
     "Every business's data is kept apart, and it's backed up every night, bill photos included. Your data is yours: the monthly spreadsheets take it anywhere.",

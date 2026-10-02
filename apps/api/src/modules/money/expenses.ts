@@ -1,4 +1,4 @@
-import { can, round2 } from "@wedding-yantra/core";
+import { can, isOwnerOrManager, round2 } from "@wedding-yantra/core";
 import type { Expense, ExpenseListSummary, ExpenseMonth, ExpenseStatus } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
@@ -18,6 +18,9 @@ const requireChange = (ctx: MemberContext, row: { submitted_by: string | null })
   if (can(ctx, "expenses.submit") && row.submitted_by === ctx.userId) return;
   throw forbidden("Only the owner, a manager or the person who added it can change this expense");
 };
+/** Below manager, an approver's own expense (added or paid by them) is checked by someone else. */
+const isOwnExpense = (ctx: MemberContext, row: { submitted_by: string | null; paid_by: string | null }) =>
+  !isOwnerOrManager(ctx.role) && (row.submitted_by === ctx.userId || row.paid_by === ctx.userId);
 
 interface ExpenseRow {
   id: string;
@@ -195,6 +198,7 @@ export async function expensesSummary(db: Queryable, ctx: MemberContext, filters
 export async function reimburseExpense(db: Db, secret: Buffer, ctx: MemberContext, id: string, reimbursed: boolean): Promise<Expense> {
   if (!can(ctx, "expenses.approve")) throw forbidden("Only the owner or a manager can mark money paid back");
   const current = await loadRow(db, ctx, id);
+  if (isOwnExpense(ctx, current)) throw forbidden("Someone else pays back your own expenses");
   if (!current.paid_by) throw new AppError(409, "PAID_BY_BUSINESS", "The business paid this one, so nobody is owed.");
   await db.query(
     `UPDATE expenses SET reimbursed_at = CASE WHEN $2 THEN coalesce(reimbursed_at, now()) END, reimbursed_by = CASE WHEN $2 THEN $3::uuid END WHERE id = $1`,
@@ -263,14 +267,14 @@ function checkGst(amount: number, gst: number) {
   if (gst > amount) throw new AppError(400, "VALIDATION_ERROR", "GST can't be more than the amount", { gstAmount: "More than the amount" });
 }
 
-/** The owner's and managers' expenses count straight away; the team's wait for approval. */
+/** Expenses the owner or an approving manager adds count straight away; everyone else's wait for approval. */
 export async function createExpense(db: Db, secret: Buffer, ctx: MemberContext, input: ExpenseFields): Promise<Expense> {
   if (!can(ctx, "expenses.submit")) throw forbidden("Your role can't add expenses");
   return withTransaction(db, async (tx) => {
     await checkLinks(tx, ctx, input);
     await assertOption(tx, ctx.workspaceId, "expense_category", input.category, "category");
     if (input.method) await assertOption(tx, ctx.workspaceId, "payment_method", input.method, "method");
-    const approver = can(ctx, "expenses.approve");
+    const approver = can(ctx, "expenses.approve") && isOwnerOrManager(ctx.role);
     const gstAmount = gstFor(input.amount, input.gstRate, input.gstAmount);
     checkGst(input.amount, gstAmount);
     const { rows } = await tx.query<{ id: string }>(
@@ -329,7 +333,9 @@ export async function updateExpense(db: Db, secret: Buffer, ctx: MemberContext, 
     const current = await loadRow(tx, ctx, id, true);
     requireChange(ctx, current);
     await requireNotPayout(tx, id);
-    const approver = can(ctx, "expenses.approve");
+    // Below manager, an approver changes their own expense, or one they make theirs, like anyone else.
+    const own = isOwnExpense(ctx, current) || isOwnExpense(ctx, { submitted_by: null, paid_by: input.paidBy ?? null });
+    const approver = can(ctx, "expenses.approve") && !own;
     if (!approver && current.status === "approved") {
       throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to change it.");
     }
@@ -382,7 +388,8 @@ export async function reviewExpense(
   decision: { approve: boolean; reason?: string | null },
 ): Promise<Expense> {
   if (!can(ctx, "expenses.approve")) throw forbidden("Only the owner or a manager can approve expenses");
-  await loadRow(db, ctx, id);
+  const current = await loadRow(db, ctx, id);
+  if (isOwnExpense(ctx, current)) throw forbidden("Someone else approves your own expenses");
   await db.query(
     `UPDATE expenses SET status = $2, reject_reason = $3, reviewed_by = $4, reviewed_at = now() WHERE id = $1`,
     [id, decision.approve ? "approved" : "rejected", decision.approve ? null : (decision.reason ?? null), ctx.userId],
@@ -456,9 +463,11 @@ export async function eventSpend(db: Queryable, eventId: string): Promise<{ spen
 
 export async function pendingExpenseCount(db: Queryable, ctx: MemberContext): Promise<number> {
   if (!can(ctx, "expenses.approve")) return 0;
+  // Below manager, their own expenses wait for someone else, so they aren't theirs to approve.
+  const others = isOwnerOrManager(ctx.role) ? "" : " AND submitted_by IS DISTINCT FROM $2 AND paid_by IS DISTINCT FROM $2";
   const { rows } = await db.query<{ count: string }>(
-    `SELECT count(*) AS count FROM expenses WHERE workspace_id = $1 AND status = 'pending' AND deleted_at IS NULL`,
-    [ctx.workspaceId],
+    `SELECT count(*) AS count FROM expenses WHERE workspace_id = $1 AND status = 'pending' AND deleted_at IS NULL${others}`,
+    others ? [ctx.workspaceId, ctx.userId] : [ctx.workspaceId],
   );
   return Number(rows[0]!.count);
 }

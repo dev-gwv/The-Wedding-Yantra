@@ -1,7 +1,7 @@
 "use client";
 
 import { can, eventScope, firstName, formatMoney, formatMoneyShort, greeting, leadScope, todayIn, type Access } from "@wedding-yantra/core";
-import { useHome } from "@wedding-yantra/api-client/react";
+import { useHome, useMoneyOverview } from "@wedding-yantra/api-client/react";
 import type { HomeSummary } from "@wedding-yantra/types";
 import {
   AlarmClock,
@@ -30,6 +30,7 @@ import { useState, type ReactNode } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { EventCard } from "@/components/bookings/event-card";
 import { ExpenseSheet } from "@/components/money/expense-sheet";
+import { RecordPaymentSheet } from "@/components/money/payments-view";
 import { DueRow } from "@/components/money/rows";
 import { LeadCard } from "@/components/sales/lead-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
@@ -48,13 +49,15 @@ export default function HomePage() {
   // Signed-in screens only render in the browser, so the viewer's own clock is used.
   const hello = greeting(new Date().getHours());
   const today = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: workspace.timezone }).format(new Date());
+  // Someone whose screens come from their department gets that department's Home, e.g. "Sales dashboard".
+  const dashboard = workspace.accessSource === "department" && workspace.departmentLabel ? `${workspace.departmentLabel} dashboard` : null;
 
   return (
     <>
       <PageHeader
         eyebrow={<Eyebrow>{workspace.name}</Eyebrow>}
         title={`${hello}${me.user.name ? `, ${firstName(me.user.name)}` : ""}`}
-        subtitle={today}
+        subtitle={dashboard ? `${dashboard} · ${today}` : today}
       />
 
       {home.isPending && (
@@ -119,12 +122,12 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Access }) {
       {/* The day's work: your tasks, the tasks you've given, and the team. */}
       {works && <DailyReport />}
 
-      {(sells || home.money) && <Numbers home={home} />}
+      {(sells || home.money) && <Numbers home={home} role={role} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
         <div className="space-y-6">
           {sells ? (
-            <FollowUps home={home} />
+            <FollowUps home={home} own={leadScope(role) === "own"} />
           ) : (
             !works && (
               <Card>
@@ -189,10 +192,14 @@ function SectionHead({ title, href, link }: { title: string; href: string; link:
   );
 }
 
-/** The everyday things, one tap from Home. */
+/** The everyday things, one tap from Home. Four at most. */
 function QuickActions({ role }: { role: Access }) {
+  const { workspace } = useCurrentWorkspace();
   const router = useRouter();
-  const [adding, setAdding] = useState<"lead" | "expense" | null>(null);
+  const [adding, setAdding] = useState<"lead" | "expense" | "payment" | null>(null);
+  // Without leads, recording money from clients takes the enquiry's place (an accountant's day).
+  const records = can(role, "payments.record") && can(role, "finance.view") && !can(role, "leads.work");
+  const overview = useMoneyOverview(workspace.id, records);
   const actions: { label: string; icon: LucideIcon; onClick?: () => void; href?: string }[] = [
     ...(can(role, "leads.work") ? [{ label: "Add enquiry", icon: UserPlus, onClick: () => setAdding("lead") }] : []),
     ...(can(role, "quotes.manage") ? [{ label: "Make a quote", icon: FileText, href: "/app/quotes/new" }] : []),
@@ -201,8 +208,9 @@ function QuickActions({ role }: { role: Access }) {
       : can(role, "events.manage")
         ? [{ label: "Add event", icon: CalendarPlus, href: "/app/events/new" }]
         : []),
+    ...(records ? [{ label: "Record payment", icon: IndianRupee, onClick: () => setAdding("payment") }] : []),
     ...(can(role, "expenses.submit") ? [{ label: "Add expense", icon: ReceiptText, onClick: () => setAdding("expense") }] : []),
-  ];
+  ].slice(0, 4);
   if (!actions.length) return null;
   const tile =
     "flex flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-1.5 py-3.5 text-center text-[13px] font-bold leading-tight shadow-soft transition hover:border-sun-300 motion-safe:hover:-translate-y-0.5 sm:flex-row sm:justify-start sm:gap-3 sm:px-4 sm:py-4 sm:text-left sm:text-[15px]";
@@ -232,41 +240,69 @@ function QuickActions({ role }: { role: Access }) {
         }}
       />
       <ExpenseSheet open={adding === "expense"} onClose={() => setAdding(null)} />
+      {records && <RecordPaymentSheet open={adding === "payment"} onClose={() => setAdding(null)} dues={overview.data?.dues ?? []} />}
     </>
   );
 }
 
-/** How the month is going, for those who see money; the day's follow-ups for everyone else. */
-function Numbers({ home }: { home: HomeSummary }) {
+type Tile = { label: string; value: string; icon: LucideIcon; href: string; tone?: "danger"; note?: string; noteTone?: "brand" };
+
+/**
+ * How the month is going, for those who see money; the day's follow-ups for those who sell.
+ * Each tile follows what the person can see: lead tiles only with Leads, money tiles only with
+ * Payments, and the month's enquiries and bookings only for those who see every lead.
+ */
+function Numbers({ home, role }: { home: HomeSummary; role: Access }) {
   const { overdue, dueToday, newLeads, openValue, monthEnquiries, monthBooked } = home.sales;
   const month = new Intl.DateTimeFormat("en-IN", { month: "long" }).format(new Date());
-  const tiles: { label: string; value: string; icon: LucideIcon; href: string; tone?: "danger"; note?: string; noteTone?: "brand" }[] = home.money
-    ? [
-        { label: `Enquiries in ${month}`, value: String(monthEnquiries ?? 0), icon: Inbox, href: "/app/leads?view=pipeline" },
-        {
-          label: `Booked in ${month}`,
-          value: String(monthBooked ?? 0),
-          icon: PartyPopper,
-          href: "/app/events",
-          note: home.sales.monthBookedValue ? formatMoneyShort(home.sales.monthBookedValue) : undefined,
-          noteTone: "brand",
-        },
-        { label: `Received in ${month}`, value: formatMoneyShort(home.money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?range=month" },
-        {
-          label: "Outstanding",
-          value: formatMoneyShort(home.money.toCollect),
-          icon: Wallet,
-          href: "/app/money/outstanding",
-          tone: home.money.overdue > 0 ? "danger" : undefined,
-          note: home.money.overdue > 0 ? `${formatMoneyShort(home.money.overdue)} late` : undefined,
-        },
-      ]
-    : [
-        { label: "Follow-ups late", value: String(overdue), icon: AlarmClock, href: "/app/leads", tone: overdue > 0 ? "danger" : undefined },
-        { label: "Follow-ups today", value: String(dueToday), icon: BellRing, href: "/app/leads" },
-        { label: "New enquiries", value: String(newLeads), icon: Inbox, href: "/app/leads?view=pipeline" },
-        { label: "In the pipeline", value: formatMoneyShort(openValue), icon: IndianRupee, href: "/app/leads?view=pipeline" },
-      ];
+  const scope = leadScope(role);
+  const money = home.money;
+  const followUps: Tile[] = [
+    { label: "Follow-ups late", value: String(overdue), icon: AlarmClock, href: "/app/leads", tone: overdue > 0 ? "danger" : undefined },
+    { label: "Follow-ups today", value: String(dueToday), icon: BellRing, href: "/app/leads" },
+  ];
+  const monthTiles: Tile[] = [
+    { label: `Enquiries in ${month}`, value: String(monthEnquiries ?? 0), icon: Inbox, href: "/app/leads?view=pipeline" },
+    {
+      label: `Booked in ${month}`,
+      value: String(monthBooked ?? 0),
+      icon: PartyPopper,
+      href: "/app/events",
+      note: home.sales.monthBookedValue ? formatMoneyShort(home.sales.monthBookedValue) : undefined,
+      noteTone: "brand",
+    },
+  ];
+  let tiles: Tile[];
+  if (money && scope !== "none") {
+    tiles = [
+      ...(scope === "all" ? monthTiles : followUps),
+      { label: `Received in ${month}`, value: formatMoneyShort(money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?range=month" },
+      {
+        label: "Outstanding",
+        value: formatMoneyShort(money.toCollect),
+        icon: Wallet,
+        href: "/app/money/outstanding",
+        tone: money.overdue > 0 ? "danger" : undefined,
+        note: money.overdue > 0 ? `${formatMoneyShort(money.overdue)} late` : undefined,
+      },
+    ];
+  } else if (money) {
+    // Payments without leads, as for an accountant: the money in, what's owed, and the team's expenses.
+    tiles = [
+      { label: `Received in ${month}`, value: formatMoneyShort(money.receivedThisMonth ?? 0), icon: IndianRupee, href: "/app/money?range=month" },
+      { label: "Outstanding", value: formatMoneyShort(money.toCollect), icon: Wallet, href: "/app/money/outstanding" },
+      { label: "Overdue", value: formatMoneyShort(money.overdue), icon: AlarmClock, href: "/app/money/outstanding", tone: money.overdue > 0 ? "danger" : undefined },
+      can(role, "expenses.approve")
+        ? { label: "Expenses to approve", value: String(money.pendingExpenses), icon: ReceiptText, href: "/app/money/expenses" }
+        : { label: `Spent in ${month}`, value: formatMoneyShort(money.spentThisMonth ?? 0), icon: ReceiptText, href: "/app/money/expenses" },
+    ];
+  } else {
+    tiles = [
+      ...followUps,
+      { label: "New enquiries", value: String(newLeads), icon: Inbox, href: "/app/leads?view=pipeline" },
+      { label: "In the pipeline", value: formatMoneyShort(openValue), icon: IndianRupee, href: "/app/leads?view=pipeline" },
+    ];
+  }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {tiles.map((t) => (
@@ -284,7 +320,7 @@ function Numbers({ home }: { home: HomeSummary }) {
 }
 
 /** Who to call or message first: follow-ups late or due today. */
-function FollowUps({ home }: { home: HomeSummary }) {
+function FollowUps({ home, own }: { home: HomeSummary; /** Sees only their own leads */ own: boolean }) {
   const { due, overdue, dueToday } = home.sales;
   if (!due.length) {
     return (
@@ -299,6 +335,7 @@ function FollowUps({ home }: { home: HomeSummary }) {
           }
         >
           Enquiries to call back show up here, so you know who to reach first each morning.
+          {own && " You see the leads you add or are given."}
         </EmptyState>
       </Card>
     );

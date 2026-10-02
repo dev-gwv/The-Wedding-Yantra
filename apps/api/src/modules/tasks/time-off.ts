@@ -4,6 +4,7 @@ import type { Db, Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { runsWorkOf, workOfFilter } from "./service.js";
 
 const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
@@ -37,7 +38,7 @@ const toTimeOff = (r: Row): TimeOff => ({
   createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
 });
 
-/** Owners and managers see everyone's days off; everyone else sees their own. */
+/** Owners and managers see everyone's days off (a department's manager, their people's); everyone else sees their own. */
 export async function listTimeOff(
   db: Queryable,
   ctx: MemberContext,
@@ -51,7 +52,11 @@ export async function listTimeOff(
   };
   const where = ["o.workspace_id = $1", "o.deleted_at IS NULL"];
   if (!manages(ctx)) where.push(`o.user_id = ${add(ctx.userId)}`);
-  else if (q.userId) where.push(`o.user_id = ${add(q.userId)}`);
+  else {
+    if (q.userId) where.push(`o.user_id = ${add(q.userId)}`);
+    const theirs = workOfFilter(ctx, "o.user_id", params);
+    if (theirs) where.push(theirs);
+  }
   if (q.from) where.push(`o.end_date >= ${add(q.from)}::date`);
   if (q.to) where.push(`o.start_date <= ${add(q.to)}::date`);
   const { rows } = await db.query<Row>(`${SELECT} WHERE ${where.join(" AND ")} ORDER BY o.start_date, u.name LIMIT 500`, params);
@@ -72,6 +77,7 @@ export async function addTimeOff(
       userId,
     ]);
     if (!rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose someone from your team", { userId: "Choose someone from your team" });
+    if (!(await runsWorkOf(db, ctx, userId))) throw forbidden("You mark days off for people in your department");
   }
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO time_off (workspace_id, user_id, start_date, end_date, note, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
@@ -96,19 +102,28 @@ export async function removeTimeOff(db: Db, ctx: MemberContext, id: string): Pro
     `SELECT user_id FROM time_off WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
     [id, ctx.workspaceId],
   );
-  // Someone else's days off aren't visible to you unless you manage the team.
+  // Someone else's days off aren't visible to you unless you manage the team (or their department).
   if (!rows[0] || (!manages(ctx) && rows[0].user_id !== ctx.userId)) throw notFound("These days off");
+  if (!(await runsWorkOf(db, ctx, rows[0].user_id))) throw notFound("These days off");
   await db.query(`UPDATE time_off SET deleted_at = now() WHERE id = $1`, [id]);
 }
 
 /** Names of people off on a day, for the daily summary. */
-export async function offOn(db: Queryable, workspaceId: string, day: string): Promise<string[]> {
+export async function offOn(
+  db: Queryable,
+  workspaceId: string,
+  day: string,
+  /** Only this department's people, and this person: for a department's manager */
+  only?: { userId: string; department: string | null },
+): Promise<string[]> {
   const { rows } = await db.query<{ name: string | null }>(
     `SELECT DISTINCT u.name FROM time_off o JOIN users u ON u.id = o.user_id
       JOIN memberships m ON m.workspace_id = o.workspace_id AND m.user_id = o.user_id AND m.removed_at IS NULL
+      LEFT JOIN member_details d ON d.membership_id = m.id
      WHERE o.workspace_id = $1 AND o.deleted_at IS NULL AND $2::date BETWEEN o.start_date AND o.end_date
+       ${only ? "AND (o.user_id = $3 OR d.department = $4)" : ""}
      ORDER BY u.name`,
-    [workspaceId, day],
+    only ? [workspaceId, day, only.userId, only.department] : [workspaceId, day],
   );
   return rows.map((r) => r.name ?? "A team member");
 }

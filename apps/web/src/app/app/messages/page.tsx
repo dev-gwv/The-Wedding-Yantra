@@ -1,8 +1,8 @@
 "use client";
 
 import { useBroadcasts } from "@wedding-yantra/api-client/react";
-import { BROADCAST_AUDIENCE_INFO, BROADCAST_PRESETS, broadcastProgress, can, formatDate } from "@wedding-yantra/core";
-import { ChevronRight, Megaphone, Plus } from "lucide-react";
+import { BROADCAST_AUDIENCE_INFO, BROADCAST_PRESETS, broadcastProgress, can, formatDate, type BroadcastAudience } from "@wedding-yantra/core";
+import { ChevronRight, Lock, Megaphone, Plus } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
@@ -11,10 +11,14 @@ import { Card, EmptyState, Notice, PageHeader, ProgressBar } from "@/components/
 import { Spinner } from "@/components/ui/spinner";
 import { errorMessage } from "@/lib/errors";
 
+/** Lists drawn from leads, not clients: only someone who sees every lead may open them. */
+const FROM_LEADS: ReadonlySet<BroadcastAudience> = new Set(["lost_enquiries"]);
+
 export default function MessagesPage() {
   const { workspace } = useCurrentWorkspace();
   const allowed = can(workspace, "clients.manage");
   const list = useBroadcasts(workspace.id);
+  const messages = list.data?.filter((b) => !FROM_LEADS.has(b.audience) || can(workspace, "leads.view_all"));
 
   return (
     <>
@@ -23,21 +27,27 @@ export default function MessagesPage() {
         title="Messages to clients"
         subtitle="Festival wishes, anniversary wishes and offers, sent from your own WhatsApp."
         action={
-          allowed && list.data && list.data.length > 0 ? (
+          allowed && messages && messages.length > 0 ? (
             <ButtonLink href="/app/messages/new">
               <Plus className="size-4" strokeWidth={2.5} /> New message
             </ButtonLink>
           ) : undefined
         }
       />
-      {!allowed && <Notice>Only the owner or a manager can send messages to clients.</Notice>}
+      {!allowed && (
+        <Card>
+          <EmptyState icon={Lock} title="Messages to clients aren't on your screens">
+            Ask the owner if you need them.
+          </EmptyState>
+        </Card>
+      )}
       {allowed && list.isPending && (
         <div className="flex justify-center py-16 text-brand">
           <Spinner />
         </div>
       )}
       {allowed && list.isError && <Notice tone="danger">{errorMessage(list.error)}</Notice>}
-      {list.data && list.data.length === 0 && (
+      {allowed && messages && messages.length === 0 && (
         <Card>
           <EmptyState
             icon={Megaphone}
@@ -59,9 +69,9 @@ export default function MessagesPage() {
           </div>
         </Card>
       )}
-      {list.data && list.data.length > 0 && (
+      {allowed && messages && messages.length > 0 && (
         <Card className="divide-y divide-line overflow-hidden">
-          {list.data.map((b) => {
+          {messages.map((b) => {
             const p = broadcastProgress(b.counts);
             return (
               <Link key={b.id} href={`/app/messages/${b.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-cream">

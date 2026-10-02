@@ -1,4 +1,4 @@
-import { ROLE_INFO, ROLES, TRIAL_DAYS } from "@wedding-yantra/core";
+import { AREA_INFO, AREAS, ROLE_INFO, ROLES, TRIAL_DAYS } from "@wedding-yantra/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/site-header";
@@ -197,7 +197,17 @@ export default function HelpPage() {
 
           <section id="roles" className="scroll-mt-6 rounded-3xl border border-line p-6 shadow-soft">
             <h2 className="font-display text-2xl font-extrabold">Who can do what</h2>
-            <dl className="mt-4 divide-y divide-line">
+            <p className="mt-3 leading-relaxed">
+              Each person has a department and a role. The department decides which screens they see. The role decides how much they can do on
+              them. Someone with no department keeps their role&apos;s usual access.
+            </p>
+            <p className="mt-2 leading-relaxed">
+              The owner chooses each department&apos;s screens in Master data, Departments, and can switch on an extra screen for one person on their
+              page in Employees.
+            </p>
+
+            <h3 className="mt-6 font-display text-lg font-extrabold">Roles: how much they can do</h3>
+            <dl className="mt-2 divide-y divide-line">
               {ROLES.map((role) => (
                 <div key={role} className="flex flex-col gap-0.5 py-3 sm:flex-row sm:gap-4">
                   <dt className="w-32 shrink-0 font-bold">{ROLE_INFO[role].label}</dt>
@@ -205,6 +215,20 @@ export default function HelpPage() {
                 </div>
               ))}
             </dl>
+
+            <h3 className="mt-6 font-display text-lg font-extrabold">Screens: what a department can open</h3>
+            <dl className="mt-2 divide-y divide-line">
+              {AREAS.map((area) => (
+                <div key={area} className="flex flex-col gap-0.5 py-3 sm:flex-row sm:gap-4">
+                  <dt className="w-32 shrink-0 font-bold">{AREA_INFO[area].label}</dt>
+                  <dd className="text-ink-muted">{AREA_INFO[area].opens}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-ink-muted">
+              Managers and staff always have Home, My day, their tasks, alerts, days off, the employee list and their own expenses, whatever their
+              department.
+            </p>
           </section>
         </div>
 

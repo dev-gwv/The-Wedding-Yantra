@@ -11,6 +11,7 @@ import type {
 } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
+import { memberAccess } from "../auth/access.js";
 import type { MemberContext } from "../auth/guard.js";
 import { writeCustom } from "../fields/service.js";
 
@@ -275,7 +276,7 @@ export async function firstOpenStage(db: Queryable, workspaceId: string) {
   return rows[0];
 }
 
-/** Checks that someone is an active member before a lead is given to them. */
+/** Checks that someone is an active member with the Leads screen before a lead is given to them. */
 async function assertMember(db: Queryable, workspaceId: string, userId: string): Promise<string | null> {
   const { rows } = await db.query<{ name: string | null }>(
     `SELECT u.name FROM memberships m JOIN users u ON u.id = m.user_id
@@ -285,6 +286,12 @@ async function assertMember(db: Queryable, workspaceId: string, userId: string):
   if (!rows[0]) {
     throw new AppError(400, "VALIDATION_ERROR", "Pick someone from your team", {
       assignedToUserId: "Pick someone from your team",
+    });
+  }
+  const access = await memberAccess(db, workspaceId, userId);
+  if (!access || !can(access, "leads.work")) {
+    throw new AppError(400, "VALIDATION_ERROR", "Choose someone who has the Leads screen", {
+      assignedToUserId: "Choose someone who has the Leads screen",
     });
   }
   return rows[0].name;
@@ -540,12 +547,15 @@ export async function salesSummary(db: Db, ctx: MemberContext) {
     ),
     listLeads(db, ctx, { followUp: "due" }),
     // Bookings: events made this month, however they came in (enquiry, quote or typed in).
+    // Someone who sees only their own leads counts only the bookings from those leads.
     db.query<{ n: string; value: string }>(
       `SELECT count(*) AS n, coalesce(sum(e.value), 0) AS value
          FROM events e JOIN workspaces w ON w.id = e.workspace_id
+         LEFT JOIN leads l ON l.id = e.lead_id
         WHERE e.workspace_id = $1 AND e.deleted_at IS NULL AND e.status <> 'cancelled'
-          AND e.created_at AT TIME ZONE w.timezone >= date_trunc('month', now() AT TIME ZONE w.timezone)`,
-      [ctx.workspaceId],
+          AND e.created_at AT TIME ZONE w.timezone >= date_trunc('month', now() AT TIME ZONE w.timezone)
+          AND ${scopeSql}`,
+      params,
     ),
   ]);
   const r = counts.rows[0]!;

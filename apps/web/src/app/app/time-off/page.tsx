@@ -1,6 +1,6 @@
 "use client";
 
-import { can, daysBetween, formatDateRange } from "@wedding-yantra/core";
+import { can, daysBetween, formatDateRange, teamScope } from "@wedding-yantra/core";
 import { useAddTimeOff, useRemoveTimeOff, useTeam, useTimeOff } from "@wedding-yantra/api-client/react";
 import { timeOffInput, type TimeOff } from "@wedding-yantra/types";
 import { CalendarOff, Lock, Plus, Trash2 } from "lucide-react";
@@ -32,8 +32,8 @@ export default function TimeOffPage() {
         <BackLink href="/app/more" label="More" />
         <PageHeader title="Days off" />
         <Card>
-          <EmptyState icon={Lock} title="Days off aren't part of your role">
-            They&apos;re for the people who work events.
+          <EmptyState icon={Lock} title="Days off aren't on your screens">
+            They&apos;re for the people who get tasks. Ask the owner if you need them.
           </EmptyState>
         </Card>
       </>
@@ -164,7 +164,11 @@ function AddForm({ onDone }: { onDone: () => void }) {
     }
   }
 
-  const members = (team.data?.members ?? []).filter((m) => m.role !== "accountant");
+  // A department's manager marks days off only for the people in it, and for themselves.
+  const ownDepartment = teamScope(workspace) === "department";
+  const members = (team.data?.members ?? []).filter(
+    (m) => m.role !== "accountant" && (!ownDepartment || m.isYou || (!!workspace.department && m.department === workspace.department)),
+  );
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
       {manage && members.length > 1 && (

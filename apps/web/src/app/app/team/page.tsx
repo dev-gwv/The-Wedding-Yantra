@@ -1,12 +1,13 @@
 "use client";
 
-import { assignableRoles, can, firstName, formatDate, formatPhone, ROLE_INFO, whatsappLink, type Role } from "@wedding-yantra/core";
+import { AREA_INFO, assignableRoles, can, firstName, formatDate, formatPhone, ROLE_INFO, whatsappLink, type Role } from "@wedding-yantra/core";
 import { useInviteMember, useRevokeInvitation, useTeam } from "@wedding-yantra/api-client/react";
 import { createInvitationInput, EMPLOYMENT_TYPE_LABELS, type Invitation } from "@wedding-yantra/types";
 import { ChevronRight, Copy, Lock, MessageCircle, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
+import { OptionSelect } from "@/components/app/option-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { cn } from "@/lib/cn";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -147,6 +148,15 @@ export default function TeamPage() {
                     <span className="block truncate text-sm text-ink-muted tabular">
                       {[m.departmentLabel, m.designationLabel, m.employmentType && EMPLOYMENT_TYPE_LABELS[m.employmentType], formatPhone(m.phone)].filter(Boolean).join(" · ")}
                     </span>
+                    {m.extraAreas.length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {m.extraAreas.map((a) => (
+                          <span key={a} className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-brand-strong" title="Extra screen, just for them">
+                            + {AREA_INFO[a].label}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </span>
                   <Pill tone={m.role === "owner" ? "brand" : "neutral"}>{ROLE_INFO[m.role].label}</Pill>
                   <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
@@ -162,7 +172,9 @@ export default function TeamPage() {
                 title="Add the people you work with"
                 action={<Button onClick={() => setInviting(true)}>Invite someone</Button>}
               >
-                Invite staff, freelancers or your accountant by phone. They join with one tap from WhatsApp.
+                {can(workspace, "members.hr")
+                  ? "Invite people by phone and choose their department, so each person sees the right screens. They join with one tap from WhatsApp."
+                  : "Invite people by phone. They join with one tap from WhatsApp."}
               </EmptyState>
             </Card>
           )}
@@ -200,12 +212,13 @@ function PendingInvite({ invitation, onShare }: { invitation: Invitation; onShar
   const revoke = useRevokeInvitation(workspace.id);
   const toast = useToast();
 
-  // The link is only shown once, so "send again" makes a fresh one.
+  // The link is only shown once, so "send again" makes a fresh one, in the same department.
+  // Only the owner sends a department; for anyone else the new link keeps the old one's.
   async function resend() {
     try {
-      const input = { name: invitation.name, phone: invitation.phone, role: invitation.role };
-      const created = await invite.mutateAsync(input);
-      onShare({ ...input, token: created.token });
+      const { name, phone, role, department } = invitation;
+      const created = await invite.mutateAsync({ name, phone, role, ...(can(workspace, "members.hr") ? { department } : {}) });
+      onShare({ name, phone, role, token: created.token });
     } catch (err) {
       toast(errorMessage(err), "error");
     }
@@ -226,7 +239,7 @@ function PendingInvite({ invitation, onShare }: { invitation: Invitation; onShar
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{invitation.name}</span>
         <span className="block text-sm text-ink-muted tabular">
-          {formatPhone(invitation.phone)} · {ROLE_INFO[invitation.role].label}
+          {[formatPhone(invitation.phone), invitation.departmentLabel, ROLE_INFO[invitation.role].label].filter(Boolean).join(" · ")}
         </span>
       </span>
       <div className="flex basis-full justify-end gap-1 sm:basis-auto">
@@ -254,9 +267,12 @@ function InviteSheet({
 }) {
   const { workspace } = useCurrentWorkspace();
   const invite = useInviteMember(workspace.id);
+  // Only the owner chooses a department, as it decides which screens they'll see.
+  const owner = can(workspace, "members.hr");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<Role>(roles.includes("staff") ? "staff" : (roles[0] ?? "staff"));
+  const [department, setDepartment] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function close() {
@@ -266,14 +282,16 @@ function InviteSheet({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const check = validate(createInvitationInput, { name, phone, role });
+    const input = { name, phone, role, ...(owner ? { department } : {}) };
+    const check = validate(createInvitationInput, input);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
     try {
-      const created = await invite.mutateAsync({ name, phone, role });
+      const created = await invite.mutateAsync(input);
       onCreated({ name, phone: created.invitation.phone, role, token: created.token });
       setName("");
       setPhone("");
+      setDepartment(null);
     } catch (err) {
       const fields = apiFieldErrors(err);
       setErrors(Object.keys(fields).length ? fields : { _: errorMessage(err) });
@@ -298,6 +316,12 @@ function InviteSheet({
             </option>
           ))}
         </SelectField>
+        {owner && (
+          <div>
+            <OptionSelect list="department" label="Department" value={department} onChange={setDepartment} error={errors.department} none="No department" />
+            <p className="mt-1.5 text-sm text-ink-muted">Decides which screens they see. You can change it later.</p>
+          </div>
+        )}
         {errors._ && <Notice tone="danger">{errors._}</Notice>}
         <Button type="submit" size="lg" loading={invite.isPending}>
           Create invite
@@ -307,6 +331,15 @@ function InviteSheet({
   );
 }
 
+/** How the invite message names the role: "as staff", "with view-only access". */
+const AS_ROLE: Record<Role, string> = {
+  owner: "as the owner",
+  manager: "as a manager",
+  staff: "as staff",
+  freelancer: "as a freelancer",
+  accountant: "with view-only access",
+};
+
 function ShareSheet({ share, onClose }: { share: Share | null; onClose: () => void }) {
   const { me, workspace } = useCurrentWorkspace();
   const toast = useToast();
@@ -315,7 +348,7 @@ function ShareSheet({ share, onClose }: { share: Share | null; onClose: () => vo
   const url = inviteUrl(share.token);
   const message =
     `Hi ${firstName(share.name)}, ${me.user.name ?? "I"} has added you to ${workspace.name} on Wedding Yantra ` +
-    `as ${ROLE_INFO[share.role].label.toLowerCase()}. Tap to join: ${url}`;
+    `${AS_ROLE[share.role]}. Tap to join: ${url}`;
 
   async function copy() {
     try {

@@ -3,6 +3,7 @@ import type { TaskPriority, TaskRepeat } from "@wedding-yantra/types";
 import type { Db, Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { runsWorkOf, workOfFilter } from "./service.js";
 
 const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
@@ -84,11 +85,24 @@ export async function makeDueRepeats(db: Queryable, workspaceId: string): Promis
 export async function listRepeats(db: Queryable, ctx: MemberContext, scope: "mine" | "team" = "mine"): Promise<TaskRepeat[]> {
   requireWork(ctx);
   if (scope === "team" && !manages(ctx)) throw forbidden("Only the owner or a manager can see everyone's");
+  const params: unknown[] = [ctx.workspaceId];
+  let only = "";
+  if (scope === "mine") {
+    params.push(ctx.userId);
+    only = "AND r.assignee_id = $2";
+  } else {
+    // A department's manager sees their people's, and the ones they made.
+    const theirs = workOfFilter(ctx, "r.assignee_id", params);
+    if (theirs) {
+      params.push(ctx.userId);
+      only = `AND (${theirs} OR r.created_by = $${params.length})`;
+    }
+  }
   const { rows } = await db.query<RuleRow>(
     `${RULE_SELECT}
-      WHERE r.workspace_id = $1 AND r.stopped_at IS NULL ${scope === "team" ? "" : "AND r.assignee_id = $2"}
+      WHERE r.workspace_id = $1 AND r.stopped_at IS NULL ${only}
       ORDER BY r.created_at`,
-    scope === "team" ? [ctx.workspaceId] : [ctx.workspaceId, ctx.userId],
+    params,
   );
   return rows.map(toRepeat);
 }
@@ -114,6 +128,7 @@ export async function createRepeat(
     if (!manages(ctx)) throw forbidden("Only the owner or a manager can give tasks to others");
     const m = await db.query(`SELECT 1 FROM memberships WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NULL`, [ctx.workspaceId, assignee]);
     if (!m.rowCount) throw new AppError(400, "VALIDATION_ERROR", "Choose someone from your team", { assigneeId: "Choose someone from your team" });
+    if (!(await runsWorkOf(db, ctx, assignee))) throw forbidden("You give tasks to people in your department");
   }
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO task_repeats (workspace_id, title, notes, assignee_id, priority, due_time, frequency, weekdays, month_day, start_date, created_by)
@@ -149,8 +164,8 @@ export async function stopRepeat(db: Db, ctx: MemberContext, id: string): Promis
   );
   const r = rows[0];
   if (!r) throw notFound("This repeating task");
-  if (!manages(ctx) && r.assignee_id !== ctx.userId && r.created_by !== ctx.userId) {
-    throw forbidden("Only the owner, a manager or whoever it's for can stop it");
-  }
+  const own = r.assignee_id === ctx.userId || r.created_by === ctx.userId;
+  if (!manages(ctx) && !own) throw forbidden("Only the owner, a manager or whoever it's for can stop it");
+  if (!own && !(await runsWorkOf(db, ctx, r.assignee_id))) throw forbidden("You stop repeating tasks for people in your department");
   await db.query(`UPDATE task_repeats SET stopped_at = now() WHERE id = $1`, [id]);
 }

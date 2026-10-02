@@ -1,5 +1,6 @@
-import { eveningDigestText, morningDigestText, taskAlertText, taskReminderText, type ReminderState } from "@wedding-yantra/core";
+import { eveningDigestText, morningDigestText, taskAlertText, taskReminderText, teamScope, type ReminderState } from "@wedding-yantra/core";
 import type { Queryable } from "../../db.js";
+import { loadAccess } from "../auth/access.js";
 import { awardStreaks } from "../review/points.js";
 import { makeDueRepeats } from "../tasks/repeats.js";
 import { notify } from "./service.js";
@@ -201,13 +202,14 @@ async function reminders(db: Queryable, workspaceId: string, today: string, slot
   return notify(db, items);
 }
 
-/** The team's day for owners and managers: done, late by person, stuck, waiting for a check. */
+/**
+ * The team's day for the owner and managers who run everyone's work: done, late by person,
+ * stuck, waiting for a check. A manager limited to a department doesn't get the whole team's.
+ */
 async function evening(db: Queryable, workspaceId: string, today: string): Promise<number> {
-  const bosses = await db.query<{ user_id: string }>(
-    `SELECT user_id FROM memberships WHERE workspace_id = $1 AND removed_at IS NULL AND role IN ('owner', 'manager')`,
-    [workspaceId],
-  );
-  if (!bosses.rows.length) return 0;
+  const access = await loadAccess(db, workspaceId);
+  const bosses = [...access].filter(([, a]) => teamScope(a) === "all").map(([userId]) => userId);
+  if (!bosses.length) return 0;
   const { rows } = await db.query<{ done_today: number; stuck: number; to_check: number; due_tomorrow: number }>(
     `SELECT count(*) FILTER (WHERE t.status = 'done' AND (coalesce(t.completed_at, t.done_at) AT TIME ZONE w.timezone)::date = $2)::int AS done_today,
             count(*) FILTER (WHERE t.status = 'waiting')::int AS stuck,
@@ -228,9 +230,9 @@ async function evening(db: Queryable, workspaceId: string, today: string): Promi
   if (!text) return 0;
   return notify(
     db,
-    bosses.rows.map((b) => ({
+    bosses.map((userId) => ({
       workspaceId,
-      userId: b.user_id,
+      userId,
       kind: "digest.evening" as const,
       ...text,
       link: "/app/tasks/team",

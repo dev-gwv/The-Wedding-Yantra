@@ -47,7 +47,6 @@ function EmployeeForm({ employee: e, onSaved }: { employee: Employee; onSaved: (
   const save = useSaveEmployeeDetails(workspace.id, e.id);
   const pay = e.pay;
   const [designation, setDesignation] = useState<string | null>(e.designation);
-  const [department, setDepartment] = useState<string | null>(e.department);
   const [employmentType, setEmploymentType] = useState<EmploymentType | "">(e.employmentType ?? "");
   const [payType, setPayType] = useState<PayType | "">(pay?.payType ?? "");
   const [v, setV] = useState({
@@ -69,7 +68,6 @@ function EmployeeForm({ employee: e, onSaved }: { employee: Employee; onSaved: (
     const payload = {
       ...v,
       designation,
-      department,
       employmentType: employmentType || null,
       payType: payType || null,
       payAmount: v.payAmount === "" ? null : Number(v.payAmount),
@@ -90,7 +88,6 @@ function EmployeeForm({ employee: e, onSaved }: { employee: Employee; onSaved: (
     <form onSubmit={submit} className="space-y-5" noValidate>
       <Group title="Work">
         <OptionSelect list="designation" label="Designation" value={designation} onChange={setDesignation} error={errors.designation} />
-        <OptionSelect list="department" label="Department" value={department} onChange={setDepartment} error={errors.department} />
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Type" value={employmentType} onChange={(ev) => setEmploymentType(ev.target.value as EmploymentType | "")} error={errors.employmentType}>
             <option value="">Not set</option>

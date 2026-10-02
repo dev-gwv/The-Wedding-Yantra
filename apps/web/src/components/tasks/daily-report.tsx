@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatDate, localISODate } from "@wedding-yantra/core";
+import { can, formatDate, localISODate, teamScope } from "@wedding-yantra/core";
 import {
   useMyDay,
   usePeopleBoard,
@@ -91,13 +91,19 @@ const byId = (list: TaskItem[]) => [
 
 /**
  * Today on one card, for anyone who works on tasks: your own tasks first; then, for owners and
- * managers, the tasks you've given and where each person on the team stands. Late and stuck
- * work is at the top, so nothing waits without you knowing.
+ * managers, the tasks you've given and where each person on the team stands (for a department's
+ * manager, each person in their department). Late and stuck work is at the top, so nothing
+ * waits without you knowing.
  */
 export function DailyReport() {
   const { workspace } = useCurrentWorkspace();
   const role = workspace;
   const manages = can(role, "tasks.manage");
+  // A department's manager sees only the people in it, so the words name the department.
+  const department =
+    teamScope(role) === "department"
+      ? (workspace.departmentLabel ?? "your department")
+      : null;
   const day = useMyDay(workspace.id, can(role, "tasks.work"));
   const given = useTasks(
     workspace.id,
@@ -311,7 +317,9 @@ export function DailyReport() {
                 Team today
               </h3>
               <p className="text-sm text-ink-muted">
-                Where each person stands right now
+                {department
+                  ? `Where each person in ${department} stands right now`
+                  : "Where each person stands right now"}
               </p>
             </div>
             <Link

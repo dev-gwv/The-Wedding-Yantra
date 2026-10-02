@@ -41,7 +41,9 @@ export default function VendorsPage() {
         <BackLink href="/app/masters" label="Master data" />
         <PageHeader title="Vendors" />
         <Card>
-          <EmptyState icon={Lock} title="Vendors and payouts are for the owner, managers and the accountant" />
+          <EmptyState icon={Lock} title="Vendors and payouts aren't on your screens">
+            Ask the owner to add Payments & invoices for you.
+          </EmptyState>
         </Card>
       </>
     );

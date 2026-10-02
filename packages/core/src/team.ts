@@ -79,7 +79,11 @@ export function activityText(a: ActivityFacts): string {
     case "member.removed":
       return `took ${a.subject ?? "someone"} off the team`;
     case "member.details_updated":
-      return `updated ${a.subject ? `${a.subject}'s` : "a team member's"} employee details`;
+      return `updated ${a.subject ? `${a.subject}'s` : "a team member's"} employee details${a.detail ? `: ${a.detail}` : ""}`;
+    case "member.screens_changed":
+      return `changed what ${a.subject ?? "a team member"} sees${a.detail ? `: ${a.detail}` : ""}`;
+    case "department.screens_changed":
+      return `changed the screens for ${a.subject ?? "a department"}${a.detail ? `: ${a.detail}` : ""}`;
     case "member.invite_revoked":
       return `cancelled the invitation for ${a.subject ?? "someone"}`;
     case "sales.stages_updated":
@@ -219,15 +223,17 @@ export interface DailySummaryFacts {
   date: string;
   /** Null for people who don't see the money */
   received: { total: number; count: number } | null;
-  newLeads: number;
-  booked: number;
+  /** Null for people who don't see every lead */
+  newLeads: number | null;
+  booked: number | null;
   tasksDone: number;
   /** Open tasks already late, by person. A null name is "anyone on the event". */
   lateTasks: { name: string | null; count: number }[];
   expensesWaiting: number | null;
   tomorrow: {
     date: string;
-    events: { title: string; functions: { name: string; time: string | null }[]; team: string[] }[];
+    /** Null for people who don't see every event */
+    events: { title: string; functions: { name: string; time: string | null }[]; team: string[] }[] | null;
     tasksDue: number;
     /** Who is off that day */
     off: string[];
@@ -246,7 +252,7 @@ export function dailySummaryMessage(s: DailySummaryFacts, businessName: string):
   if (s.received) {
     lines.push(s.received.count ? `${formatMoney(s.received.total)} received (${plural(s.received.count, "payment")})` : "No money received");
   }
-  lines.push(`${plural(s.newLeads, "new enquiry", "new enquiries")}${s.booked ? `, ${s.booked} booked` : ""}`);
+  if (s.newLeads !== null) lines.push(`${plural(s.newLeads, "new enquiry", "new enquiries")}${s.booked ? `, ${s.booked} booked` : ""}`);
   lines.push(`${plural(s.tasksDone, "task")} done`);
   if (s.lateTasks.length) {
     lines.push(`Late: ${s.lateTasks.map((l) => `${l.name ? l.name.split(" ")[0] : "Anyone"} ${l.count}`).join(", ")}`);
@@ -254,8 +260,8 @@ export function dailySummaryMessage(s: DailySummaryFacts, businessName: string):
   if (s.expensesWaiting) lines.push(`${plural(s.expensesWaiting, "expense")} waiting for approval`);
 
   lines.push("", `*Tomorrow, ${dayName(s.tomorrow.date)} ${formatDate(s.tomorrow.date, { year: false })}*`);
-  if (s.tomorrow.events.length === 0) lines.push("No events");
-  for (const e of s.tomorrow.events) {
+  if (s.tomorrow.events?.length === 0) lines.push("No events");
+  for (const e of s.tomorrow.events ?? []) {
     const fns = e.functions.map((f) => (f.time ? `${f.name} ${formatClock(f.time)}` : f.name)).join(", ");
     const team = e.team.length ? `. Team: ${e.team.map((n) => n.split(" ")[0]).join(", ")}` : "";
     lines.push(`${e.title}${fns ? `: ${fns}` : ""}${team}`);

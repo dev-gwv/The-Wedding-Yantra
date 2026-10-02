@@ -12,7 +12,18 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
 import { errorMessage } from "@/lib/errors";
-import { setWorkspaceId, useWorkspaceId } from "@/lib/session";
+import { ACCESS_KEY, CACHE_KEY, setWorkspaceId, useWorkspaceId } from "@/lib/session";
+
+/** What each business let this person do when this device last looked, to notice a screen taken away. */
+
+function savedAccess(): Record<string, string[]> {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(ACCESS_KEY) ?? "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? (saved as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function WorkspaceGate({ children }: { children: ReactNode }) {
   const me = useMe();
@@ -35,6 +46,27 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
     () => workspaces?.find((w) => w.id === savedId) ?? workspaces?.[0] ?? null,
     [workspaces, savedId],
   );
+
+  // When the owner takes a screen away, or someone leaves a business, the copy of that
+  // business kept on this device is dropped, so nothing from a lost screen stays on the phone.
+  useEffect(() => {
+    if (!workspaces) return;
+    const before = savedAccess();
+    const now: Record<string, string[]> = Object.fromEntries(workspaces.map((w) => [w.id, [...w.permissions]]));
+    const lost = Object.keys(before).filter((id) => Array.isArray(before[id]) && before[id].some((p) => !now[id]?.includes(p)));
+    for (const id of lost) {
+      queryClient.removeQueries({ queryKey: ["workspace", id], type: "inactive" });
+      // Screens open right now forget what they showed and ask again.
+      void queryClient.resetQueries({ queryKey: ["workspace", id], type: "active" });
+    }
+    try {
+      // The saved copy is written again, without the dropped business, a moment later.
+      if (lost.length) window.localStorage.removeItem(CACHE_KEY);
+      window.localStorage.setItem(ACCESS_KEY, JSON.stringify(now));
+    } catch {
+      // Storage blocked: nothing was kept to drop.
+    }
+  }, [workspaces, queryClient]);
 
   useEffect(() => {
     // Only send people to set up a business when the list is fresh, not a cached old copy.

@@ -20,7 +20,8 @@ import { errorMessage } from "@/lib/errors";
 
 /**
  * One person's work: what they're doing now, what's stuck or late, what's waiting for your
- * check, and their recent updates. Owners and managers open anyone; others only themselves.
+ * check, and their recent updates. Owners and managers open anyone (a department's manager,
+ * the people in their department); others only themselves.
  */
 export default function PersonTasksPage() {
   const { id } = useParams<{ id: string }>();

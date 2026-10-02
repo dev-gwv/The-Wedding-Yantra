@@ -1,4 +1,4 @@
-import { can } from "@wedding-yantra/core";
+import { can, eventScope, leadScope } from "@wedding-yantra/core";
 import type { DailySummary } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { offOn } from "../tasks/time-off.js";
@@ -7,6 +7,7 @@ import { requireReview } from "./activity.js";
 /**
  * One day of the business in numbers, and tomorrow's events: what an owner sends to
  * themselves or the team group at the end of the day. Counted in the business's time zone.
+ * Leads, money and events show only to people with those screens.
  */
 export async function dailySummary(db: Queryable, ctx: Parameters<typeof requireReview>[0], date?: string): Promise<DailySummary> {
   requireReview(ctx);
@@ -19,6 +20,17 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
   );
   const { day, tomorrow, tz } = rows[0]!;
   const seesMoney = can(ctx, "finance.view");
+  const seesLeads = leadScope(ctx) === "all";
+  const seesEvents = eventScope(ctx) === "all";
+  // A department's manager sees the team's work only for their department's people, and their own.
+  const inDepartment = ctx.teamScope === "department";
+  const inTeam = (column: string, me: number, department: number) =>
+    inDepartment
+      ? `AND (${column} = $${me} OR EXISTS (SELECT 1 FROM memberships m JOIN member_details d ON d.membership_id = m.id
+                                           WHERE m.workspace_id = $1 AND m.user_id = ${column} AND m.removed_at IS NULL AND d.department = $${department}))`
+      : "";
+  const lateWho = inTeam("t.assignee_id", 4, 5);
+  const who = (params: unknown[]) => (inDepartment ? [...params, ctx.userId, ctx.department] : params);
 
   const [received, sales, done, late, waiting, events, dueTomorrow, off] = await Promise.all([
     db.query<{ total: string; count: number }>(
@@ -34,9 +46,10 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
       [ws, day, tz],
     ),
     db.query<{ count: number }>(
-      `SELECT count(*) AS count FROM tasks
-        WHERE workspace_id = $1 AND deleted_at IS NULL AND status = 'done' AND (done_at AT TIME ZONE $3)::date = $2::date`,
-      [ws, day, tz],
+      `SELECT count(*) AS count FROM tasks t
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status = 'done' AND (t.done_at AT TIME ZONE $3)::date = $2::date
+          ${inTeam("t.assignee_id", 4, 5)}`,
+      who([ws, day, tz]),
     ),
     // Late by the end of the day: due that day or before, and not ticked off by then.
     db.query<{ name: string | null; count: number }>(
@@ -45,9 +58,10 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
         WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.due_date <= $2::date
           AND (t.status NOT IN ('done', 'cancelled') OR (t.done_at AT TIME ZONE $3)::date > $2::date)
           AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
+          ${lateWho}
         GROUP BY t.assignee_id, u.name
         ORDER BY count(*) DESC, u.name NULLS LAST`,
-      [ws, day, tz],
+      who([ws, day, tz]),
     ),
     db.query<{ count: number }>(
       `SELECT count(*) AS count FROM expenses WHERE workspace_id = $1 AND deleted_at IS NULL AND status = 'pending'`,
@@ -68,23 +82,24 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
     db.query<{ count: number }>(
       `SELECT count(*) AS count FROM tasks t LEFT JOIN events e ON e.id = t.event_id
         WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status NOT IN ('done', 'cancelled') AND t.due_date = $2::date
-          AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))`,
-      [ws, tomorrow],
+          AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
+          ${inTeam("t.assignee_id", 3, 4)}`,
+      inDepartment ? [ws, tomorrow, ctx.userId, ctx.department] : [ws, tomorrow],
     ),
-    offOn(db, ws, tomorrow),
+    offOn(db, ws, tomorrow, inDepartment ? { userId: ctx.userId, department: ctx.department } : undefined),
   ]);
 
   return {
     date: day,
     received: seesMoney ? { total: Number(received.rows[0]!.total), count: Number(received.rows[0]!.count) } : null,
-    newLeads: Number(sales.rows[0]!.new_leads),
-    booked: Number(sales.rows[0]!.booked),
+    newLeads: seesLeads ? Number(sales.rows[0]!.new_leads) : null,
+    booked: seesLeads ? Number(sales.rows[0]!.booked) : null,
     tasksDone: Number(done.rows[0]!.count),
     lateTasks: late.rows.map((r) => ({ name: r.name, count: Number(r.count) })),
     expensesWaiting: can(ctx, "expenses.approve") ? Number(waiting.rows[0]!.count) : null,
     tomorrow: {
       date: tomorrow,
-      events: events.rows.map((e) => ({ title: e.title, functions: e.functions ?? [], team: e.team })),
+      events: seesEvents ? events.rows.map((e) => ({ title: e.title, functions: e.functions ?? [], team: e.team })) : null,
       tasksDue: Number(dueTomorrow.rows[0]!.count),
       off,
     },

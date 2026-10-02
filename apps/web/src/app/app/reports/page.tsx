@@ -32,8 +32,8 @@ export default function ReportsPage() {
       <MoneyPageHeader section="reports" subtitle="A month of the business in plain numbers, and the spreadsheets your CA asks for" />
       {!allowed ? (
         <Card>
-          <EmptyState icon={Lock} title="Reports aren't part of your role">
-            The owner, managers and the accountant see the monthly report.
+          <EmptyState icon={Lock} title="Reports aren't on your screens">
+            Ask the owner to add Payments & invoices for you.
           </EmptyState>
         </Card>
       ) : (

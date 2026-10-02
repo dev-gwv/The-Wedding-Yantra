@@ -53,12 +53,15 @@ export function useWorkspaceId(): string | null | undefined {
 
 /** Where the last-seen data is kept on this device (see providers.tsx). */
 export const CACHE_KEY = "wy.cache";
+/** What each business let this person see last time (see app/app/layout.tsx). */
+export const ACCESS_KEY = "wy.access";
 
 export function clearSession() {
   write(TOKEN_KEY, null);
   write(WORKSPACE_KEY, null);
   try {
     window.localStorage.removeItem(CACHE_KEY);
+    window.localStorage.removeItem(ACCESS_KEY);
   } catch {
     // Storage blocked: nothing was kept.
   }

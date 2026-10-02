@@ -142,8 +142,8 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     referredLeads,
     custom: row.custom,
     noMessages: row.no_messages,
-    // The page link lets anyone see the client's bills, so only those who share it see it.
-    portalToken: can(ctx, "clients.manage") ? row.portal_token : null,
+    // The page link lets anyone see the client's bills, so only those who share it and see money see it.
+    portalToken: can(ctx, "clients.manage") && can(ctx, "finance.view") ? row.portal_token : null,
   };
 }
 

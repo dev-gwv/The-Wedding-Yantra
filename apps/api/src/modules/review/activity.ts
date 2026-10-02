@@ -1,4 +1,4 @@
-import { can, formatDate, formatDateRange, ROLE_INFO, type Role } from "@wedding-yantra/core";
+import { can, formatDate, formatDateRange, ROLE_INFO, type Permission, type Role } from "@wedding-yantra/core";
 import type { ActivityItem, ActivityPage } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { AppError, forbidden } from "../../lib/http.js";
@@ -43,6 +43,19 @@ const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
 const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
 const roleLabel = (v: unknown) => (typeof v === "string" && v in ROLE_INFO ? ROLE_INFO[v as Role].label : null);
 
+/** Entries about a screen's things, which someone without that screen doesn't see. */
+const HIDDEN_WITHOUT: [Permission, string[]][] = [
+  ["leads.view_all", ["lead", "partner"]],
+  ["finance.view", ["bill", "payment", "expense", "payout", "vendor"]],
+  ["quotes.view", ["quote"]],
+  ["clients.view", ["client"]],
+  ["events.view", ["event", "venue", "deliverable"]],
+];
+
+/** The department an employee was put in, from a details change: its key, or null when taken out. */
+const departmentTo = (m: Record<string, unknown>): { to: string | null } | null =>
+  m.department && typeof m.department === "object" && "to" in m.department ? { to: str((m.department as { to: unknown }).to) } : null;
+
 /** Looks up names for one kind of thing, by id, within the business. Deleted things keep their names. */
 async function lookup<T extends { id: string }>(db: Queryable, sql: string, workspaceId: string, ids: Set<string>): Promise<Map<string, T>> {
   const list = [...ids].filter((id) => UUID.test(id));
@@ -63,6 +76,8 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
     return `$${params.length}`;
   };
   const byActor = q.userId ? add(q.userId) : null;
+  // Filtered here, not after, so every page stays full and the cursor stays right.
+  const hidden = add(HIDDEN_WITHOUT.flatMap(([perm, types]) => (can(ctx, perm) ? [] : types)));
   let after = "";
   if (q.before) {
     const [at, source, id] = decode(q.before);
@@ -73,11 +88,11 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
        FROM (
          SELECT 'log' AS source, a.id::text AS id, a.created_at, a.actor_user_id, a.action, a.entity_type, a.entity_id, a.meta, NULL AS body
            FROM activity_log a
-          WHERE a.workspace_id = $1 ${byActor ? `AND a.actor_user_id = ${byActor}` : ""}
+          WHERE a.workspace_id = $1 AND a.entity_type <> ALL(${hidden}::text[]) ${byActor ? `AND a.actor_user_id = ${byActor}` : ""}
          UNION ALL
          SELECT 'lead', la.id::text, la.created_at, la.actor_user_id, 'lead.' || la.kind, 'lead', la.lead_id::text, la.meta, la.body
            FROM lead_activities la
-          WHERE la.workspace_id = $1 ${byActor ? `AND la.actor_user_id = ${byActor}` : ""}
+          WHERE la.workspace_id = $1 AND 'lead' <> ALL(${hidden}::text[]) ${byActor ? `AND la.actor_user_id = ${byActor}` : ""}
        ) x
        LEFT JOIN users u ON u.id = x.actor_user_id
        ${after}
@@ -91,7 +106,9 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
   const ids = (type: string) => new Set(page.filter((r) => r.entity_type === type && r.entity_id).map((r) => r.entity_id!));
   const metaIds = (key: string) => new Set(page.map((r) => str(r.meta[key])).filter((v): v is string => v !== null));
   const ws = ctx.workspaceId;
-  const [events, tasks, bills, payments, expenses, quotes, members, invitations, leads, clients, users, workspace] = await Promise.all([
+  const seesEvents = can(ctx, "events.view");
+  const departmentKeys = [...new Set(page.map((r) => (r.action === "member.details_updated" ? departmentTo(r.meta)?.to : null)).filter((k): k is string => !!k))];
+  const [events, tasks, bills, payments, expenses, quotes, members, invitations, leads, clients, users, workspace, departments] = await Promise.all([
     lookup<{ id: string; title: string }>(db, `SELECT id, title FROM events WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, ws, new Set([...ids("event"), ...metaIds("eventId")])),
     lookup<{ id: string; title: string; event_id: string | null; event_title: string | null }>(
       db,
@@ -148,6 +165,15 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
       new Set([...metaIds("assigneeId"), ...metaIds("userId")]),
     ),
     db.query<{ name: string }>(`SELECT name FROM workspaces WHERE id = $1`, [ws]),
+    // Departments are kept by key; hidden ones keep their names.
+    departmentKeys.length
+      ? db
+          .query<{ key: string; label: string }>(
+            `SELECT key, label FROM custom_options WHERE workspace_id = $1 AND list = 'department' AND key = ANY($2::text[])`,
+            [ws, departmentKeys],
+          )
+          .then(({ rows }) => new Map(rows.map((r) => [r.key, r.label])))
+      : new Map<string, string>(),
   ]);
 
   const items = page.map((r): ActivityItem => {
@@ -174,10 +200,19 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.detail = roleLabel(m.role);
         item.link = { kind: "team", id: null };
         break;
-      case "membership":
-        item.subject = (id && members.get(id)?.name) ?? null;
-        item.detail = roleLabel(m.to);
+      case "membership": {
+        item.subject = (id && members.get(id)?.name) ?? str(m.name);
+        const moved = r.action === "member.details_updated" ? departmentTo(m) : null;
+        if (r.action === "member.screens_changed") item.detail = str(m.summary);
+        else if (moved) item.detail = moved.to ? `put in ${departments.get(moved.to) ?? moved.to}` : "taken out of their department";
+        else item.detail = roleLabel(m.to);
         item.link = { kind: "team", id: id ?? null };
+        break;
+      }
+      case "department":
+        item.subject = str(m.label);
+        item.detail = str(m.summary);
+        item.link = { kind: "departments", id: null };
         break;
       case "quote": {
         const quote = id ? quotes.get(id) : undefined;
@@ -252,11 +287,12 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         const t = id ? tasks.get(id) : undefined;
         item.subject = str(m.title) ?? t?.title ?? null;
         item.other = (str(m.assigneeId) && users.get(str(m.assigneeId)!)?.name) ?? null;
-        item.detail = r.action === "task.done" ? (t?.event_title ?? null) : null;
+        // Without the Events screen, the task opens on its own and doesn't name its event.
+        item.detail = r.action === "task.done" && seesEvents ? (t?.event_title ?? null) : null;
         item.late = m.late === true;
         if (r.action === "task.deadline_moved" && str(m.to)) item.detail = `to ${formatDate(str(m.to)!, { year: false })}`;
         if (r.action === "task.stuck" || r.action === "task.sent_back") item.detail = str(m.reason) ?? null;
-        item.link = t?.event_id ? { kind: "event", id: t.event_id } : { kind: "tasks", id: id ?? null };
+        item.link = t?.event_id && seesEvents ? { kind: "event", id: t.event_id } : { kind: "tasks", id: id ?? null };
         break;
       }
       case "time_off": {

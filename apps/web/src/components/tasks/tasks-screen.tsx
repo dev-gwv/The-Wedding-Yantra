@@ -59,8 +59,8 @@ export function TasksScreen({ tab: page }: { tab: Tab }) {
         <BackLink href="/app/more" label="More" />
         <PageHeader title="Tasks" />
         <Card>
-          <EmptyState icon={Lock} title="Tasks aren't part of your role">
-            The owner, managers, staff and freelancers get tasks here.
+          <EmptyState icon={Lock} title="Tasks aren't on your screens">
+            Ask the owner if you need to get tasks.
           </EmptyState>
         </Card>
       </>

@@ -30,7 +30,9 @@ export default function PartnersPage() {
         <BackLink href="/app/more" label="More" />
         <PageHeader title="Partner QR codes" />
         <Card>
-          <EmptyState icon={Lock} title="Partner QR codes are for the owner and managers" />
+          <EmptyState icon={Lock} title="Partner QR codes aren't on your screens">
+            Ask the owner if you need them.
+          </EmptyState>
         </Card>
       </>
     );

@@ -367,6 +367,18 @@ describe("activity sentences", () => {
       "New enquiry from Neha via the enquiry form",
     );
   });
+  it("says what changed about someone's screens", () => {
+    expect(activityText({ ...base, action: "member.screens_changed", subject: "Arfin", detail: "put in Sales; added Quotes & prices" })).toBe(
+      "changed what Arfin sees: put in Sales; added Quotes & prices",
+    );
+    expect(activityText({ ...base, action: "department.screens_changed", subject: "Sales", detail: "took away Events & calendar" })).toBe(
+      "changed the screens for Sales: took away Events & calendar",
+    );
+    expect(activityText({ ...base, action: "member.details_updated", subject: "Arfin", detail: "put in Sales" })).toBe(
+      "updated Arfin's employee details: put in Sales",
+    );
+    expect(activityText({ ...base, action: "member.details_updated", subject: "Arfin" })).toBe("updated Arfin's employee details");
+  });
 });
 
 describe("daily summary message", () => {
@@ -408,6 +420,23 @@ describe("daily summary message", () => {
         "Off: Ravi",
       ].join("\n"),
     );
+  });
+  it("leaves out the enquiries for someone who doesn't see every lead", () => {
+    const text = dailySummaryMessage(
+      {
+        date: "2026-09-25",
+        received: null,
+        newLeads: null,
+        booked: null,
+        tasksDone: 1,
+        lateTasks: [],
+        expensesWaiting: null,
+        tomorrow: { date: "2026-09-26", events: [], tasksDue: 0, off: [] },
+      },
+      "Riya Makeup Studio",
+    );
+    expect(text).not.toMatch(/enquir/);
+    expect(text).toContain("1 task done");
   });
 });
 

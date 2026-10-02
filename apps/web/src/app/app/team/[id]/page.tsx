@@ -3,12 +3,13 @@
 import { can, canManageMember, firstName, formatDate, formatMoney, formatPhone, ROLE_INFO, whatsappLink } from "@wedding-yantra/core";
 import { useEmployee } from "@wedding-yantra/api-client/react";
 import { EMPLOYMENT_TYPE_LABELS, type Employee } from "@wedding-yantra/types";
-import { ListChecks, Lock, MessageCircle, Pencil, Phone, ShieldCheck, UserMinus } from "lucide-react";
+import { ListChecks, Lock, MessageCircle, Pencil, Phone, UserMinus } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { AccessCard } from "@/components/team/access-card";
 import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
 import { ManageSheet } from "@/components/team/manage-sheet";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Splash } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 
-/** One person in the employee master: work details, emergency contact, pay and bank. */
+/** One person in the employee master: work details, access, emergency contact, pay and bank. */
 export default function EmployeePage() {
   const { id } = useParams<{ id: string }>();
   const { workspace } = useCurrentWorkspace();
@@ -82,15 +83,14 @@ export default function EmployeePage() {
               <Pencil className="size-4" /> Edit details
             </Button>
           )}
-          {manageable && (
-            <Button variant="ghost" onClick={() => setManaging("role")}>
-              <ShieldCheck className="size-4" /> Change role
-            </Button>
-          )}
         </div>
       </Card>
 
       <WorkCard e={e} />
+      {/* What someone can see is for the owner, managers of the team, and the person themselves. */}
+      {!e.leftAt && (e.isYou || editable || can(workspace, "members.manage")) && (
+        <AccessCard employee={e} onChangeRole={manageable ? () => setManaging("role") : undefined} />
+      )}
       {e.emergency && <EmergencyCard e={e} />}
       {e.pay && <PayCard e={e} owner={editable} />}
 
@@ -128,7 +128,6 @@ export default function EmployeePage() {
 
 const isEmpty = (e: Employee) =>
   !e.designation &&
-  !e.department &&
   !e.employmentType &&
   !e.joinedOn &&
   !e.emergency?.name &&
@@ -153,10 +152,8 @@ function WorkCard({ e }: { e: Employee }) {
       <h2 className="mb-3 font-display text-lg font-extrabold">Work</h2>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px] sm:grid-cols-3">
         <Detail label="Designation">{e.designationLabel}</Detail>
-        <Detail label="Department">{e.departmentLabel}</Detail>
         <Detail label="Type">{e.employmentType && EMPLOYMENT_TYPE_LABELS[e.employmentType]}</Detail>
         <Detail label="Joining date">{e.joinedOn && formatDate(e.joinedOn)}</Detail>
-        <Detail label="Role in the app">{ROLE_INFO[e.role].label}</Detail>
         <Detail label="On the app since">{formatDate(e.joinedAt.slice(0, 10))}</Detail>
       </dl>
     </Card>

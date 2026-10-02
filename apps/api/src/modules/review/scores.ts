@@ -16,7 +16,8 @@ const ACTIVE_EVENT = "(t.event_id IS NULL OR (e.status <> 'cancelled' AND e.dele
 /**
  * Each person's month, measured from their own work: tasks done by their day, follow-ups
  * kept, enquiries booked and expenses added in time. Owners and managers see everyone and
- * the business as a whole; everyone else sees only themselves.
+ * the business as a whole (a department's manager sees its people and themselves); everyone
+ * else sees only themselves.
  */
 export async function teamScores(db: Queryable, ctx: MemberContext, month: string): Promise<TeamScores> {
   const all = can(ctx, "team.review");
@@ -29,12 +30,14 @@ export async function teamScores(db: Queryable, ctx: MemberContext, month: strin
   );
   const { start, end, today, tz } = rows[0]!;
 
+  const scope = all ? ctx.teamScope : "self";
   const members = await db.query<{ user_id: string; name: string | null; role: Role }>(
     `SELECT m.user_id, u.name, m.role
        FROM memberships m JOIN users u ON u.id = m.user_id
-      WHERE m.workspace_id = $1 AND m.removed_at IS NULL ${all ? "" : "AND m.user_id = $2"}
+      WHERE m.workspace_id = $1 AND m.removed_at IS NULL
+        ${scope === "all" ? "" : scope === "department" ? "AND (m.user_id = $2 OR EXISTS (SELECT 1 FROM member_details d WHERE d.membership_id = m.id AND d.department = $3))" : "AND m.user_id = $2"}
       ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 WHEN 'staff' THEN 2 WHEN 'freelancer' THEN 3 ELSE 4 END, u.name`,
-    all ? [ctx.workspaceId] : [ctx.workspaceId, ctx.userId],
+    scope === "all" ? [ctx.workspaceId] : scope === "department" ? [ctx.workspaceId, ctx.userId, ctx.department] : [ctx.workspaceId, ctx.userId],
   );
 
   // Tasks whose day has passed this month, and whether they were ticked off by then.
@@ -127,13 +130,16 @@ export async function teamScores(db: Queryable, ctx: MemberContext, month: strin
     };
   });
 
-  return { month, people, business: all ? await businessScores(db, ctx.workspaceId, { start, end, today, tz }) : null };
+  return { month, people, business: all ? await businessScores(db, ctx, { start, end, today, tz }) : null };
 }
 
-/** For events that began this month: money in before the day, and whether every step was on time. */
+/**
+ * For events that began this month: money in before the day (for people who see the money),
+ * and whether every step was on time.
+ */
 async function businessScores(
   db: Queryable,
-  workspaceId: string,
+  ctx: MemberContext,
   m: { start: string; end: string; today: string; tz: string },
 ): Promise<NonNullable<TeamScores["business"]>> {
   const { rows } = await db.query<{ due: string; collected: string; done: number; total: number }>(
@@ -159,11 +165,11 @@ async function businessScores(
                 GROUP BY ev.id) y
      )
      SELECT money.due, money.collected, steps.done, steps.total FROM money, steps`,
-    [workspaceId, m.start, m.end, m.today, m.tz],
+    [ctx.workspaceId, m.start, m.end, m.today, m.tz],
   );
   const r = rows[0]!;
   return {
-    moneyBeforeEvents: { collected: Number(r.collected), due: Number(r.due) },
+    moneyBeforeEvents: can(ctx, "finance.view") ? { collected: Number(r.collected), due: Number(r.due) } : null,
     eventsOnTime: { done: Number(r.done), total: Number(r.total) },
   };
 }

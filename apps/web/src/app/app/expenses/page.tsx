@@ -19,7 +19,7 @@ export default function ExpensesPage() {
         <ExpensesView />
       ) : (
         <Card>
-          <EmptyState icon={Lock} title="Expenses aren't part of your role">
+          <EmptyState icon={Lock} title="Expenses aren't on your screens">
             Ask the owner if you need to add what you spend.
           </EmptyState>
         </Card>

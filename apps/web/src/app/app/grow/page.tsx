@@ -25,8 +25,8 @@ export default function GrowPage() {
       <PageHeader title="Reviews and referrals" subtitle="Happy clients bring the next ones. Ask for a review after every event." />
       {!allowed ? (
         <Card>
-          <EmptyState icon={Lock} title="This is for the owner and managers">
-            They ask clients for reviews and see who refers new work.
+          <EmptyState icon={Lock} title="Reviews and referrals aren't on your screens">
+            Ask the owner if you need them.
           </EmptyState>
         </Card>
       ) : grow.isPending ? (

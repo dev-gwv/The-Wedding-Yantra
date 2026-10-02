@@ -178,14 +178,18 @@ function PersonCard({ person }: { person: PersonScore }) {
 }
 
 function BusinessCard({ business }: { business: NonNullable<TeamScores["business"]> }) {
-  const money = percentOf(business.moneyBeforeEvents.collected, business.moneyBeforeEvents.due);
+  // Null for people who don't see the money: they get only the steps.
+  const cash = business.moneyBeforeEvents;
+  const money = cash ? percentOf(cash.collected, cash.due) : null;
   const steps = percentOf(business.eventsOnTime.done, business.eventsOnTime.total);
   if (money === null && steps === null) {
     return (
       <Card className="p-5">
         <h3 className="text-sm font-bold text-ink-muted">The business</h3>
         <p className="mt-1 text-sm text-ink-muted">
-          Once events begin this month, you&apos;ll see how much money came in before each event and whether every step was done on time.
+          {cash
+            ? "Once events begin this month, you'll see how much money came in before each event and whether every step was done on time."
+            : "Once events begin this month, you'll see whether every step was done on time."}
         </p>
       </Card>
     );
@@ -193,16 +197,18 @@ function BusinessCard({ business }: { business: NonNullable<TeamScores["business
   return (
     <Card className="p-5">
       <h3 className="text-sm font-bold text-ink-muted">The business, for events that began this month</h3>
-      <dl className="mt-3 grid gap-4 sm:grid-cols-2">
-        <div>
-          <dt className="text-sm text-ink-muted">Money collected before the event</dt>
-          <dd className="mt-1 font-display text-2xl font-extrabold tabular">{money === null ? "–" : `${money}%`}</dd>
-          {business.moneyBeforeEvents.due > 0 && (
-            <dd className="text-sm text-ink-muted tabular">
-              {formatMoney(business.moneyBeforeEvents.collected)} of {formatMoney(business.moneyBeforeEvents.due)}
-            </dd>
-          )}
-        </div>
+      <dl className={cn("mt-3 grid gap-4", cash && "sm:grid-cols-2")}>
+        {cash && (
+          <div>
+            <dt className="text-sm text-ink-muted">Money collected before the event</dt>
+            <dd className="mt-1 font-display text-2xl font-extrabold tabular">{money === null ? "–" : `${money}%`}</dd>
+            {cash.due > 0 && (
+              <dd className="text-sm text-ink-muted tabular">
+                {formatMoney(cash.collected)} of {formatMoney(cash.due)}
+              </dd>
+            )}
+          </div>
+        )}
         <div>
           <dt className="text-sm text-ink-muted">Events with every step on time</dt>
           <dd className="mt-1 font-display text-2xl font-extrabold tabular">{steps === null ? "–" : `${steps}%`}</dd>

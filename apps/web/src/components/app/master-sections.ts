@@ -34,7 +34,8 @@ export function masterSections(role: Access): MasterSection[] {
       href: "/app/services",
       icon: Package,
       paths: ["/app/services", "/app/settings/services"],
-      show: can(role, "catalogue.manage") || can(role, "quotes.view"),
+      // Anyone who can read prices: those who sell, quote or make invoices.
+      show: can(role, "leads.work") || can(role, "quotes.view") || can(role, "bills.manage") || can(role, "catalogue.manage"),
     },
     { key: "lists", label: "Lists", href: "/app/settings/lists", icon: Tags, paths: ["/app/settings/lists"], show: can(role, "workspace.update") },
   ];

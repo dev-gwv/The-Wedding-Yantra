@@ -41,8 +41,8 @@ function LeadsScreen() {
       <>
         <PageHeader title="Leads" />
         <Card>
-          <EmptyState icon={Lock} title="Leads aren't part of your role">
-            The owner or a manager handles enquiries. Ask them if you need access.
+          <EmptyState icon={Lock} title="Leads aren't on your screens">
+            Ask the owner to add Leads & follow-ups for you.
           </EmptyState>
         </Card>
       </>

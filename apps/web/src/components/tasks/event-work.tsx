@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatClock, formatDate, ROLE_INFO } from "@wedding-yantra/core";
+import { can, eventScope, formatClock, formatDate, ROLE_INFO } from "@wedding-yantra/core";
 import { useApplyChecklist, useChecklist, useSaveEventTeam, useTasks, useTeam, useTimeOff } from "@wedding-yantra/api-client/react";
 import { saveEventTeamInput, type TaskItem, type WeddingEvent } from "@wedding-yantra/types";
 import { Check, ListChecks, Plus, UsersRound } from "lucide-react";
@@ -21,7 +21,8 @@ import { TaskSheet } from "./task-sheet";
 /** Who works the event, what they do there and when they must reach. */
 export function EventTeamCard({ event }: { event: WeddingEvent }) {
   const { workspace, me } = useCurrentWorkspace();
-  const manage = can(workspace, "tasks.manage");
+  // Choosing the team needs the Events screen too, so nobody adds themselves to an event they can't see.
+  const manage = can(workspace, "tasks.manage") && eventScope(workspace) === "all";
   const [editing, setEditing] = useState(false);
   if (!manage && event.team.length === 0) return null;
 
@@ -214,7 +215,8 @@ export function EventTasks({ event }: { event: WeddingEvent }) {
   const list = [...(tasks.data ?? [])].filter((t) => t.status !== "cancelled").sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
   const done = list.filter((t) => t.done).length;
   const steps = checklist.data?.length ?? 0;
-  const offerChecklist = manage && event.status !== "cancelled" && steps > 0 && !list.some((t) => t.fromChecklist);
+  // Adding the checklist needs the Events screen too, like choosing the team.
+  const offerChecklist = manage && eventScope(workspace) === "all" && event.status !== "cancelled" && steps > 0 && !list.some((t) => t.fromChecklist);
 
   async function addChecklist() {
     try {

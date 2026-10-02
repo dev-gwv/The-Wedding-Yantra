@@ -1,11 +1,11 @@
 "use client";
 
-import { can } from "@wedding-yantra/core";
-import { CalendarDays, ChevronDown, ClipboardList, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
+import { can, eventScope, leadScope, type Access } from "@wedding-yantra/core";
+import { CalendarDays, ChevronDown, ClipboardList, Database, FileText, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useState, type ReactNode } from "react";
-import { MONEY_SECTIONS, moneySectionOf } from "@/components/money/money-page";
+import { moneySectionOf, moneySections } from "@/components/money/money-page";
 import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
 import { taskSectionOf, taskSections } from "./task-sections";
 import { cn } from "@/lib/cn";
@@ -14,18 +14,38 @@ import { BusinessMark } from "./business-mark";
 import { Logo } from "./logo";
 import { useCurrentWorkspace } from "./workspace-context";
 
-/** Five places, never more. The same five will be the tabs of the mobile app. */
-const NAV: { href: string; label: string; icon: LucideIcon; /** On the phone's tab bar, where space is short */ short?: string }[] = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** On the phone's tab bar, where space is short */
+  short?: string;
+  /** Who gets it; everyone when left out. Each person sees only the screens they can open. */
+  show?: (who: Access) => boolean;
+}
+
+/**
+ * Five places on the phone, never more. The same five will be the tabs of the mobile app.
+ * Each person gets only the ones they can open.
+ */
+const NAV: NavItem[] = [
   { href: "/app", label: "Home", icon: House },
-  { href: "/app/leads", label: "Leads", icon: Inbox },
-  { href: "/app/events", label: "Events", icon: CalendarDays },
-  { href: "/app/money", label: "Payments and invoices", short: "Payments", icon: IndianRupee },
+  { href: "/app/leads", label: "Leads", icon: Inbox, show: (who) => leadScope(who) !== "none" },
+  // Quotes without the money: Quotes is all they'd find under Payments and invoices. Sales
+  // quotes all day, so it gets a tab on the phone too.
+  { href: "/app/money/quotes", label: "Quotes", icon: FileText, show: (who) => can(who, "quotes.view") && !can(who, "finance.view") },
+  { href: "/app/events", label: "Events", icon: CalendarDays, show: (who) => eventScope(who) !== "none" },
+  { href: "/app/money", label: "Payments and invoices", short: "Payments", icon: IndianRupee, show: (who) => can(who, "finance.view") },
   { href: "/app/more", label: "More", icon: Menu },
 ];
+
+/** The tab-bar columns for each number of tabs, written out so the styles are kept. */
+const TAB_COLUMNS = ["", "grid-cols-1", "grid-cols-2", "grid-cols-3", "grid-cols-4", "grid-cols-5"];
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
   if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/departments", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/partners", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/money/quotes") return ["/app/money/quotes", "/app/quotes"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
@@ -33,6 +53,25 @@ function isActive(pathname: string, href: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { workspace } = useCurrentWorkspace();
+  const nav = NAV.filter((n) => !n.show || n.show(workspace));
+  const tabs = nav;
+  const activeTab = tabs.find((n) => isActive(pathname, n.href))?.href ?? null;
+
+  // Tasks come right after Events: a group for those who give tasks, one link for everyone
+  // else. They stay when Events isn't on someone's screens.
+  const tasks = taskSections(workspace);
+  const tasksItem = !can(workspace, "tasks.work") ? null : tasks.length > 1 ? (
+    <NavGroup
+      label="Team Task Management"
+      icon={ClipboardList}
+      href="/app/tasks"
+      sections={tasks}
+      current={taskSectionOf(pathname)}
+      active={taskSectionOf(pathname) !== null}
+    />
+  ) : (
+    <NavLink href="/app/tasks" label="My tasks" icon={ClipboardList} active={taskSectionOf(pathname) !== null} />
+  );
 
   return (
     <div className="min-h-dvh bg-surface lg:pl-76 print:pl-0">
@@ -52,29 +91,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
         <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1" aria-label="Main">
-          {NAV.filter((n) => n.href !== "/app/more").map(({ href, label, icon: Icon }) => {
+          {NAV.filter((n) => n.href !== "/app/more").map(({ href, label, icon: Icon, show }) => {
             const active = isActive(pathname, href);
-            if (href === "/app/money" && can(workspace, "finance.view"))
-              return <NavGroup key={href} label={label} icon={Icon} href={href} sections={MONEY_SECTIONS} current={moneySectionOf(pathname)} active={active} />;
-            const link = <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
-            if (href !== "/app/events" || !can(workspace, "tasks.work")) return link;
-            // Tasks come right after Events: a group for those who give tasks, one link for everyone else.
-            const tasks = taskSections(workspace);
+            const item = show && !show(workspace) ? null : href === "/app/money" ? (
+              <NavGroup label={label} icon={Icon} href={href} sections={moneySections(workspace)} current={moneySectionOf(pathname)} active={active} />
+            ) : (
+              <NavLink href={href} label={label} icon={Icon} active={active} />
+            );
             return (
               <Fragment key={href}>
-                {link}
-                {tasks.length > 1 ? (
-                  <NavGroup
-                    label="Team Task Management"
-                    icon={ClipboardList}
-                    href="/app/tasks"
-                    sections={tasks}
-                    current={taskSectionOf(pathname)}
-                    active={taskSectionOf(pathname) !== null}
-                  />
-                ) : (
-                  <NavLink href="/app/tasks" label="My tasks" icon={ClipboardList} active={taskSectionOf(pathname) !== null} />
-                )}
+                {item}
+                {href === "/app/events" && tasksItem}
               </Fragment>
             );
           })}
@@ -131,9 +158,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="Main"
         className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur lg:hidden print:hidden"
       >
-        <ul className="mx-auto grid max-w-md grid-cols-5 pt-2">
-          {NAV.map(({ href, label, short, icon: Icon }) => {
-            const active = isActive(pathname, href);
+        <ul className={cn("mx-auto grid max-w-md pt-2", TAB_COLUMNS[tabs.length])}>
+          {tabs.map(({ href, label, short, icon: Icon }) => {
+            const active = activeTab === href;
             return (
               <li key={href}>
                 <Link

@@ -95,7 +95,8 @@ export default function ClientPage() {
 
           <MasterDetails client={c} />
 
-          {can(workspace, "clients.manage") && <PortalCard client={c} business={workspace.name} />}
+          {/* The client's page shows their invoices, so sharing it needs Payments & invoices too. */}
+          {can(workspace, "clients.manage") && can(workspace, "finance.view") && <PortalCard client={c} business={workspace.name} />}
 
           {events.data && events.data.length > 0 && (
             <section>

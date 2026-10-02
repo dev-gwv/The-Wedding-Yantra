@@ -8,14 +8,15 @@ import { assertWorkspaceFile, toUploaded } from "../files/service.js";
 import { taskAlert } from "./alerts.js";
 import { awardFinished, awardMoved, awardSentBack } from "../review/points.js";
 import { optionJoin } from "../options/service.js";
-import { loadTask, manages, TASK_SELECT, taskEvent, toTask, type TaskRow } from "./service.js";
+import { loadTask, manages, runsWorkOf, TASK_SELECT, taskEvent, toTask, workOfFilter, type TaskRow } from "./service.js";
 
 /** Whether a finished task was on time: finished on or before its day, in the business's time zone. */
 const LATE_SQL = `(t.due_date IS NOT NULL AND (coalesce(t.completed_at, now()) AT TIME ZONE w.timezone)::date > t.due_date)`;
 
 function roles(ctx: MemberContext, row: TaskRow) {
   return {
-    manages: manages(ctx),
+    // A department's manager runs only their own people's tasks (worked out by loadTask).
+    manages: row.runs ?? manages(ctx),
     isGiver: row.created_by === ctx.userId,
     // Nobody named: anyone who can see it (on the event) works it.
     isAssignee: row.assignee_id === ctx.userId || row.assignee_id === null,
@@ -456,6 +457,9 @@ function historyRows(rows: { id: string; actor_id: string | null; actor_name: st
 /** Each person's load today and the business's totals, in one look. */
 export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<PeopleBoard> {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager sees everyone's tasks");
+  // A department's manager sees their own people, and the unassigned tasks they gave.
+  const params: unknown[] = [ctx.workspaceId];
+  const theirs = workOfFilter(ctx, "m.user_id", params);
   const { rows } = await db.query<{
     user_id: string;
     name: string | null;
@@ -489,18 +493,18 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
        CROSS JOIN today
        LEFT JOIN tasks t ON t.workspace_id = m.workspace_id AND t.assignee_id = m.user_id AND t.deleted_at IS NULL
        LEFT JOIN events e ON e.id = t.event_id
-      WHERE m.workspace_id = $1 AND m.removed_at IS NULL AND m.role <> 'accountant'
+      WHERE m.workspace_id = $1 AND m.removed_at IS NULL AND m.role <> 'accountant'${theirs ? ` AND ${theirs}` : ""}
         AND (t.id IS NULL OR t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
       GROUP BY m.user_id, u.name, m.role, today.d, m.workspace_id, w.timezone
       ORDER BY count(t.id) FILTER (WHERE t.status NOT IN ('done', 'cancelled') AND t.due_date < today.d) DESC,
                count(t.id) FILTER (WHERE t.status NOT IN ('done', 'cancelled')) DESC, u.name`,
-    [ctx.workspaceId],
+    params,
   );
   const un = await db.query<{ n: number }>(
     `SELECT count(*)::int AS n FROM tasks t LEFT JOIN events e ON e.id = t.event_id
       WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.assignee_id IS NULL AND t.status NOT IN ('done', 'cancelled')
-        AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))`,
-    [ctx.workspaceId],
+        AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))${theirs ? " AND t.created_by = $2" : ""}`,
+    theirs ? [ctx.workspaceId, ctx.userId] : [ctx.workspaceId],
   );
   const people = rows.map((p) => ({
     user: { id: p.user_id, name: p.name },
@@ -558,6 +562,8 @@ export async function personTasks(db: Queryable, ctx: MemberContext, userId: str
   );
   const p = person.rows[0];
   if (!p) throw notFound("This person");
+  // A department's manager opens only their own people, as if the rest weren't there.
+  if (!(await runsWorkOf(db, ctx, userId))) throw notFound("This team member");
 
   const tasks = await db.query<TaskRow>(
     `${TASK_SELECT}

@@ -14,7 +14,8 @@ import { portalUrl } from "@/lib/links";
 
 /**
  * The client's own page: their event dates, quotes, bills and payments, always current.
- * For owners and managers, who share it on WhatsApp and can stop sharing it.
+ * For people who manage clients and see money (it shows their invoices), who share it on
+ * WhatsApp and can stop sharing it.
  */
 export function PortalCard({ client, business }: { client: Client; business: string }) {
   const { workspace } = useCurrentWorkspace();

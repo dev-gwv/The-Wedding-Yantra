@@ -8,6 +8,14 @@ const requireManage = (ctx: MemberContext) => {
   if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can send messages to clients");
 };
 
+/** Lists drawn from leads, not clients: only someone who sees every lead may use them. */
+const FROM_LEADS: ReadonlySet<BroadcastAudience> = new Set(["lost_enquiries"]);
+const requireAudience = (ctx: MemberContext, audience: BroadcastAudience) => {
+  if (FROM_LEADS.has(audience) && !can(ctx, "leads.view_all")) {
+    throw forbidden("This list comes from your leads, so it needs every lead on the Leads screen");
+  }
+};
+
 interface PersonRow {
   client_id: string | null;
   lead_id: string | null;
@@ -66,6 +74,7 @@ const audienceRows = async (db: Queryable, workspaceId: string, audience: Broadc
 
 export async function previewAudience(db: Queryable, ctx: MemberContext, audience: BroadcastAudience): Promise<BroadcastAudiencePreview> {
   requireManage(ctx);
+  requireAudience(ctx, audience);
   const rows = await audienceRows(db, ctx.workspaceId, audience);
   return { audience, count: rows.length, names: rows.slice(0, 5).map((r) => r.name.trim().split(/\s+/)[0] ?? r.name) };
 }
@@ -113,6 +122,7 @@ export async function getBroadcast(db: Queryable, ctx: MemberContext, id: string
   requireManage(ctx);
   const { rows } = await db.query<BroadcastRow>(`${SELECT} WHERE b.id = $1 AND b.workspace_id = $2 AND b.deleted_at IS NULL`, [id, ctx.workspaceId]);
   if (!rows[0]) throw notFound("This message");
+  requireAudience(ctx, rows[0].audience);
   const people = await db.query<{
     id: string;
     name: string;
@@ -145,6 +155,7 @@ export async function createBroadcast(
   input: { title: string; message: string; audience: BroadcastAudience },
 ): Promise<BroadcastDetail> {
   requireManage(ctx);
+  requireAudience(ctx, input.audience);
   const id = await withTransaction(db, async (tx) => {
     const people = await audienceRows(tx, ctx.workspaceId, input.audience);
     if (!people.length) throw new AppError(409, "NOBODY_TO_SEND", "Nobody fits this list yet. Pick another, or add clients with a mobile number.");
@@ -175,14 +186,15 @@ export async function markRecipient(
 ): Promise<BroadcastRecipient> {
   requireManage(ctx);
   return withTransaction(db, async (tx) => {
-    const { rows } = await tx.query<{ client_id: string | null }>(
-      `SELECT r.client_id FROM broadcast_recipients r
+    const { rows } = await tx.query<{ client_id: string | null; audience: BroadcastAudience }>(
+      `SELECT r.client_id, b.audience FROM broadcast_recipients r
          JOIN broadcasts b ON b.id = r.broadcast_id
         WHERE r.id = $1 AND r.broadcast_id = $2 AND b.workspace_id = $3 AND b.deleted_at IS NULL
         FOR UPDATE OF r`,
       [recipientId, broadcastId, ctx.workspaceId],
     );
     if (!rows[0]) throw notFound("This person");
+    requireAudience(ctx, rows[0].audience);
     if (input.noMoreMessages) {
       if (!rows[0].client_id) throw new AppError(400, "NOT_A_CLIENT", "Only clients can be left out of future messages");
       await tx.query(`UPDATE clients SET no_messages = true WHERE id = $1`, [rows[0].client_id]);

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { can, computeQuoteTotals, quoteNumber } from "@wedding-yantra/core";
+import { can, computeQuoteTotals, quoteNumber, quoteScope } from "@wedding-yantra/core";
 import {
   EVENT_LABELS,
   type EventType,
@@ -14,15 +14,25 @@ import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
-import { upsertClientForLead } from "../sales/leads.js";
+import { scopeCondition, upsertClientForLead } from "../sales/leads.js";
 import { logoPath } from "../files/logo.js";
 
 const requireView = (ctx: MemberContext) => {
   if (!can(ctx, "quotes.view")) throw forbidden("Your role doesn't include quotes");
 };
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx, "quotes.manage")) throw forbidden("Only the owner or a manager can make quotes");
+  if (!can(ctx, "quotes.manage")) throw forbidden("Making quotes isn't on your screens. Ask the owner if you need it.");
 };
+/**
+ * SQL to AND in: only quotes this person may see. Staff who work only their own leads see
+ * the quotes they made and the ones on their leads (`q` is the quote, `l` its lead).
+ */
+export function quoteScopeSql(ctx: MemberContext, params: unknown[]): string {
+  if (quoteScope(ctx) === "all") return "TRUE";
+  params.push(ctx.userId);
+  const p = `$${params.length}`;
+  return `(q.created_by = ${p} OR l.assigned_to = ${p} OR l.created_by = ${p})`;
+}
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -132,10 +142,13 @@ async function toQuote(db: Queryable, r: QuoteRow): Promise<Quote> {
   };
 }
 
-async function loadRow(db: Queryable, workspaceId: string, quoteId: string, lock = false): Promise<QuoteRow> {
+/** Loads one quote the person is allowed to see, or throws "not found". */
+async function loadRow(db: Queryable, ctx: MemberContext, quoteId: string, lock = false): Promise<QuoteRow> {
+  const params: unknown[] = [quoteId, ctx.workspaceId];
+  const scope = quoteScopeSql(ctx, params);
   const { rows } = await db.query<QuoteRow>(
-    `${QUOTE_SELECT} WHERE q.id = $1 AND q.workspace_id = $2 AND q.deleted_at IS NULL${lock ? " FOR UPDATE OF q" : ""}`,
-    [quoteId, workspaceId],
+    `${QUOTE_SELECT} WHERE q.id = $1 AND q.workspace_id = $2 AND q.deleted_at IS NULL AND ${scope}${lock ? " FOR UPDATE OF q" : ""}`,
+    params,
   );
   if (!rows[0]) throw notFound("This quote");
   return rows[0];
@@ -143,7 +156,7 @@ async function loadRow(db: Queryable, workspaceId: string, quoteId: string, lock
 
 export async function getQuote(db: Queryable, ctx: MemberContext, quoteId: string): Promise<Quote> {
   requireView(ctx);
-  return toQuote(db, await loadRow(db, ctx.workspaceId, quoteId));
+  return toQuote(db, await loadRow(db, ctx, quoteId));
 }
 
 export async function listQuotes(
@@ -153,7 +166,7 @@ export async function listQuotes(
 ): Promise<QuoteSummary[]> {
   requireView(ctx);
   const params: unknown[] = [ctx.workspaceId];
-  const where = ["q.workspace_id = $1", "q.deleted_at IS NULL"];
+  const where = ["q.workspace_id = $1", "q.deleted_at IS NULL", quoteScopeSql(ctx, params)];
   if (filters.leadId) {
     params.push(filters.leadId);
     where.push(`q.lead_id = $${params.length}`);
@@ -249,11 +262,15 @@ export async function createQuote(
   return withTransaction(db, async (tx) => {
     let clientId = input.clientId ?? null;
     if (input.leadId) {
-      const lead = await tx.query<{ client_id: string | null }>(
-        `SELECT client_id FROM leads WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
-        [input.leadId, ctx.workspaceId],
+      const params: unknown[] = [input.leadId, ctx.workspaceId];
+      const visible = scopeCondition(ctx, params);
+      const lead = await tx.query<{ client_id: string | null; visible: boolean }>(
+        `SELECT l.client_id, ${visible} AS visible FROM leads l WHERE l.id = $1 AND l.workspace_id = $2 AND l.deleted_at IS NULL`,
+        params,
       );
       if (!lead.rows[0]) throw new AppError(400, "VALIDATION_ERROR", "Choose a lead from your list", { leadId: "Choose a lead" });
+      // Same rule as the leads list: staff quote only on the leads they added or were given.
+      if (!lead.rows[0].visible) throw notFound("This lead");
       clientId = clientId ?? lead.rows[0].client_id;
     }
     if (clientId) {
@@ -295,7 +312,7 @@ export async function createQuote(
         [ctx.workspaceId, input.leadId, ctx.userId, `Made quote ${quoteNumber(number)}`, { quoteId: id }],
       );
     }
-    return toQuote(tx, await loadRow(tx, ctx.workspaceId, id));
+    return toQuote(tx, await loadRow(tx, ctx, id));
   });
 }
 
@@ -314,7 +331,7 @@ export async function updateQuote(
 ): Promise<Quote> {
   requireManage(ctx);
   return withTransaction(db, async (tx) => {
-    const current = await loadRow(tx, ctx.workspaceId, quoteId, true);
+    const current = await loadRow(tx, ctx, quoteId, true);
     if (current.status === "accepted" || current.status === "declined") {
       throw new AppError(409, "QUOTE_CLOSED", `This quote was ${current.status}. Make a new one to change it.`);
     }
@@ -336,13 +353,13 @@ export async function updateQuote(
       const items: ItemFields[] = input.items ?? (await loadItems(tx, quoteId));
       await writeItems(tx, ctx.workspaceId, quoteId, items, input.discount ?? Number(current.discount));
     }
-    return toQuote(tx, await loadRow(tx, ctx.workspaceId, quoteId));
+    return toQuote(tx, await loadRow(tx, ctx, quoteId));
   });
 }
 
 export async function markSent(db: Db, ctx: MemberContext, quoteId: string): Promise<Quote> {
   requireManage(ctx);
-  const current = await loadRow(db, ctx.workspaceId, quoteId);
+  const current = await loadRow(db, ctx, quoteId);
   if (current.status === "draft") {
     await db.query(`UPDATE quotes SET status = 'sent', sent_at = now() WHERE id = $1`, [quoteId]);
     if (current.lead_id) {
@@ -358,7 +375,7 @@ export async function markSent(db: Db, ctx: MemberContext, quoteId: string): Pro
 
 export async function deleteQuote(db: Db, ctx: MemberContext, quoteId: string): Promise<void> {
   requireManage(ctx);
-  const current = await loadRow(db, ctx.workspaceId, quoteId);
+  const current = await loadRow(db, ctx, quoteId);
   if (current.status === "accepted") throw new AppError(409, "QUOTE_CLOSED", "Accepted quotes are kept for your records");
   await db.query(`UPDATE quotes SET deleted_at = now() WHERE id = $1`, [quoteId]);
 }
@@ -495,19 +512,19 @@ async function decline(tx: Queryable, quote: QuoteRow, reason: string | null, ac
 export async function acceptQuote(db: Db, ctx: MemberContext, quoteId: string): Promise<Quote> {
   requireManage(ctx);
   return withTransaction(db, async (tx) => {
-    const row = await loadRow(tx, ctx.workspaceId, quoteId, true);
+    const row = await loadRow(tx, ctx, quoteId, true);
     const who = (await tx.query<{ name: string | null }>(`SELECT name FROM users WHERE id = $1`, [ctx.userId])).rows[0]?.name;
     await book(tx, row, `Marked by ${who ?? "the team"}`, ctx.userId);
-    return toQuote(tx, await loadRow(tx, ctx.workspaceId, quoteId));
+    return toQuote(tx, await loadRow(tx, ctx, quoteId));
   });
 }
 
 export async function declineQuote(db: Db, ctx: MemberContext, quoteId: string, reason: string | null): Promise<Quote> {
   requireManage(ctx);
   return withTransaction(db, async (tx) => {
-    const row = await loadRow(tx, ctx.workspaceId, quoteId, true);
+    const row = await loadRow(tx, ctx, quoteId, true);
     await decline(tx, row, reason, ctx.userId);
-    return toQuote(tx, await loadRow(tx, ctx.workspaceId, quoteId));
+    return toQuote(tx, await loadRow(tx, ctx, quoteId));
   });
 }
 

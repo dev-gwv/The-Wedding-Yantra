@@ -25,12 +25,12 @@ export interface PersonScore {
 
 export interface TeamScores {
   month: string;
-  /** Everyone for owners and managers; just you for everyone else */
+  /** Everyone for owners and managers (a department's manager: its people and themselves); just you for everyone else */
   people: PersonScore[];
   /** The business as a whole, for owners and managers */
   business: {
-    /** For events that began this month: money in before the first function, of what was due */
-    moneyBeforeEvents: { collected: number; due: number };
+    /** For events that began this month: money in before the first function, of what was due. Null for people who don't see the money */
+    moneyBeforeEvents: { collected: number; due: number } | null;
     /** Events that began this month whose every step was done by its day */
     eventsOnTime: { done: number; total: number };
   } | null;
@@ -40,7 +40,7 @@ export interface TeamScores {
 // Activity log
 // ---------------------------------------------------------------------------
 
-export const ACTIVITY_LINK_KINDS = ["event", "lead", "bill", "quote", "client", "team", "expenses", "tasks", "vendor", "venue", "partner"] as const;
+export const ACTIVITY_LINK_KINDS = ["event", "lead", "bill", "quote", "client", "team", "expenses", "tasks", "vendor", "venue", "partner", "departments"] as const;
 export type ActivityLinkKind = (typeof ACTIVITY_LINK_KINDS)[number];
 
 /** One thing someone did. `activityText()` in core turns it into a sentence. */

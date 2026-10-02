@@ -36,8 +36,8 @@ export default function VenuesPage() {
         <BackLink href="/app/masters" label="Master data" />
         <PageHeader title="Venues" />
         <Card>
-          <EmptyState icon={Lock} title="The venue list is for the owner, managers and staff">
-            Each event you&apos;re on shows its venue&apos;s address and Maps link.
+          <EmptyState icon={Lock} title="The venue list isn't on your screens">
+            Each event you&apos;re on shows its venue&apos;s address and Maps link. For the whole list, ask the owner to add Events & calendar for you.
           </EmptyState>
         </Card>
       </>

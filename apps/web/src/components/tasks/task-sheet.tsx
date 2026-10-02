@@ -1,6 +1,6 @@
 "use client";
 
-import { can, describeRepeat, eventScope, formatDate, WEEKDAY_NAMES, weekdayOf, type RepeatFrequency } from "@wedding-yantra/core";
+import { can, describeRepeat, eventScope, formatDate, teamScope, WEEKDAY_NAMES, weekdayOf, type RepeatFrequency } from "@wedding-yantra/core";
 import {
   useCreateTask,
   useCreateTaskRepeat,
@@ -207,7 +207,11 @@ function TaskForm({
   // The task's own event stays choosable even when it's in the past.
   const eventOptions = events.data ?? [];
   const missingEvent = task?.eventId && !eventOptions.some((e) => e.id === task.eventId) ? { id: task.eventId, title: task.eventTitle ?? "Event" } : null;
-  const members = team.data?.members ?? [];
+  // A department's manager gives tasks only to the people in it, and to themselves.
+  const ownDepartment = teamScope(workspace) === "department";
+  const members = (team.data?.members ?? []).filter(
+    (m) => !ownDepartment || m.isYou || m.userId === task?.assignee?.id || (!!workspace.department && m.department === workspace.department),
+  );
   const eventChosen = !!(forEvent || eventId);
   const canRepeat = !task && !eventChosen;
 

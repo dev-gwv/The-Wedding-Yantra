@@ -87,6 +87,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   const canPickClient = can(workspace, "clients.view");
   const [referrer, setReferrer] = useState<PersonRef | null>(lead?.referredByClient ?? null);
   const team = useTeam(canAssign ? workspace.id : null);
+  // Only people with the Leads screen can be given a lead; whoever has it now stays on the list.
+  const handlers = (team.data?.members ?? []).filter((m) => m.permissions.includes("leads.work") || m.userId === lead?.assignedTo?.id);
   const create = useCreateLead(workspace.id);
   const update = useUpdateLead(workspace.id, lead?.id ?? "");
   const [values, setValues] = useState<Values>(() => initial(lead));
@@ -201,10 +203,10 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
         </div>
       )}
 
-      {canAssign && team.data && team.data.members.length > 1 && (
+      {canAssign && handlers.length > 1 && (
         <SelectField label="Who handles it" value={values.assignedToUserId} onChange={set("assignedToUserId")} error={errors.assignedToUserId}>
           {!lead && <option value="">Me</option>}
-          {team.data.members.map((m) => (
+          {handlers.map((m) => (
             <option key={m.userId} value={m.userId}>
               {m.name ?? m.phone}
               {m.isYou ? " (you)" : ""}

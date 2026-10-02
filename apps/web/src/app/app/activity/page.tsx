@@ -26,6 +26,7 @@ const LINKS: Record<NonNullable<ActivityItem["link"]>["kind"], (id: string | nul
   vendor: (id) => (id ? `/app/vendors/${id}` : "/app/vendors"),
   venue: (id) => (id ? `/app/venues/${id}` : "/app/venues"),
   partner: (id) => (id ? `/app/partners/${id}` : "/app/partners"),
+  departments: () => "/app/departments",
 };
 
 /** Who did what, and when. For owners and managers. */

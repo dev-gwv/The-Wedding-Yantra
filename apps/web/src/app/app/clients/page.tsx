@@ -33,8 +33,8 @@ export default function ClientsPage() {
         <BackLink href="/app/masters" label="Master data" />
         <PageHeader title="Clients" />
         <Card>
-          <EmptyState icon={Lock} title="Clients aren't part of your role">
-            Ask the owner if you need to see client details.
+          <EmptyState icon={Lock} title="Clients aren't on your screens">
+            Ask the owner to add Clients for you.
           </EmptyState>
         </Card>
       </>

@@ -34,9 +34,9 @@ const toItem = (r: Row): CatalogueItem => ({
 const COLUMNS = "ci.id, ci.name, ci.category, sc.label AS category_label, ci.description, ci.unit, ci.price, ci.tax_rate, ci.sac, ci.active";
 const FROM = `catalogue_items ci ${optionJoin("sc", "service_category", "ci.workspace_id", "ci.category")}`;
 
-/** Everyone who can work on leads or quotes can read the price list. */
+/** Everyone who can work on leads, quotes or invoices can read the price list. */
 export function canRead(ctx: MemberContext) {
-  return can(ctx, "leads.work") || can(ctx, "quotes.view");
+  return can(ctx, "leads.work") || can(ctx, "quotes.view") || can(ctx, "bills.manage");
 }
 
 export async function listCatalogue(db: Db, ctx: MemberContext, includeArchived = false): Promise<CatalogueItem[]> {

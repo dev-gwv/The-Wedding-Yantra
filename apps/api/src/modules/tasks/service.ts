@@ -18,6 +18,58 @@ const requireWork = (ctx: MemberContext) => {
 const requireManage = (ctx: MemberContext) => {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager can do this");
 };
+/** An event's team and checklist: so a manager without Events can't put themselves on one. */
+const requireEvents = (ctx: MemberContext) => {
+  if (eventScope(ctx) !== "all") throw forbidden("This needs the Events & calendar screen");
+};
+
+/**
+ * Whether this person runs someone's work: gives them tasks, opens their page, marks their
+ * days off. The owner and managers of the whole team run everyone's; a manager limited to a
+ * department runs the work of the people in it, and their own.
+ */
+export async function runsWorkOf(db: Queryable, ctx: MemberContext, userId: string): Promise<boolean> {
+  if (ctx.teamScope === "all" || userId === ctx.userId) return true;
+  if (ctx.teamScope === "self" || !ctx.department) return false;
+  const { rowCount } = await db.query(
+    `SELECT 1 FROM memberships m JOIN member_details md ON md.membership_id = m.id
+      WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NULL AND md.department = $3`,
+    [ctx.workspaceId, userId, ctx.department],
+  );
+  return !!rowCount;
+}
+
+/**
+ * The same rule as SQL on a user id column, adding its values to `params`: only the people
+ * whose work this person runs. Null when they run everyone's.
+ */
+export function workOfFilter(ctx: MemberContext, column: string, params: unknown[]): string | null {
+  if (ctx.teamScope === "all") return null;
+  params.push(ctx.userId);
+  const me = `${column} = $${params.length}`;
+  if (ctx.teamScope === "self" || !ctx.department) return me;
+  params.push(ctx.workspaceId, ctx.department);
+  return `(${me} OR EXISTS (SELECT 1 FROM memberships dm JOIN member_details dd ON dd.membership_id = dm.id
+            WHERE dm.workspace_id = $${params.length - 1} AND dm.user_id = ${column} AND dm.removed_at IS NULL
+              AND dd.department = $${params.length}))`;
+}
+
+/**
+ * Whether this person runs a task as a manager: the owner and managers of the whole team run
+ * every task; a department's manager runs the tasks of their own people (for them, or given
+ * by them).
+ */
+async function runsTask(db: Queryable, ctx: MemberContext, row: { assignee_id: string | null; created_by: string | null }): Promise<boolean> {
+  if (!manages(ctx)) return false;
+  if (ctx.teamScope === "all") return true;
+  if (row.assignee_id && (await runsWorkOf(db, ctx, row.assignee_id))) return true;
+  return row.created_by !== null && (await runsWorkOf(db, ctx, row.created_by));
+}
+
+/** Giving a task to someone: a department's manager gives them only to their own people. */
+async function assertRunsWorkOf(db: Queryable, ctx: MemberContext, userId: string) {
+  if (!(await runsWorkOf(db, ctx, userId))) throw forbidden("You give tasks to people in your department");
+}
 
 // ---------------------------------------------------------------------------
 // Reading tasks
@@ -69,6 +121,8 @@ export interface TaskRow {
   last_sub_link: string | null;
   last_sub_decision: "approved" | "sent_back" | null;
   last_sub_reason: string | null;
+  /** Set by loadTask: whether this person runs the task as a manager */
+  runs?: boolean;
 }
 
 export const TASK_SELECT = `
@@ -166,13 +220,14 @@ export async function loadTask(db: Queryable, ctx: MemberContext, id: string, lo
   );
   const row = rows[0];
   if (!row) throw notFound("This task");
+  const runs = await runsTask(db, ctx, row);
   const visible =
-    manages(ctx) ||
+    runs ||
     row.assignee_id === ctx.userId ||
     row.created_by === ctx.userId ||
     (row.event_id !== null && (await seesEvent(db, ctx, row.event_id)));
   if (!visible) throw notFound("This task");
-  return row;
+  return { ...row, runs };
 }
 
 export async function listTasks(
@@ -204,13 +259,20 @@ export async function listTasks(
     where.push(`t.event_id = ${add(filters.eventId)}`);
   } else {
     if (filters.clientId) {
-      // A client's tasks: managers see all of them, everyone else their own.
+      // A client's tasks: managers see their people's, everyone else their own.
       where.push(`t.client_id = ${add(filters.clientId)}`);
       if (!manages(ctx)) where.push(`(t.assignee_id = ${add(ctx.userId)} OR t.created_by = $${params.length})`);
+      else {
+        const theirs = workOfFilter(ctx, "t.assignee_id", params);
+        if (theirs) where.push(`(${theirs} OR t.created_by = ${add(ctx.userId)})`);
+      }
     } else if (filters.scope === "team") {
       requireManage(ctx);
       if (filters.assigneeId === "none") where.push("t.assignee_id IS NULL");
       else if (filters.assigneeId) where.push(`t.assignee_id = ${add(filters.assigneeId)}`);
+      // A department's manager sees their people's tasks, and the ones they gave.
+      const theirs = workOfFilter(ctx, "t.assignee_id", params);
+      if (theirs) where.push(`(${theirs} OR t.created_by = ${add(ctx.userId)})`);
     } else if (filters.scope === "given") {
       // Tasks I gave others: to follow up on.
       where.push(`t.created_by = ${add(ctx.userId)}`, `t.assignee_id IS DISTINCT FROM $${params.length}`);
@@ -293,8 +355,10 @@ export async function createTask(db: Db, ctx: MemberContext, input: TaskFields):
   const assignee = input.assigneeId === undefined ? ctx.userId : input.assigneeId;
   if (assignee !== ctx.userId) {
     if (!manages(ctx)) throw forbidden("Only the owner or a manager can give tasks to others");
-    if (assignee) await assertMember(db, ctx.workspaceId, assignee);
-    else if (!input.eventId) {
+    if (assignee) {
+      await assertMember(db, ctx.workspaceId, assignee);
+      await assertRunsWorkOf(db, ctx, assignee);
+    } else if (!input.eventId) {
       throw new AppError(400, "VALIDATION_ERROR", "Choose who does it", { assigneeId: "Choose who does it" });
     }
   }
@@ -354,10 +418,13 @@ export async function updateTask(db: Db, ctx: MemberContext, id: string, input: 
   return withTransaction(db, async (tx) => {
     const row = await loadTask(tx, ctx, id, true);
     // Your own tasks are yours to change; other people's are the manager's.
-    if (!manages(ctx) && row.created_by !== ctx.userId) throw forbidden("Only the owner or a manager can change this task");
+    if (!row.runs && row.created_by !== ctx.userId) throw forbidden("Only the owner or a manager can change this task");
     if (input.assigneeId !== undefined && input.assigneeId !== row.assignee_id) {
       if (!manages(ctx)) throw forbidden("Only the owner or a manager can give tasks to others");
-      if (input.assigneeId) await assertMember(tx, ctx.workspaceId, input.assigneeId);
+      if (input.assigneeId) {
+        await assertMember(tx, ctx.workspaceId, input.assigneeId);
+        await assertRunsWorkOf(tx, ctx, input.assigneeId);
+      }
     }
     if (input.eventId && !(await seesEvent(tx, ctx, input.eventId))) {
       throw new AppError(400, "VALIDATION_ERROR", "Choose an event from your list", { eventId: "Choose an event" });
@@ -435,7 +502,7 @@ export async function setTaskDone(db: Db, ctx: MemberContext, id: string, done: 
 export async function deleteTask(db: Db, ctx: MemberContext, id: string): Promise<void> {
   requireWork(ctx);
   const row = await loadTask(db, ctx, id);
-  if (!manages(ctx) && row.created_by !== ctx.userId) throw forbidden("Only the owner or a manager can remove this task");
+  if (!row.runs && row.created_by !== ctx.userId) throw forbidden("Only the owner or a manager can remove this task");
   await db.query(`UPDATE tasks SET deleted_at = now() WHERE id = $1`, [id]);
 }
 
@@ -499,6 +566,7 @@ export async function saveChecklist(
  */
 export async function applyChecklist(db: Db, ctx: MemberContext, eventId: string): Promise<TaskItem[]> {
   requireManage(ctx);
+  requireEvents(ctx);
   await withTransaction(db, async (tx) => {
     const e = await tx.query<{ start_date: string | null; end_date: string | null }>(
       `SELECT (SELECT min(date)::text FROM event_functions WHERE event_id = e.id) AS start_date,
@@ -538,6 +606,7 @@ export async function saveEventTeam(
   members: { userId: string; roleNote?: string | null; callTime?: string | null }[],
 ): Promise<TeamMember[]> {
   requireManage(ctx);
+  requireEvents(ctx);
   await withTransaction(db, async (tx) => {
     const e = await tx.query(`SELECT 1 FROM events WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [eventId, ctx.workspaceId]);
     if (!e.rowCount) throw notFound("This event");
@@ -631,15 +700,18 @@ export async function myDay(db: Db, ctx: MemberContext): Promise<MyDay> {
 export async function homeTasks(db: Queryable, ctx: MemberContext): Promise<{ overdue: number; dueToday: number; teamOverdue: number | null }> {
   if (!can(ctx, "tasks.work")) return { overdue: 0, dueToday: 0, teamOverdue: null };
   await makeDueRepeats(db, ctx.workspaceId);
+  const params: unknown[] = [ctx.workspaceId, ctx.userId];
+  // Like the team's task list: a department's manager counts their people's, and the ones they gave.
+  const theirs = manages(ctx) ? workOfFilter(ctx, "t.assignee_id", params) : null;
   const { rows } = await db.query<{ overdue: string; due_today: string; team_overdue: string }>(
     `WITH today AS (SELECT (now() AT TIME ZONE timezone)::date AS d FROM workspaces WHERE id = $1)
      SELECT count(*) FILTER (WHERE t.assignee_id = $2 AND t.due_date < today.d) AS overdue,
             count(*) FILTER (WHERE t.assignee_id = $2 AND t.due_date = today.d) AS due_today,
-            count(*) FILTER (WHERE t.due_date < today.d) AS team_overdue
+            count(*) FILTER (WHERE t.due_date < today.d${theirs ? ` AND (${theirs} OR t.created_by = $2)` : ""}) AS team_overdue
        FROM tasks t CROSS JOIN today
        LEFT JOIN events e ON e.id = t.event_id
       WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status NOT IN ('done', 'cancelled') AND ${ACTIVE_EVENT}`,
-    [ctx.workspaceId, ctx.userId],
+    params,
   );
   const r = rows[0]!;
   return { overdue: Number(r.overdue), dueToday: Number(r.due_today), teamOverdue: manages(ctx) ? Number(r.team_overdue) : null };

@@ -31,8 +31,8 @@ function EventsScreen() {
       <>
         <PageHeader title="Events" />
         <Card>
-          <EmptyState icon={Lock} title="Events you're booked on show here">
-            When the owner adds you to an event, you&apos;ll see its dates and venue here.
+          <EmptyState icon={Lock} title="Events aren't on your screens">
+            Ask the owner to add Events & calendar for you.
           </EmptyState>
         </Card>
       </>
