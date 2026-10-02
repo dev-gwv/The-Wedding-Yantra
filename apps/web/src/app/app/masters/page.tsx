@@ -5,6 +5,7 @@ import { useClients, useTeam, useVendors, useVenues } from "@wedding-yantra/api-
 import { ChevronRight, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
+import { masterSections } from "@/components/app/master-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Card, PageHeader } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
@@ -33,6 +34,8 @@ export default function MastersPage() {
   const vendors = useVendors(workspace.id, can(role, "finance.view"));
   const team = useTeam(can(role, "members.view") ? workspace.id : null);
   const venues = useVenues(workspace.id, can(role, "events.view"));
+  // The same records, for the same people, as under Master data in the side menu.
+  const visible = new Map(masterSections(role).map((s) => [s.key as string, s.href]));
 
   const tiles: Tile[] = [
     {
@@ -40,9 +43,9 @@ export default function MastersPage() {
       title: "Clients",
       about: "Who booked you, emergency contacts, the wedding",
       icon: UsersRound,
-      href: "/app/clients",
+      href: visible.get("clients") ?? null,
       status: "live",
-      show: can(role, "clients.view"),
+      show: visible.has("clients"),
       count: clients.data?.length ?? null,
     },
     {
@@ -50,9 +53,9 @@ export default function MastersPage() {
       title: "Employees",
       about: can(role, "members.hr") ? "Your team: designation, emergency contact, pay and bank" : "Your team: designation and emergency contact",
       icon: Users,
-      href: can(role, "members.view") ? "/app/team" : "/app/team/me",
+      href: visible.get("employees") ?? null,
       status: "live",
-      show: true,
+      show: visible.has("employees"),
       count: team.data?.members.length ?? null,
     },
     {
@@ -60,9 +63,9 @@ export default function MastersPage() {
       title: "Vendors",
       about: "Who you hire: category, contact, UPI and bank, GST",
       icon: HandCoins,
-      href: "/app/vendors",
+      href: visible.get("vendors") ?? null,
       status: "live",
-      show: can(role, "finance.view"),
+      show: visible.has("vendors"),
       count: vendors.data?.length ?? null,
     },
     {
@@ -70,9 +73,9 @@ export default function MastersPage() {
       title: "Venues",
       about: "Where events happen: address, Maps link, contact, rules",
       icon: MapPin,
-      href: "/app/venues",
+      href: visible.get("venues") ?? null,
       status: "live",
-      show: can(role, "events.view"),
+      show: visible.has("venues"),
       count: venues.data?.length ?? null,
     },
     {
@@ -80,18 +83,18 @@ export default function MastersPage() {
       title: "Services and packages",
       about: "What you sell, grouped your way, and packages at one price",
       icon: Package,
-      href: "/app/services",
+      href: visible.get("services") ?? null,
       status: "live",
-      show: can(role, "catalogue.manage") || can(role, "quotes.view"),
+      show: visible.has("services"),
     },
     {
       key: "lists",
       title: "Lists",
       about: "Choices in the forms: service categories, designations, vendor and venue types, payment modes",
       icon: Tags,
-      href: "/app/settings/lists",
+      href: visible.get("lists") ?? null,
       status: "live",
-      show: can(role, "workspace.update"),
+      show: visible.has("lists"),
     },
   ];
 

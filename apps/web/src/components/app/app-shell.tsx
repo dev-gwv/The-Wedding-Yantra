@@ -4,8 +4,9 @@ import { can } from "@wedding-yantra/core";
 import { CalendarDays, ChevronDown, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { MONEY_SECTIONS, moneySectionOf } from "@/components/money/money-page";
+import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
 import { cn } from "@/lib/cn";
 import { AlertBell } from "./alert-bell";
 import { BusinessMark } from "./business-mark";
@@ -51,24 +52,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="flex flex-col gap-1" aria-label="Main">
           {NAV.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
-            if (href === "/app/money" && can(workspace.role, "finance.view")) return <MoneyGroup key={href} pathname={pathname} active={active} />;
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-                  active
-                    ? "bg-gradient-primary text-on-brand shadow-warm"
-                    : "text-ink-muted hover:bg-cream hover:text-brand-strong",
-                )}
-              >
-                <Icon className="size-[18px] shrink-0" strokeWidth={2} />
-                {label}
-              </Link>
-            );
+            // On a computer, Master data has its own place in this menu, so More doesn't claim its pages.
+            const active = href === "/app/more" ? isActive(pathname, href) && !inMasterData(pathname) : isActive(pathname, href);
+            if (href === "/app/money" && can(workspace.role, "finance.view"))
+              return <NavGroup key={href} label={label} icon={Icon} href={href} sections={MONEY_SECTIONS} current={moneySectionOf(pathname)} active={active} />;
+            if (href === "/app/more") {
+              return (
+                <Fragment key={href}>
+                  <NavGroup
+                    label="Master data"
+                    icon={Database}
+                    href="/app/masters"
+                    sections={masterSections(workspace.role)}
+                    current={masterSectionOf(pathname)}
+                    active={inMasterData(pathname)}
+                  />
+                  <NavLink href={href} label={label} icon={Icon} active={active} />
+                </Fragment>
+              );
+            }
+            return <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
           })}
         </nav>
         <div className="mt-4 flex flex-col gap-1 border-t border-line pt-4">
@@ -82,17 +85,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Sun className="size-[18px] shrink-0" strokeWidth={2} />
             My day
-          </Link>
-          <Link
-            href="/app/masters"
-            aria-current={["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team", "/app/services"].some((p) => pathname.startsWith(p)) ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-              ["/app/masters", "/app/clients", "/app/vendors", "/app/venues", "/app/team", "/app/services"].some((p) => pathname.startsWith(p)) ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
-            )}
-          >
-            <Database className="size-[18px] shrink-0" strokeWidth={2} />
-            Master data
           </Link>
           <AlertBell
             label
@@ -161,14 +153,43 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+function NavLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: LucideIcon; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
+        active ? "bg-gradient-primary text-on-brand shadow-warm" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
+      )}
+    >
+      <Icon className="size-[18px] shrink-0" strokeWidth={2} />
+      {label}
+    </Link>
+  );
+}
+
 /**
- * Payments and invoices, with its parts under it: open while you're in it, and the arrow
- * shows them from anywhere else without leaving the page.
+ * A menu item with its parts under it (Payments and invoices, Master data): open while
+ * you're in it, and the arrow shows them from anywhere else without leaving the page.
  */
-function MoneyGroup({ pathname, active }: { pathname: string; active: boolean }) {
+function NavGroup({
+  label,
+  icon: Icon,
+  href,
+  sections,
+  current,
+  active,
+}: {
+  label: string;
+  icon: LucideIcon;
+  href: string;
+  sections: { key: string; label: string; href: string; icon: LucideIcon }[];
+  current: string | null;
+  active: boolean;
+}) {
   const [peek, setPeek] = useState(false);
   const open = active || peek;
-  const current = moneySectionOf(pathname);
   return (
     <div>
       <div
@@ -177,17 +198,17 @@ function MoneyGroup({ pathname, active }: { pathname: string; active: boolean })
           active ? "bg-gradient-primary text-on-brand shadow-warm" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
         )}
       >
-        <Link href="/app/money" className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3">
-          <IndianRupee className="size-[18px] shrink-0" strokeWidth={2} />
-          <span className="truncate">Payments and invoices</span>
+        <Link href={href} className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3">
+          <Icon className="size-[18px] shrink-0" strokeWidth={2} />
+          <span className="truncate">{label}</span>
         </Link>
         {!active && (
           <button
             type="button"
             onClick={() => setPeek((p) => !p)}
             aria-expanded={open}
-            aria-label={open ? "Hide the parts of Payments and invoices" : "Show the parts of Payments and invoices"}
-            className="grid size-9 shrink-0 place-items-center rounded-xl hover:bg-sun-100"
+            aria-label={open ? `Hide the parts of ${label}` : `Show the parts of ${label}`}
+            className="mr-1 grid size-7 shrink-0 place-items-center rounded-lg hover:bg-sun-100"
           >
             <ChevronDown className={cn("size-4 transition", open && "rotate-180")} />
           </button>
@@ -195,21 +216,21 @@ function MoneyGroup({ pathname, active }: { pathname: string; active: boolean })
         {active && <ChevronDown className="mr-3 size-4 shrink-0 rotate-180" aria-hidden />}
       </div>
       {open && (
-        <ul className="ml-[22px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2" aria-label="Payments and invoices">
-          {MONEY_SECTIONS.map(({ key, label, href, icon: Icon }) => {
+        <ul className="ml-[22px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2" aria-label={label}>
+          {sections.map(({ key, label: text, href: to, icon: SubIcon }) => {
             const here = current === key;
             return (
               <li key={key}>
                 <Link
-                  href={href}
+                  href={to}
                   aria-current={here ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold transition",
                     here ? "bg-cream text-brand-strong" : "text-ink-muted hover:bg-cream hover:text-brand-strong",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" strokeWidth={2} />
-                  {label}
+                  <SubIcon className="size-4 shrink-0" strokeWidth={2} />
+                  {text}
                 </Link>
               </li>
             );
