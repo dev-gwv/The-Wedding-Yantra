@@ -368,6 +368,34 @@ export interface TaskDetail extends TaskItem {
   can: { edit: boolean; move: boolean; review: boolean; cancel: boolean; comment: boolean };
 }
 
+/** One line in a person's recent updates: something done on a task, by them or on their work. */
+export interface TaskUpdate {
+  id: string;
+  at: string;
+  actor: PersonRef | null;
+  /** A history event, a comment, a step ticked off, or the task finished */
+  kind: "event" | "comment" | "step" | "done";
+  /** For events: created, moved, submitted, approved, sent_back, deadline_moved, … */
+  action: string;
+  meta: Record<string, unknown>;
+  /** The comment, or the step's name */
+  text: string | null;
+  task: { id: string; title: string };
+}
+
+/** One person's tasks and what they've been doing: the employee task page. */
+export interface PersonTasks {
+  today: string;
+  person: { user: PersonRef; role: string; designation: string | null; offToday: boolean };
+  counts: { pending: number; doing: number; stuck: number; late: number; toCheck: number; doneThisWeek: number };
+  /** Open tasks, and those finished in the last seven days */
+  tasks: TaskItem[];
+  /** Newest first, last 14 days */
+  updates: TaskUpdate[];
+  /** Pass as `before` for the next page of updates; null when there are no more */
+  nextBefore: string | null;
+}
+
 /** The owner's board: each person's load, and the business's totals. */
 export interface PeopleBoard {
   today: string;

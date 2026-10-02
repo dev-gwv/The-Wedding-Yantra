@@ -4,6 +4,7 @@ import { formatClock, formatDueDay, TASK_STATUS_INFO, type TaskStatus } from "@w
 import { useMoveAnyTask, useUpdateTask } from "@wedding-yantra/api-client/react";
 import type { PeopleBoard, TaskItem } from "@wedding-yantra/types";
 import { CalendarOff, ListChecks, MessageSquare, Paperclip, Plus, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useState, type DragEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Avatar } from "@/components/ui/misc";
@@ -218,7 +219,9 @@ export function PeopleView({
             title={
               <span className="flex items-center gap-2">
                 <Avatar name={p.user.name} className="size-7 text-[10px]" />
-                <span className="truncate">{name}</span>
+                <Link href={`/app/tasks/people/${p.user.id}`} className="truncate hover:text-brand-strong hover:underline" title={`${name}: tasks and updates`}>
+                  {name}
+                </Link>
               </span>
             }
             head={

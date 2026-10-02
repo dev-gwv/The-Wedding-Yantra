@@ -80,6 +80,15 @@ export function taskRoutes(app: FastifyInstance, deps: { db: Db; files: Files })
     const ctx = await member(request, request.params.workspaceId);
     return ok(await delegation.peopleBoard(db, ctx));
   });
+  app.get<{ Params: { workspaceId: string; userId: string }; Querystring: { before?: string } }>(
+    "/workspaces/:workspaceId/tasks/people/:userId",
+    async (request) => {
+      const ctx = await member(request, request.params.workspaceId);
+      const userId = request.params.userId === "me" ? ctx.userId : assertId(request.params.userId, "This person");
+      const before = typeof request.query.before === "string" && request.query.before ? request.query.before.slice(0, 120) : undefined;
+      return ok(await delegation.personTasks(db, ctx, userId, before));
+    },
+  );
   app.get<WsId>("/workspaces/:workspaceId/tasks/:id", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
     const id = assertId(request.params.id, "This task");

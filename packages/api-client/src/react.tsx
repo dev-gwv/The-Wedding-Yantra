@@ -173,6 +173,7 @@ export const queryKeys = {
   myDay: (id: string) => ["workspace", id, "work", "my-day"] as const,
   task: (id: string, taskId: string) => ["workspace", id, "work", "task", taskId] as const,
   taskBoard: (id: string) => ["workspace", id, "work", "board"] as const,
+  personTasks: (id: string, userId: string) => ["workspace", id, "work", "person", userId] as const,
   timeOff: (id: string, query: object) => ["workspace", id, "work", "time-off", query] as const,
   broadcasts: (id: string) => ["workspace", id, "broadcasts"] as const,
   broadcast: (id: string, broadcastId: string) => ["workspace", id, "broadcasts", broadcastId] as const,
@@ -948,6 +949,18 @@ export function useTask(workspaceId: string, taskId: string | null) {
     if (loadedAt) void qc.invalidateQueries({ queryKey: queryKeys.alerts(workspaceId) });
   }, [loadedAt, qc, workspaceId]);
   return query;
+}
+
+/** One person's tasks, with their recent updates a page at a time (the first page brings the tasks). */
+export function usePersonTasks(workspaceId: string, userId: string, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: queryKeys.personTasks(workspaceId, userId),
+    queryFn: ({ pageParam }) => api.tasks.person(workspaceId, userId, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
+    enabled,
+  });
 }
 
 export function usePeopleBoard(workspaceId: string, enabled = true) {

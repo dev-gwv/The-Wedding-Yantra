@@ -1,6 +1,6 @@
 "use client";
 
-import { formatClock, formatDate, formatDueDay, linksIn, TASK_STATUS_INFO, taskWhatsappText, timeAgo, whatsappLink } from "@wedding-yantra/core";
+import { formatClock, formatDate, formatDueDay, linksIn, taskWhatsappText, timeAgo, whatsappLink } from "@wedding-yantra/core";
 import {
   useApi,
   useMoveTask,
@@ -48,6 +48,7 @@ import { errorMessage } from "@/lib/errors";
 import { prepareUpload } from "@/lib/images";
 import { useBusinessDay } from "@/lib/today";
 import { PriorityMark, StatusPill } from "./task-bits";
+import { historyText } from "./updates";
 
 /** One task in full: where it stands, what to do next, and everything said and handed in. */
 export function TaskView({ taskId, initial, onEdit, onClose }: { taskId: string; initial?: TaskItem; onEdit: (t: TaskItem) => void; onClose: () => void }) {
@@ -721,38 +722,6 @@ function Comments({ task }: { task: TaskDetail }) {
       </form>
     </section>
   );
-}
-
-function historyText(h: TaskHistoryItem): string {
-  const m = h.meta;
-  const s = (v: unknown) => (typeof v === "string" ? v : null);
-  switch (h.action) {
-    case "created":
-      return "added this task";
-    case "moved": {
-      const to = s(m.to) as keyof typeof TASK_STATUS_INFO | null;
-      const label = to ? TASK_STATUS_INFO[to]?.label.toLowerCase() : "a new stage";
-      return `moved it to ${label}${s(m.reason) ? `: ${s(m.reason)}` : ""}`;
-    }
-    case "submitted":
-      return "handed it in";
-    case "approved":
-      return "approved it";
-    case "sent_back":
-      return `sent it back${s(m.reason) ? `: ${s(m.reason)}` : ""}`;
-    case "deadline_moved":
-      return `moved the date${s(m.to) ? ` to ${formatDate(s(m.to)!, { year: false })}` : ""}${s(m.reason) ? `: ${s(m.reason)}` : ""}`;
-    case "due_changed":
-      return s(m.to) ? `set the date to ${formatDate(s(m.to)!, { year: false })}` : "took the date off";
-    case "reassigned":
-      return "changed who does it";
-    case "file_added":
-      return "added a file";
-    case "edited":
-      return "changed the details";
-    default:
-      return h.action.replace(/[._]/g, " ");
-  }
 }
 
 function HistoryList({ items }: { items: TaskHistoryItem[] }) {

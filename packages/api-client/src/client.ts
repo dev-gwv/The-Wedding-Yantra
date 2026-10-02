@@ -166,6 +166,7 @@ import type {
   CommentInput,
   MoveTaskInput,
   PeopleBoard,
+  PersonTasks,
   ReviewTaskInput,
   SnoozeTaskInput,
   SubmitTaskInput,
@@ -431,6 +432,8 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string, id: string) => request<TaskDetail>("GET", `${task(workspaceId, id)}`),
       /** Each person's load and the business's totals (owners and managers) */
       board: (workspaceId: string) => request<PeopleBoard>("GET", `${ws(workspaceId)}/tasks/board`),
+      person: (workspaceId: string, userId: string, before?: string) =>
+        request<PersonTasks>("GET", `${ws(workspaceId)}/tasks/people/${userId}${qs({ before })}`),
       move: (workspaceId: string, id: string, input: MoveTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/move`, input),
       submit: (workspaceId: string, id: string, input: SubmitTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/submit`, input),
       review: (workspaceId: string, id: string, input: ReviewTaskInput) => request<TaskDetail>("POST", `${task(workspaceId, id)}/review`, input),

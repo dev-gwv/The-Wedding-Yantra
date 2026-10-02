@@ -1,5 +1,5 @@
 import { canMove, type TaskStatus } from "@wedding-yantra/core";
-import type { PeopleBoard, TaskDetail, TaskHistoryItem, TaskItem, TaskStep } from "@wedding-yantra/types";
+import type { PeopleBoard, PersonTasks, TaskDetail, TaskHistoryItem, TaskItem, TaskStep, TaskUpdate } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
@@ -7,7 +7,8 @@ import type { MemberContext } from "../auth/guard.js";
 import { assertWorkspaceFile, toUploaded } from "../files/service.js";
 import { taskAlert } from "./alerts.js";
 import { awardFinished, awardMoved, awardSentBack } from "../review/points.js";
-import { loadTask, manages, taskEvent, toTask, type TaskRow } from "./service.js";
+import { optionJoin } from "../options/service.js";
+import { loadTask, manages, TASK_SELECT, taskEvent, toTask, type TaskRow } from "./service.js";
 
 /** Whether a finished task was on time: finished on or before its day, in the business's time zone. */
 const LATE_SQL = `(t.due_date IS NOT NULL AND (coalesce(t.completed_at, now()) AT TIME ZONE w.timezone)::date > t.due_date)`;
@@ -518,5 +519,129 @@ export async function peopleBoard(db: Queryable, ctx: MemberContext): Promise<Pe
     today: rows[0]?.today ?? new Date().toISOString().slice(0, 10),
     people,
     totals: { late: sum("late"), dueToday: sum("dueToday"), toCheck: sum("toCheck"), stuck: sum("stuck"), doneThisWeek: sum("doneThisWeek"), unassigned: un.rows[0]!.n },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One person's tasks and recent updates
+// ---------------------------------------------------------------------------
+
+const UPDATES_PAGE = 50;
+
+/** The cursor is the last update's exact time (to the microsecond) and its id. */
+function decodeBefore(before: string | undefined): [string, string] | null {
+  if (!before) return null;
+  const i = before.lastIndexOf("~");
+  const at = before.slice(0, i);
+  if (i < 1 || Number.isNaN(Date.parse(at.replace(" ", "T") + "Z"))) throw new AppError(400, "VALIDATION_ERROR", "That page link is broken", { before: "Start from the top" });
+  return [at, before.slice(i + 1)];
+}
+
+/**
+ * Everything one person is on, and what they've been doing: tasks they started, got stuck
+ * on, handed in or finished, their comments and ticked steps, and what others did on their
+ * work (an approval, a task sent back). Owners and managers see anyone; others only themselves.
+ */
+export async function personTasks(db: Queryable, ctx: MemberContext, userId: string, before?: string): Promise<PersonTasks> {
+  if (!manages(ctx) && userId !== ctx.userId) throw forbidden("Only the owner or a manager sees someone else's tasks");
+  const person = await db.query<{ user_id: string; name: string | null; role: string; designation: string | null; off_today: boolean; today: string }>(
+    `SELECT m.user_id, u.name, m.role, coalesce(dl.label, d.designation) AS designation, (now() AT TIME ZONE w.timezone)::date::text AS today,
+            EXISTS (SELECT 1 FROM time_off o WHERE o.workspace_id = m.workspace_id AND o.user_id = m.user_id AND o.deleted_at IS NULL
+                     AND (now() AT TIME ZONE w.timezone)::date BETWEEN o.start_date AND o.end_date) AS off_today
+       FROM memberships m
+       JOIN users u ON u.id = m.user_id
+       JOIN workspaces w ON w.id = m.workspace_id
+       LEFT JOIN member_details d ON d.membership_id = m.id
+       ${optionJoin("dl", "designation", "m.workspace_id", "d.designation")}
+      WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NULL`,
+    [ctx.workspaceId, userId],
+  );
+  const p = person.rows[0];
+  if (!p) throw notFound("This person");
+
+  const tasks = await db.query<TaskRow>(
+    `${TASK_SELECT}
+      WHERE t.workspace_id = $1 AND t.assignee_id = $2 AND t.deleted_at IS NULL
+        AND (t.event_id IS NULL OR (e.status <> 'cancelled' AND e.deleted_at IS NULL))
+        AND (t.status NOT IN ('done', 'cancelled')
+             OR (t.status = 'done' AND (t.done_at AT TIME ZONE w.timezone)::date > (now() AT TIME ZONE w.timezone)::date - 7))
+      ORDER BY t.due_date NULLS LAST, CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, t.created_at
+      LIMIT 500`,
+    [ctx.workspaceId, userId],
+  );
+  const list = tasks.rows.map(toTask);
+  const open = list.filter((t) => t.status !== "done" && t.status !== "cancelled");
+
+  const cursor = decodeBefore(before);
+  const params: unknown[] = [ctx.workspaceId, userId];
+  let after = "";
+  if (cursor) {
+    params.push(cursor[0], cursor[1]);
+    after = `AND (x.at < ($3::timestamp AT TIME ZONE 'UTC') OR (x.at = ($3::timestamp AT TIME ZONE 'UTC') AND x.id < $4))`;
+  }
+  // Their own doing, and what was done on their work. A move to Done shows once, as finished.
+  const { rows } = await db.query<{
+    id: string;
+    at: Date;
+    at_key: string;
+    actor_id: string | null;
+    actor_name: string | null;
+    kind: TaskUpdate["kind"];
+    action: string;
+    meta: Record<string, unknown>;
+    text: string | null;
+    task_id: string;
+    task_title: string;
+  }>(
+    `SELECT x.*, (x.at AT TIME ZONE 'UTC')::text AS at_key, u.name AS actor_name FROM (
+       SELECT 'e' || ev.id AS id, ev.created_at AS at, ev.actor_id, 'event' AS kind, ev.action, ev.meta, NULL::text AS text, t.id AS task_id, t.title AS task_title
+         FROM task_events ev JOIN tasks t ON t.id = ev.task_id
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND (ev.actor_id = $2 OR t.assignee_id = $2)
+          AND NOT (ev.action = 'moved' AND ev.meta->>'to' = 'done')
+       UNION ALL
+       SELECT 'c' || k.id, k.created_at, k.author_id, 'comment', 'comment', '{}'::jsonb, k.body, t.id, t.title
+         FROM task_comments k JOIN tasks t ON t.id = k.task_id
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND k.deleted_at IS NULL AND (k.author_id = $2 OR t.assignee_id = $2)
+       UNION ALL
+       SELECT 's' || s.id, s.done_at, s.done_by, 'step', 'step', '{}'::jsonb, s.title, t.id, t.title
+         FROM task_steps s JOIN tasks t ON t.id = s.task_id
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND s.done_at IS NOT NULL AND (s.done_by = $2 OR t.assignee_id = $2)
+       UNION ALL
+       SELECT 'd' || t.id, t.done_at, t.done_by, 'done', 'done', '{}'::jsonb, NULL, t.id, t.title
+         FROM tasks t
+        WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND t.status = 'done' AND t.done_at IS NOT NULL AND (t.done_by = $2 OR t.assignee_id = $2)
+     ) x
+     LEFT JOIN users u ON u.id = x.actor_id
+     WHERE x.at > now() - interval '14 days' ${after}
+     ORDER BY x.at DESC, x.id DESC
+     LIMIT ${UPDATES_PAGE + 1}`,
+    params,
+  );
+  const page = rows.slice(0, UPDATES_PAGE);
+  const last = page[page.length - 1];
+
+  return {
+    today: p.today,
+    person: { user: { id: p.user_id, name: p.name }, role: p.role, designation: p.designation, offToday: p.off_today },
+    counts: {
+      pending: open.length,
+      doing: open.filter((t) => t.status === "doing").length,
+      stuck: open.filter((t) => t.status === "waiting").length,
+      late: open.filter((t) => t.overdue).length,
+      toCheck: open.filter((t) => t.status === "review").length,
+      doneThisWeek: list.filter((t) => t.status === "done").length,
+    },
+    tasks: list,
+    updates: page.map((r) => ({
+      id: r.id,
+      at: r.at.toISOString(),
+      actor: r.actor_id ? { id: r.actor_id, name: r.actor_name } : null,
+      kind: r.kind,
+      action: r.action,
+      meta: r.meta ?? {},
+      text: r.text,
+      task: { id: r.task_id, title: r.task_title },
+    })),
+    nextBefore: rows.length > UPDATES_PAGE && last ? `${last.at_key}~${last.id}` : null,
   };
 }

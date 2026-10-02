@@ -21,7 +21,7 @@ import { TaskSheet } from "./task-sheet";
 type Tone = "danger" | "warning" | "success" | undefined;
 
 /** One count in a report: red when something is late, amber when stuck. */
-function Stat({
+export function Stat({
   label,
   value,
   tone,
@@ -357,7 +357,12 @@ export function DailyReport() {
                   return (
                     <li key={p.user.id} className="px-5 py-3">
                       <p className="font-semibold">
-                        {p.user.name ?? "Team member"}
+                        <Link
+                          href={`/app/tasks/people/${p.user.id}`}
+                          className="hover:text-brand-strong hover:underline"
+                        >
+                          {p.user.name ?? "Team member"}
+                        </Link>
                         {p.offToday && (
                           <span className="ml-2 rounded-full bg-cream px-2 py-0.5 text-[11px] font-bold text-ink-muted">
                             Off today
@@ -403,9 +408,12 @@ export function DailyReport() {
                     {people.map((p) => (
                       <tr key={p.user.id}>
                         <td className="py-2.5 pl-5 pr-3">
-                          <span className="font-semibold">
+                          <Link
+                            href={`/app/tasks/people/${p.user.id}`}
+                            className="font-semibold hover:text-brand-strong hover:underline"
+                          >
                             {p.user.name ?? "Team member"}
-                          </span>
+                          </Link>
                           {p.offToday && (
                             <span className="ml-2 rounded-full bg-cream px-2 py-0.5 text-[11px] font-bold text-ink-muted">
                               Off today

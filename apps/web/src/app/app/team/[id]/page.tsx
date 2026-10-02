@@ -3,7 +3,8 @@
 import { can, canManageMember, firstName, formatDate, formatMoney, formatPhone, ROLE_INFO, whatsappLink } from "@wedding-yantra/core";
 import { useEmployee } from "@wedding-yantra/api-client/react";
 import { EMPLOYMENT_TYPE_LABELS, type Employee } from "@wedding-yantra/types";
-import { Lock, MessageCircle, Pencil, Phone, ShieldCheck, UserMinus } from "lucide-react";
+import { ListChecks, Lock, MessageCircle, Pencil, Phone, ShieldCheck, UserMinus } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -70,6 +71,11 @@ export default function EmployeePage() {
                 <Phone className="size-4" /> Call
               </a>
             </>
+          )}
+          {!e.leftAt && (e.isYou || can(workspace.role, "tasks.manage")) && (
+            <Link href={`/app/tasks/people/${e.userId}`} className={buttonClass({ variant: "secondary" })}>
+              <ListChecks className="size-4" /> Tasks and updates
+            </Link>
           )}
           {editable && (
             <Button variant="secondary" onClick={() => setEditing(true)}>
