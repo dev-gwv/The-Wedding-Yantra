@@ -70,7 +70,7 @@ function AlertsPage() {
 
   return (
     <>
-      <PageHeader title="Alerts" subtitle="Tasks given to you, reminders, hand-ins and the day's round-ups" />
+      <PageHeader title="Alerts" subtitle="New enquiries, follow-ups, quote answers, your tasks and the day's round-ups" />
       <div className="mb-6 inline-flex rounded-2xl border border-line bg-cream p-1" role="tablist" aria-label="Alerts">
         {(
           [
@@ -134,7 +134,7 @@ function AlertList() {
             <span className="block text-sm text-ink-muted">
               {push === "needs-install"
                 ? "On iPhone, tap Share → Add to Home Screen, open the app from there, then turn alerts on."
-                : "New tasks and reminders reach you even when the app is closed."}
+                : "New enquiries, follow-ups and tasks reach you even when the app is closed."}
             </span>
           </span>
           {push === "off" && (

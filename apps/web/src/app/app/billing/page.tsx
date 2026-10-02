@@ -22,7 +22,7 @@ export default function BillingPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Plan and billing" />
       {!allowed ? (
         <Card>
