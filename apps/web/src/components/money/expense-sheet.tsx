@@ -14,22 +14,41 @@ import {
   useVendors,
 } from "@wedding-yantra/api-client/react";
 import { EXPENSE_STATUS_LABELS, expenseInput, updateExpenseInput, type Expense, type UploadedFile } from "@wedding-yantra/types";
-import { Camera, ChevronDown, FileText, HandCoins, X } from "lucide-react";
+import { Camera, ChevronDown, FileText, HandCoins, ImageUp, X } from "lucide-react";
 import { OptionPills, OptionIcon } from "@/components/app/option-picker";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { SelectField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
-import { Sheet } from "@/components/ui/sheet";
+import { MoneyInput } from "@/components/ui/money-input";
+import { DraftRestored, Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { prepareUpload } from "@/lib/images";
+import { discardDraft, useDraft } from "@/lib/use-draft";
 
 /** GST rates a purchase bill usually carries, after GST 2.0 */
 const PURCHASE_GST_RATES = [0, 5, 18, 40];
 const gstInside = (amount: number, rate: number) => Math.round(((amount * rate) / (100 + rate)) * 100) / 100;
+
+/** What the expense form holds; a new one is kept as a draft in this shape. */
+interface ExpenseDraft {
+  amount: number | null;
+  category: string;
+  spentOn: string;
+  paidTo: string;
+  forEvent: string;
+  note: string;
+  receipt: UploadedFile | null;
+  method: string | null;
+  paidBy: string;
+  vendorId: string;
+  gstRate: number | null;
+  gstTyped: string;
+  vendorInvoiceNo: string;
+}
 
 /** Add money spent, or open one to change, approve or reject it. */
 export function ExpenseSheet({
@@ -44,14 +63,36 @@ export function ExpenseSheet({
   /** Opened from an event: the expense is for it */
   eventId?: string;
 }) {
+  const { workspace } = useCurrentWorkspace();
+  const [dirty, setDirty] = useState(false);
+  // A new expense is kept as a draft until it's sent; one already saved isn't.
+  const draftKey = expense ? null : `expense.${workspace.id}.${eventId ?? "any"}`;
   return (
-    <Sheet open={open} onClose={onClose} title={expense ? "Expense" : "Money spent"}>
-      {open && <ExpenseForm expense={expense} eventId={eventId} onDone={onClose} />}
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={expense ? "Expense" : "Money spent"}
+      dirty={dirty}
+      onDiscard={() => discardDraft(draftKey)}
+    >
+      {open && <ExpenseForm expense={expense} eventId={eventId} draftKey={draftKey} onDirty={setDirty} onDone={onClose} />}
     </Sheet>
   );
 }
 
-function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?: string; onDone: () => void }) {
+function ExpenseForm({
+  expense,
+  eventId,
+  draftKey,
+  onDirty,
+  onDone,
+}: {
+  expense?: Expense;
+  eventId?: string;
+  draftKey: string | null;
+  onDirty: (dirty: boolean) => void;
+  onDone: () => void;
+}) {
   const api = useApi();
   const { workspace, me } = useCurrentWorkspace();
   const approver = can(workspace, "expenses.approve");
@@ -75,25 +116,56 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   const team = useTeam(approver ? workspace.id : null);
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
 
-  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
-  const [category, setCategory] = useState<string>(expense?.category ?? "");
-  const [spentOn, setSpentOn] = useState(() => expense?.spentOn ?? localISODate());
-  const [paidTo, setPaidTo] = useState(expense?.paidTo ?? "");
-  const [forEvent, setForEvent] = useState(expense?.eventId ?? eventId ?? "");
-  const [note, setNote] = useState(expense?.note ?? "");
-  const [receipt, setReceipt] = useState<UploadedFile | null>(expense?.receipt ?? null);
-  const [method, setMethod] = useState<string | null>(expense?.method ?? null);
-  const [paidBy, setPaidBy] = useState(expense?.paidBy?.id ?? "");
+  // Everything typed in, kept together so a new one can be saved as a draft.
+  const initial: ExpenseDraft = {
+    amount: expense ? expense.amount : null,
+    category: expense?.category ?? "",
+    spentOn: expense?.spentOn ?? localISODate(),
+    paidTo: expense?.paidTo ?? "",
+    forEvent: expense?.eventId ?? eventId ?? "",
+    note: expense?.note ?? "",
+    receipt: expense?.receipt ?? null,
+    method: expense?.method ?? null,
+    paidBy: expense?.paidBy?.id ?? "",
+    vendorId: expense?.vendorId ?? "",
+    gstRate: expense?.gstRate ?? null,
+    // Empty means "work it out from the rate"; typed means the bill says otherwise.
+    gstTyped: expense && expense.gstRate === null && expense.gstAmount > 0 ? String(expense.gstAmount) : "",
+    vendorInvoiceNo: expense?.vendorInvoiceNo ?? "",
+  };
+  const [form, setForm, clearDraft, restored] = useDraft(draftKey, initial);
+  const { amount, category, spentOn, paidTo, forEvent, note, receipt, method, paidBy, vendorId, gstRate, gstTyped, vendorInvoiceNo } = form;
+  const set =
+    <K extends keyof ExpenseDraft>(key: K) =>
+    (value: ExpenseDraft[K]) =>
+      setForm((f) => ({ ...f, [key]: value }));
+  const setAmount = set("amount");
+  const setCategory = set("category");
+  const setSpentOn = set("spentOn");
+  const setPaidTo = set("paidTo");
+  const setForEvent = set("forEvent");
+  const setNote = set("note");
+  const setReceipt = set("receipt");
+  const setMethod = set("method");
+  const setPaidBy = set("paidBy");
+  const setGstRate = set("gstRate");
+  const setGstTyped = set("gstTyped");
+  const setVendorInvoiceNo = set("vendorInvoiceNo");
+
+  // Not what it opened with (a restored draft counts): closing asks first.
+  const [pristine] = useState(() => JSON.stringify(initial));
+  const dirty = JSON.stringify(form) !== pristine;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+
   // Choosing yourself as the one who paid makes it your own too.
   const ownOne = ownSaved || (belowManager && paidBy === me.user.id);
   const approvesThis = approver && !ownOne;
-  const [vendorId, setVendorId] = useState(expense?.vendorId ?? "");
-  const [gstOpen, setGstOpen] = useState(!!expense && (expense.gstAmount > 0 || !!expense.vendorInvoiceNo));
-  const [gstRate, setGstRate] = useState<number | null>(expense?.gstRate ?? null);
-  // Empty means "work it out from the rate"; typed means the bill says otherwise.
-  const [gstTyped, setGstTyped] = useState(expense && expense.gstRate === null && expense.gstAmount > 0 ? String(expense.gstAmount) : "");
-  const [vendorInvoiceNo, setVendorInvoiceNo] = useState(expense?.vendorInvoiceNo ?? "");
+  const [gstOpen, setGstOpen] = useState(
+    expense ? expense.gstAmount > 0 || !!expense.vendorInvoiceNo : form.gstRate !== null || !!form.gstTyped || !!form.vendorInvoiceNo,
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -112,7 +184,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   async function submit(e: FormEvent) {
     e.preventDefault();
     const fields = {
-      amount,
+      amount: amount ?? "",
       category,
       spentOn,
       paidTo,
@@ -136,6 +208,7 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
         toast(expense.status === "rejected" && !approvesThis ? "Sent for approval again" : "Expense saved");
       } else {
         await create.mutateAsync(fields as Parameters<typeof create.mutateAsync>[0]);
+        clearDraft();
         toast(approvesThis ? "Expense added" : "Sent for approval");
       }
       onDone();
@@ -168,9 +241,9 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   }
 
   function pickVendor(id: string) {
-    setVendorId(id);
     const v = vendors.data?.find((x) => x.id === id);
-    if (v && (!paidTo || vendors.data?.some((x) => x.name === paidTo))) setPaidTo(v.name);
+    const fillName = !!v && (!paidTo || !!vendors.data?.some((x) => x.name === paidTo));
+    setForm((f) => ({ ...f, vendorId: id, ...(fillName ? { paidTo: v.name } : {}) }));
   }
 
   async function deleteIt() {
@@ -185,12 +258,33 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
   }
 
   const photoUrl = receipt ? api.fileUrl(receipt.path) : null;
-  const amountNum = Number(amount) || 0;
+  const amountNum = amount ?? 0;
   const gstShown = gstTyped ? Number(gstTyped) || 0 : gstRate ? gstInside(amountNum, gstRate) : 0;
   const others = (team.data?.members ?? []).filter((m) => m.userId !== me.user.id);
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
+      {restored && <DraftRestored onClear={clearDraft} />}
+      {editable && !receipt && (
+        <>
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Take bill photo"
+            onChange={(e) => {
+              void pickPhoto(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <Button size="lg" onClick={() => cameraInput.current?.click()} loading={upload.isPending}>
+            {!upload.isPending && <Camera className="size-5" />} {upload.isPending ? "Adding photo…" : "Take bill photo"}
+          </Button>
+        </>
+      )}
       {expense && expense.status !== "approved" && (
         <Notice tone={expense.status === "rejected" ? "danger" : "warning"}>
           {EXPENSE_STATUS_LABELS[expense.status]}
@@ -238,11 +332,10 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
         </div>
       )}
       <fieldset disabled={!editable} className="space-y-4">
-        <TextField
-          label="Amount (₹)"
-          inputMode="decimal"
+        <MoneyInput
+          label="Amount"
           value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+          onChange={setAmount}
           error={errors.amount}
           className="[&_input]:font-display [&_input]:text-2xl [&_input]:font-extrabold"
         />
@@ -332,10 +425,13 @@ function ExpenseForm({ expense, eventId, onDone }: { expense?: Expense; eventId?
                   accept="image/*,application/pdf"
                   className="sr-only"
                   aria-label="Bill photo"
-                  onChange={(e) => void pickPhoto(e.target.files?.[0])}
+                  onChange={(e) => {
+                    void pickPhoto(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
                 />
                 <Button variant="secondary" onClick={() => fileInput.current?.click()} loading={upload.isPending}>
-                  {!upload.isPending && <Camera className="size-4" />} {upload.isPending ? "Adding photo…" : "Add bill photo"}
+                  {!upload.isPending && <ImageUp className="size-4" />} {upload.isPending ? "Adding photo…" : "Choose a photo or PDF"}
                 </Button>
               </>
             )

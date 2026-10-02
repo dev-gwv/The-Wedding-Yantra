@@ -1,44 +1,34 @@
 "use client";
 
-import { can, eventScope, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
+import { can, eventScope, formatPhone, ROLE_INFO } from "@wedding-yantra/core";
 import { useApi, useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
-  Database,
-  Award,
+  BarChart3,
   Bell,
-  Sun,
   Boxes,
-  Building2,
   CalendarOff,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
-  ClipboardList,
-  CreditCard,
   FileText,
-  HandCoins,
-  History,
-  MessageSquareText,
-  Star,
-  Trophy,
-  GitBranch,
+  IndianRupee,
   ListChecks,
   LogOut,
-  MessageCircle,
+  Megaphone,
+  MessageSquareText,
   Package,
   Plus,
-  QrCode,
   ReceiptText,
-  ListPlus,
-  Tags,
-  Megaphone,
+  Settings,
+  Star,
+  Sun,
+  Trophy,
   Users,
   UsersRound,
   type LucideIcon,
-  MapPin,
-  Handshake,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -57,8 +47,18 @@ export default function MorePage() {
   const api = useApi();
   const queryClient = useQueryClient();
   const [switching, setSwitching] = useState(false);
-  // The price list opens for anyone who quotes, sells or makes invoices.
-  const readsPrices = can(workspace, "leads.work") || can(workspace, "quotes.view") || can(workspace, "bills.manage") || can(workspace, "catalogue.manage");
+  const [showTools, setShowTools] = useState(false);
+  const work = can(workspace, "tasks.work");
+  // Used now and then: tucked away, still one tap from here.
+  const tools: { href: string; icon: LucideIcon; label: string }[] = [
+    ...(work ? [{ href: "/app/deliverables", icon: Package, label: "Deliverables" }] : []),
+    ...(work && eventScope(workspace) === "all" ? [{ href: "/app/inventory", icon: Boxes, label: "Stock" }] : []),
+    ...(work ? [{ href: "/app/time-off", icon: CalendarOff, label: "Days off" }] : []),
+    ...(work ? [{ href: "/app/scores", icon: Trophy, label: can(workspace, "team.review") ? "Team scores and points" : "My points and score" }] : []),
+    ...(work && can(workspace, "team.review") ? [{ href: "/app/summary", icon: MessageSquareText, label: "Daily summary" }] : []),
+    ...(can(workspace, "clients.manage") ? [{ href: "/app/grow", icon: Star, label: "Reviews and referrals" }] : []),
+    ...(can(workspace, "clients.manage") ? [{ href: "/app/messages", icon: Megaphone, label: "Wishes and offers" }] : []),
+  ];
 
   async function signOut() {
     // This phone stops getting this person's alerts.
@@ -84,72 +84,51 @@ export default function MorePage() {
         </div>
       </Card>
 
-      <Link href="/app/masters" className="mb-6 flex items-center gap-4 rounded-3xl border border-line bg-surface p-4 shadow-soft transition hover:border-sun-300 sm:p-5">
+      {/* What people open every day; everything you set up once lives under Settings. */}
+      <Card className="mb-6 divide-y divide-line overflow-hidden">
+        {work && <Row href="/app/my-day" icon={Sun} label="My day" />}
+        {work && <Row href="/app/tasks" icon={ListChecks} label="Tasks" />}
+        {can(workspace, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
+        {/* Without the money, Quotes isn't under Payments and invoices. */}
+        {can(workspace, "quotes.view") && !can(workspace, "finance.view") && <Row href="/app/money/quotes" icon={FileText} label="Quotes" />}
+        {can(workspace, "finance.view") && <Row href="/app/money" icon={IndianRupee} label="Payments and invoices" />}
+        {can(workspace, "expenses.submit") && !can(workspace, "finance.view") && <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />}
+        {can(workspace, "finance.view") && <Row href="/app/reports" icon={BarChart3} label="Reports" />}
+        <Row href="/app/team" icon={Users} label="Team" />
+        <Row href="/app/notifications" icon={Bell} label="Alerts" />
+      </Card>
+
+      <Link href="/app/settings" className="mb-6 flex items-center gap-4 rounded-3xl border border-line bg-surface p-4 shadow-soft transition hover:border-sun-300 sm:p-5">
         <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary text-on-brand shadow-soft">
-          <Database className="size-6" />
+          <Settings className="size-6" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-display text-lg font-extrabold">Master data</span>
-          <span className="block text-sm text-ink-muted">Clients, employees, vendors, venues, services and lists</span>
+          <span className="block font-display text-lg font-extrabold">Settings</span>
+          <span className="block text-sm text-ink-muted">Business profile, master data, invoices, sales setup and your alerts</span>
         </span>
         <ChevronRight className="size-5 shrink-0 text-ink-subtle" />
       </Link>
 
-      {(leadScope(workspace) !== "none" || can(workspace, "clients.view") || readsPrices) && (
-        <>
-          <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Sales</h2>
-          <Card className="mb-6 divide-y divide-line overflow-hidden">
-            {can(workspace, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
-            {/* Without the money, Quotes isn't under Payments and invoices. */}
-            {can(workspace, "quotes.view") && !can(workspace, "finance.view") && <Row href="/app/money/quotes" icon={FileText} label="Quotes" />}
-            {can(workspace, "clients.manage") && <Row href="/app/grow" icon={Star} label="Reviews and referrals" />}
-            {can(workspace, "clients.manage") && <Row href="/app/messages" icon={Megaphone} label="Wishes and offers" />}
-            {leadScope(workspace) !== "none" && <Row href="/app/settings/enquiry-form" icon={QrCode} label="Enquiry form" />}
-            {can(workspace, "leads.view_all") && <Row href="/app/partners" icon={Handshake} label="Partner QR codes" />}
-            {leadScope(workspace) !== "none" && <Row href="/app/settings/replies" icon={MessageCircle} label="WhatsApp replies" />}
-            {leadScope(workspace) !== "none" && <Row href="/app/settings/stages" icon={GitBranch} label="Sales stages" />}
-            {readsPrices && <Row href="/app/services" icon={Package} label="Services and packages" />}
-          </Card>
-        </>
+      {tools.length > 0 && (
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => setShowTools((o) => !o)}
+            aria-expanded={showTools}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-2 text-left text-xs font-extrabold uppercase tracking-wider text-ink-muted hover:text-ink"
+          >
+            More tools ({tools.length})
+            <ChevronDown className={cn("size-4 transition", showTools && "rotate-180")} />
+          </button>
+          {showTools && (
+            <Card className="mt-1 divide-y divide-line overflow-hidden">
+              {tools.map((t) => (
+                <Row key={t.href} {...t} />
+              ))}
+            </Card>
+          )}
+        </div>
       )}
-
-      {can(workspace, "tasks.work") && (
-        <>
-          <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Work</h2>
-          <Card className="mb-6 divide-y divide-line overflow-hidden">
-            <Row href="/app/my-day" icon={Sun} label="My day" />
-            <Row href="/app/tasks" icon={ListChecks} label="Tasks" />
-            <Row href="/app/deliverables" icon={Package} label="Deliverables" />
-            {eventScope(workspace) === "all" && <Row href="/app/inventory" icon={Boxes} label="Stock" />}
-            <Row href="/app/time-off" icon={CalendarOff} label="Days off" />
-            {can(workspace, "expenses.submit") && !can(workspace, "finance.view") && (
-              <Row href="/app/expenses" icon={ReceiptText} label="My expenses" />
-            )}
-            <Row href="/app/scores" icon={Trophy} label={can(workspace, "team.review") ? "Team scores and points" : "My points and score"} />
-            {can(workspace, "workspace.update") && <Row href="/app/settings/points" icon={Award} label="Points rules" />}
-            {can(workspace, "team.review") && <Row href="/app/summary" icon={MessageSquareText} label="Daily summary" />}
-            {can(workspace, "tasks.manage") && <Row href="/app/settings/checklist" icon={ClipboardList} label="Event checklist" />}
-          </Card>
-        </>
-      )}
-
-      <h2 className="mb-2 px-1 text-xs font-extrabold uppercase tracking-wider text-ink-muted">Business</h2>
-      <Card className="mb-6 divide-y divide-line overflow-hidden">
-        <Row href="/app/settings/business" icon={Building2} label="Business profile" />
-        {can(workspace, "workspace.update") && <Row href="/app/settings/fields" icon={ListPlus} label="Your own fields" />}
-        {can(workspace, "workspace.update") && <Row href="/app/settings/lists" icon={Tags} label="Your lists: relations, communities, payment modes and more" />}
-        {can(workspace, "bills.manage") && <Row href="/app/settings/invoices" icon={FileText} label="Invoice settings: bank, terms, design" />}
-        {can(workspace, "finance.view") && <Row href="/app/vendors" icon={HandCoins} label="Vendors and payouts" />}
-        {can(workspace, "events.view") && <Row href="/app/venues" icon={MapPin} label="Venues" />}
-        {can(workspace, "billing.manage") && <Row href="/app/billing" icon={CreditCard} label="Plan and billing" />}
-        <Row href="/app/notifications?tab=settings" icon={Bell} label="Alerts: what reaches you, and when" />
-        <Row href="/app/team" icon={Users} label="Employees" />
-        {can(workspace, "team.review") && <Row href="/app/activity" icon={History} label="Activity" />}
-        {me.workspaces.length > 1 && (
-          <Row onClick={() => setSwitching(true)} icon={ArrowLeftRight} label="Switch business" />
-        )}
-        <Row href="/onboarding" icon={Plus} label="Add another business" />
-      </Card>
 
       <Card className="divide-y divide-line overflow-hidden">
         <Link href="/app/settings/profile" className="flex items-center gap-3 px-5 py-4 hover:bg-cream">
@@ -160,6 +139,10 @@ export default function MorePage() {
           </span>
           <ChevronRight className="size-4 text-ink-subtle" />
         </Link>
+        {me.workspaces.length > 1 && (
+          <Row onClick={() => setSwitching(true)} icon={ArrowLeftRight} label="Switch business" />
+        )}
+        <Row href="/onboarding" icon={Plus} label="Add another business" />
         <Row href="/help" icon={CircleHelp} label="Help" />
         <Row onClick={signOut} icon={LogOut} label="Sign out" tone="danger" chevron={false} />
       </Card>

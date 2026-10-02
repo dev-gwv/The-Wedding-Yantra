@@ -12,23 +12,44 @@ import {
 } from "@wedding-yantra/api-client/react";
 import { taskInput, taskRepeatInput, updateTaskInput, type TaskItem, type TaskPriority } from "@wedding-yantra/types";
 import { ChevronDown, Repeat, ShieldCheck } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
+import { useEffect, useState, type FormEvent } from "react";
+import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields, type CustomDraft } from "@/components/app/custom-fields";
 import { OptionPills } from "@/components/app/option-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { eventDates } from "@/components/bookings/event-card";
 import { Button } from "@/components/ui/button";
 import { SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
-import { Sheet } from "@/components/ui/sheet";
+import { DraftRestored, Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { useBusinessDay } from "@/lib/today";
+import { discardDraft, useDraft } from "@/lib/use-draft";
 import { canEditTask } from "./task-row";
 import { PriorityPicker } from "./task-bits";
 import { TaskView } from "./task-view";
 import { useRunsWorkOf } from "./use-runs-work";
+
+/** What the task form holds; a new task is kept as a draft in this shape. */
+interface TaskDraft {
+  title: string;
+  dueDate: string;
+  dueTime: string;
+  assigneeId: string;
+  forEvent: string;
+  priority: TaskPriority;
+  tag: string | null;
+  needsCheck: boolean;
+  startDate: string;
+  estimate: string;
+  stepsText: string;
+  custom: CustomDraft;
+  notes: string;
+  repeat: "none" | RepeatFrequency;
+  weekdays: number[];
+  monthDay: string;
+}
 
 /** Add a task, or open one: see it in full, move it along, or change it. */
 export function TaskSheet({
@@ -56,16 +77,34 @@ export function TaskSheet({
   pickAssignee?: boolean;
 }) {
   const id = task?.id ?? taskId;
+  const { workspace } = useCurrentWorkspace();
   const [editing, setEditing] = useState<TaskItem | null>(null);
+  const [dirty, setDirty] = useState(false);
+  // A new task is kept as a draft until it's added; changes to a saved one aren't.
+  const draftKey = id ? null : `task.${workspace.id}.${eventId ?? "any"}.${pickAssignee ? "pick" : (assigneeId ?? "me")}`;
   const close = () => {
     setEditing(null);
     onClose();
   };
   return (
-    <Sheet open={open} onClose={close} title={id ? (editing ? "Change task" : "Task") : (title ?? "New task")}>
+    <Sheet
+      open={open}
+      onClose={close}
+      title={id ? (editing ? "Change task" : "Task") : (title ?? "New task")}
+      dirty={dirty}
+      onDiscard={() => discardDraft(draftKey)}
+    >
       {open && id && !editing && <TaskView taskId={id} initial={task} onEdit={setEditing} onClose={close} />}
       {open && (!id || editing) && (
-        <TaskForm task={editing ?? undefined} eventId={eventId} assigneeId={pickAssignee ? "" : assigneeId} onDone={editing ? () => setEditing(null) : close} onRemoved={close} />
+        <TaskForm
+          task={editing ?? undefined}
+          eventId={eventId}
+          assigneeId={pickAssignee ? "" : assigneeId}
+          draftKey={draftKey}
+          onDirty={setDirty}
+          onDone={editing ? () => setEditing(null) : close}
+          onRemoved={close}
+        />
       )}
     </Sheet>
   );
@@ -75,12 +114,16 @@ function TaskForm({
   task,
   eventId,
   assigneeId: startAssignee,
+  draftKey,
+  onDirty,
   onDone,
   onRemoved,
 }: {
   task?: TaskItem;
   eventId?: string;
   assigneeId?: string;
+  draftKey: string | null;
+  onDirty: (dirty: boolean) => void;
   onDone: () => void;
   onRemoved: () => void;
 }) {
@@ -98,29 +141,65 @@ function TaskForm({
   const events = useEvents(workspace.id, { from: today, status: "confirmed" }, editable && !eventId && eventScope(workspace) !== "none");
   const toast = useToast();
 
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
-  const [dueTime, setDueTime] = useState(task?.dueTime ?? "");
-  const [assigneeId, setAssigneeId] = useState(task ? (task.assignee?.id ?? "") : (startAssignee ?? me.user.id));
-  const [forEvent, setForEvent] = useState(task?.eventId ?? eventId ?? "");
-  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "normal");
-  const [tag, setTag] = useState<string | null>(task?.tag ?? null);
-  const [needsCheck, setNeedsCheck] = useState(task?.needsCheck ?? false);
-  const [startDate, setStartDate] = useState(task?.startDate ?? "");
-  const [estimate, setEstimate] = useState(task?.estimateHours ? String(task.estimateHours) : "");
-  const [stepsText, setStepsText] = useState("");
+  // Everything typed in, kept together so a new task can be saved as a draft.
+  const initial: TaskDraft = {
+    title: task?.title ?? "",
+    dueDate: task?.dueDate ?? "",
+    dueTime: task?.dueTime ?? "",
+    assigneeId: task ? (task.assignee?.id ?? "") : (startAssignee ?? me.user.id),
+    forEvent: task?.eventId ?? eventId ?? "",
+    priority: task?.priority ?? "normal",
+    tag: task?.tag ?? null,
+    needsCheck: task?.needsCheck ?? false,
+    startDate: task?.startDate ?? "",
+    estimate: task?.estimateHours ? String(task.estimateHours) : "",
+    stepsText: "",
+    custom: toDraft(task?.custom),
+    notes: task?.notes ?? "",
+    // Repeating: only for new tasks that aren't for an event.
+    repeat: "none",
+    weekdays: [weekdayOf(today)],
+    monthDay: String(Number(today.slice(8, 10))),
+  };
+  const [form, setForm, clearDraft, restored] = useDraft(draftKey, initial);
+  const { title, dueDate, dueTime, assigneeId, forEvent, priority, tag, needsCheck, startDate, estimate, stepsText, custom, notes, repeat, weekdays, monthDay } = form;
+  const set =
+    <K extends keyof TaskDraft>(key: K) =>
+    (value: TaskDraft[K]) =>
+      setForm((f) => ({ ...f, [key]: value }));
+  const setTitle = set("title");
+  const setDueDate = set("dueDate");
+  const setDueTime = set("dueTime");
+  const setAssigneeId = set("assigneeId");
+  const setForEvent = set("forEvent");
+  const setPriority = set("priority");
+  const setTag = set("tag");
+  const setNeedsCheck = set("needsCheck");
+  const setStartDate = set("startDate");
+  const setEstimate = set("estimate");
+  const setStepsText = set("stepsText");
+  const setCustom = set("custom");
+  const setNotes = set("notes");
+  const setRepeat = set("repeat");
+  const setMonthDay = set("monthDay");
+  const toggleWeekday = (d: number) => setForm((f) => ({ ...f, weekdays: f.weekdays.includes(d) ? f.weekdays.filter((x) => x !== d) : [...f.weekdays, d] }));
+
+  // Not what it opened with (a restored draft counts): closing asks first.
+  const [pristine] = useState(() => JSON.stringify(initial));
+  const dirty = JSON.stringify(form) !== pristine;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+
   const customFields = useEntityFields("task");
-  const [custom, setCustom] = useState(() => toDraft(task?.custom));
-  const [more, setMore] = useState(() => !!task && !!(task.tag || task.needsCheck || task.startDate || task.estimateHours || Object.keys(task.custom ?? {}).length));
-  const [notes, setNotes] = useState(task?.notes ?? "");
+  const [more, setMore] = useState(() =>
+    task
+      ? !!(task.tag || task.needsCheck || task.startDate || task.estimateHours || Object.keys(task.custom ?? {}).length)
+      : !!(form.tag || form.needsCheck || form.startDate || form.estimate || form.stepsText || Object.values(form.custom).some(Boolean)),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
-  // Repeating: only for new tasks that aren't for an event.
   const createRepeat = useCreateTaskRepeat(workspace.id);
   const stopRepeat = useStopTaskRepeat(workspace.id);
-  const [repeat, setRepeat] = useState<"none" | RepeatFrequency>("none");
-  const [weekdays, setWeekdays] = useState<number[]>(() => [weekdayOf(today)]);
-  const [monthDay, setMonthDay] = useState(() => String(Number(today.slice(8, 10))));
 
   const quickDays: [string, number][] = [
     ["Today", 0],
@@ -145,6 +224,7 @@ function TaskForm({
     setErrors({});
     try {
       const made = await createRepeat.mutateAsync(fields);
+      clearDraft();
       toast(`${made.label}: ${made.title}`);
       onDone();
     } catch (err) {
@@ -186,6 +266,7 @@ function TaskForm({
         toast("Task saved");
       } else {
         await create.mutateAsync(payload);
+        clearDraft();
         toast(forSomeoneElse ? "Task given" : "Task added");
       }
       onDone();
@@ -219,6 +300,7 @@ function TaskForm({
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
+      {restored && <DraftRestored onClear={clearDraft} />}
       <fieldset disabled={!editable} className="space-y-4">
         <TextField
           label="What needs doing"
@@ -312,7 +394,7 @@ function TaskForm({
                       key={name}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => setWeekdays((w) => (on ? w.filter((x) => x !== d) : [...w, d]))}
+                      onClick={() => toggleWeekday(d)}
                       className={cn(
                         "h-10 w-12 rounded-xl border text-sm font-bold",
                         on ? "border-sun-300 bg-cream text-brand-strong" : "border-line text-ink-muted hover:bg-cream",

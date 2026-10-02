@@ -1,10 +1,10 @@
 "use client";
 
 import { can, eventScope, leadScope, type Access } from "@wedding-yantra/core";
-import { CalendarDays, ChevronDown, ClipboardList, Database, FileText, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronDown, ClipboardList, Database, FileText, House, IndianRupee, Inbox, Menu, Search, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { moneySectionOf, moneySections } from "@/components/money/money-page";
 import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
 import { taskSectionOf, taskSections } from "./task-sections";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
 import { AlertBell } from "./alert-bell";
 import { BusinessMark } from "./business-mark";
 import { Logo } from "./logo";
+import { SearchSheet } from "./search-sheet";
 import { useCurrentWorkspace } from "./workspace-context";
 
 interface NavItem {
@@ -56,6 +57,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nav = NAV.filter((n) => !n.show || n.show(workspace));
   const tabs = nav;
   const activeTab = tabs.find((n) => isActive(pathname, n.href))?.href ?? null;
+  const [searching, setSearching] = useState(false);
+
+  // "/" or Ctrl+K (Cmd+K on a Mac) opens the search from anywhere, unless you're typing.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const ctrlK = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k";
+      const slash = e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey;
+      if (!ctrlK && !slash) return;
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+      if (slash && typing) return;
+      // Not over another open sheet.
+      if (document.querySelector("dialog[open]")) return;
+      e.preventDefault();
+      setSearching(true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Tasks come right after Events: a group for those who give tasks, one link for everyone
   // else. They stay when Events isn't on someone's screens.
@@ -90,6 +110,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="block truncate text-xs text-ink-muted">{workspace.businessTypeName}</span>
           </span>
         </Link>
+        <button
+          type="button"
+          onClick={() => setSearching(true)}
+          className="mb-3 flex items-center gap-3 rounded-2xl border border-line px-3 py-2.5 text-left text-sm font-semibold text-ink-muted transition hover:border-sun-300 hover:bg-cream hover:text-brand-strong"
+        >
+          <Search className="size-[18px] shrink-0" strokeWidth={2} />
+          <span className="flex-1">Search</span>
+          <kbd className="rounded-md border border-line bg-cream px-1.5 font-sans text-[11px] font-bold text-ink-muted">/</kbd>
+        </button>
         <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-1" aria-label="Main">
           {NAV.filter((n) => n.href !== "/app/more").map(({ href, label, icon: Icon, show }) => {
             const active = isActive(pathname, href);
@@ -139,6 +168,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <BusinessMark logoUrl={workspace.logoUrl} icon={workspace.businessTypeIcon} name={workspace.name} size="sm" tone="cream" />
           <span className="truncate text-sm font-bold">{workspace.name}</span>
         </Link>
+        <button
+          type="button"
+          onClick={() => setSearching(true)}
+          aria-label="Search"
+          className="grid size-10 place-items-center rounded-full text-ink-muted hover:bg-cream"
+        >
+          <Search className="size-5" strokeWidth={2} />
+        </button>
         <Link
           href="/app/my-day"
           aria-label="My day"
@@ -186,6 +223,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </ul>
       </nav>
+
+      <SearchSheet open={searching} onClose={() => setSearching(false)} />
     </div>
   );
 }
