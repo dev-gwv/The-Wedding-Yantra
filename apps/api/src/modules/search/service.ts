@@ -269,6 +269,6 @@ export async function searchAll(db: Queryable, ctx: MemberContext, q: string): P
     .flat()
     .sort((a, b) => a.rank - b.rank)
     .slice(0, TOTAL)
-    .map(({ rank: _rank, ...r }) => r);
+    .map(({ kind, id, title, subtitle, href }) => ({ kind, id, title, subtitle, href }));
   return { q, results };
 }

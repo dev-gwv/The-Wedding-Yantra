@@ -148,7 +148,7 @@ expect "it can be started and opened in full" '.success and .data.status == "doi
   "$(api POST "/api/v1/workspaces/$WS_ID/tasks/$(echo "$DTASK" | jq -r '.data.id')/move" '{"status":"doing"}' "$TOKEN")"
 expect "the team board answers" '.success and (.data.people | length) >= 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/tasks/board" "" "$TOKEN")"
-expect "alerts answer, with nothing unread yet" '.success and .data.unread == 0' \
+expect "alerts answer: the client accepting the quote reached the owner" '.success and ([.data.items[] | select(.kind == "quote.accepted")] | length) == 1' \
   "$(api GET "/api/v1/workspaces/$WS_ID/notifications" "" "$TOKEN")"
 expect "the push key is made and kept" '.success and (.data.publicKey | length) > 40' \
   "$(api GET "/api/v1/push/key" "" "$TOKEN")"
