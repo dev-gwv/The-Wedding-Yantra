@@ -35,11 +35,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { CustomFieldList } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { DateCheck } from "@/components/bookings/date-check";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { CallOutcomeSheet } from "@/components/sales/call-outcome-sheet";
 import { FollowUpBadge } from "@/components/sales/follow-up-badge";
 import { FollowUpSheet } from "@/components/sales/follow-up-picker";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
@@ -77,10 +79,38 @@ function LeadView({ lead }: { lead: Lead }) {
   const toast = useToast();
   const stages = useLeads(workspace.id).data?.stages;
   const update = useUpdateLead(workspace.id, lead.id);
-  const log = useAddLeadActivity(workspace.id, lead.id);
   const remove = useDeleteLead(workspace.id);
-  const [sheet, setSheet] = useState<"edit" | "whatsapp" | "follow-up" | "lost" | null>(null);
+  const [sheet, setSheet] = useState<"edit" | "whatsapp" | "follow-up" | "lost" | "call" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const stopWatchingCall = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopWatchingCall.current?.(), []);
+
+  /**
+   * After tapping Call, ask how it went once they're back: the phone app hides this page, so
+   * wait for it to show again. Where nothing hides it (a computer), ask after a moment.
+   */
+  function watchCall() {
+    stopWatchingCall.current?.();
+    let left = false;
+    const ask = () => {
+      stop();
+      setSheet("call");
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") left = true;
+      else if (left) ask();
+    };
+    const timer = window.setTimeout(() => {
+      if (!left) ask();
+    }, 2500);
+    const stop = () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopWatchingCall.current = null;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    stopWatchingCall.current = stop;
+  }
 
   const event = [lead.eventType ? EVENT_LABELS[lead.eventType] : null, lead.eventDate ? formatDate(lead.eventDate) : null]
     .filter(Boolean)
@@ -127,6 +157,7 @@ function LeadView({ lead }: { lead: Lead }) {
             <h1 className="font-display text-[clamp(26px,4vw,34px)] font-extrabold leading-tight">{lead.name}</h1>
             {lead.phone && <p className="mt-1 font-semibold text-ink-muted tabular">{formatPhone(lead.phone)}</p>}
             {event && <p className="mt-1 text-ink-muted">{event}</p>}
+            {lead.eventDate && lead.stageKind === "open" && <DateCheck dates={[lead.eventDate]} excludeEventId={lead.eventId} className="mt-1" />}
           </div>
           {lead.budget !== null && (
             <div className="text-right">
@@ -153,7 +184,7 @@ function LeadView({ lead }: { lead: Lead }) {
           {lead.phone ? (
             <a
               href={`tel:${lead.phone}`}
-              onClick={() => log.mutate({ kind: "call" })}
+              onClick={watchCall}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 text-[15px] font-bold transition hover:border-sun-300 hover:bg-cream"
             >
               <Phone className="size-4" /> Call
@@ -251,6 +282,19 @@ function LeadView({ lead }: { lead: Lead }) {
           setSheet(null);
           toast("Lead saved");
         }}
+      />
+      <CallOutcomeSheet
+        open={sheet === "call"}
+        onClose={() => setSheet(null)}
+        lead={lead}
+        onMarkLost={
+          stages?.some((s) => s.kind === "lost")
+            ? () => {
+                const lost = stages.find((s) => s.kind === "lost");
+                if (lost) void moveTo(lost, "chose_another");
+              }
+            : undefined
+        }
       />
       <WhatsAppSheet open={sheet === "whatsapp"} onClose={() => setSheet(null)} lead={lead} />
       <FollowUpSheet
@@ -456,7 +500,7 @@ function ActivityRow({ activity }: { activity: LeadActivity }) {
           <span className="font-semibold">{describe(activity)}</span>
           <span className="text-ink-muted"> · {timeAgo(activity.createdAt)}</span>
         </p>
-        {activity.kind === "note" && activity.body && <p className="mt-1 whitespace-pre-line text-[15px]">{activity.body}</p>}
+        {(activity.kind === "note" || activity.kind === "call") && activity.body && <p className="mt-1 whitespace-pre-line text-[15px]">{activity.body}</p>}
       </div>
     </li>
   );

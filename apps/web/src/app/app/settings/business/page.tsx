@@ -62,6 +62,7 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
     quoteTerms: workspace.quoteTerms ?? "",
     upiId: workspace.upiId ?? "",
     reviewUrl: workspace.reviewUrl ?? "",
+    eventsPerDay: String(workspace.eventsPerDay ?? 1),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -70,11 +71,12 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const check = validate(updateWorkspaceInput, values);
+    const payload = { ...values, eventsPerDay: Number(values.eventsPerDay) };
+    const check = validate(updateWorkspaceInput, payload);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
     try {
-      await update.mutateAsync(values);
+      await update.mutateAsync(payload);
       const done = values.phone.trim() !== "" && values.address.trim() !== "";
       toast(done && fromSetup ? "Saved. That step is done" : "Business profile saved");
       if (done && fromSetup) router.push("/app");
@@ -138,6 +140,21 @@ function ProfileForm({ workspace }: { workspace: Workspace }) {
             hint="Add it to charge GST on your bills. Without it, bills carry no GST."
             autoCapitalize="characters"
             className="[&_input]:uppercase"
+          />
+        </Card>
+
+        <Card className="space-y-5 p-5">
+          <TextField
+            label="How many weddings can you do in a day?"
+            value={values.eventsPerDay}
+            onChange={(e) => setValues((v) => ({ ...v, eventsPerDay: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+            error={errors.eventsPerDay}
+            inputMode="numeric"
+            type="number"
+            min={1}
+            max={50}
+            hint="We warn you when a date is full"
+            className="sm:max-w-xs"
           />
         </Card>
 

@@ -14,6 +14,7 @@ import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
+import { PhoneMatchNote } from "./phone-match";
 
 export function ClientFormSheet({
   open,
@@ -137,7 +138,10 @@ function ClientForm({ client, onSaved }: { client?: Client; onSaved: (client: Cl
         />
         <OptionSelect list="relation" label="Relationship" value={relation} onChange={setRelation} error={errors.relation} />
       </div>
-      <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
+      <div className="space-y-2">
+        <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
+        {!client && <PhoneMatchNote phone={values.phone} />}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} />
         <TextField label="Email" type="email" value={values.email} onChange={set("email")} error={errors.email} />

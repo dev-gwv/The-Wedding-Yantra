@@ -1,18 +1,18 @@
 "use client";
 
-import { can, leadScope } from "@wedding-yantra/core";
+import { can } from "@wedding-yantra/core";
 import { useClient, useLead } from "@wedding-yantra/api-client/react";
-import { EVENT_LABELS } from "@wedding-yantra/types";
-import { FileText } from "lucide-react";
+import { EVENT_LABELS, type Quote } from "@wedding-yantra/types";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { DateCheck } from "@/components/bookings/date-check";
 import { QuoteEditor } from "@/components/bookings/quote-editor";
-import { ButtonLink } from "@/components/ui/button";
-import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
+import { QuoteForPicker } from "@/components/bookings/quote-for-picker";
+import { QuoteSaved } from "@/components/bookings/quote-saved";
+import { Notice, PageHeader } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
-import { useToast } from "@/components/ui/toast";
 
 function NewQuote() {
   const params = useSearchParams();
@@ -20,37 +20,19 @@ function NewQuote() {
   const clientId = params.get("clientId");
   const { workspace } = useCurrentWorkspace();
   const router = useRouter();
-  const toast = useToast();
   const lead = useLead(workspace.id, leadId ?? "");
   const client = useClient(workspace.id, clientId ?? "");
+  const [saved, setSaved] = useState<Quote | null>(null);
 
   if (!can(workspace, "quotes.manage")) return <Notice>Making quotes isn&apos;t on your screens. Ask the owner if you need it.</Notice>;
   if (!leadId && !clientId) {
-    const seesLeads = leadScope(workspace) !== "none";
-    const seesClients = can(workspace, "clients.view");
     return (
       <>
+        <BackLink href="/app/money/quotes" label="Quotes" />
         <PageHeader title="New quote" />
-        <Card>
-          <EmptyState
-            icon={FileText}
-            title="Choose who the quote is for"
-            action={
-              (seesLeads || seesClients) && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  {seesLeads && <ButtonLink href="/app/leads">Open a lead</ButtonLink>}
-                  {seesClients && (
-                    <ButtonLink href="/app/clients" variant={seesLeads ? "secondary" : undefined}>
-                      Open a client
-                    </ButtonLink>
-                  )}
-                </div>
-              )
-            }
-          >
-            Open the lead or client, then tap Make a quote.
-          </EmptyState>
-        </Card>
+        <QuoteForPicker
+          onPick={(who) => router.replace(`/app/quotes/new?${"leadId" in who ? `leadId=${who.leadId}` : `clientId=${who.clientId}`}`)}
+        />
       </>
     );
   }
@@ -61,17 +43,29 @@ function NewQuote() {
   const eventLabel = lead.data?.eventType ? EVENT_LABELS[lead.data.eventType] : null;
   const back = leadId ? `/app/leads/${leadId}` : `/app/clients/${clientId}`;
 
+  if (saved) {
+    return (
+      <>
+        <BackLink href={back} label={name} />
+        <QuoteSaved quote={saved} />
+      </>
+    );
+  }
+
   return (
     <>
       <BackLink href={back} label={name} />
       <PageHeader title="New quote" subtitle={`For ${name}`} />
+      {lead.data?.eventDate && lead.data.stageKind === "open" && (
+        <DateCheck dates={[lead.data.eventDate]} excludeEventId={lead.data.eventId} className="-mt-2 mb-5" />
+      )}
       <QuoteEditor
         leadId={leadId}
         clientId={clientId}
         defaultTitle={eventLabel ? `${eventLabel} quote` : `Quote for ${name}`}
         onSaved={(quote) => {
-          toast(`Quote ${quote.number} saved`);
-          router.replace(`/app/quotes/${quote.id}`);
+          setSaved(quote);
+          window.scrollTo({ top: 0 });
         }}
       />
     </>

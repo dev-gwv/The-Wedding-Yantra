@@ -21,7 +21,10 @@ import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/
 import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
+import { DateCheck } from "@/components/bookings/date-check";
 import { ClientPicker } from "./client-picker";
+import { FollowUpChips, followUpFor, type FollowUpChoice } from "./follow-up-chips";
+import { PhoneMatchNote } from "./phone-match";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 interface Values {
@@ -96,6 +99,9 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fields = useEntityFields("lead");
   const [custom, setCustom] = useState(() => toDraft(lead?.custom));
+  // New leads only: editing has its own follow-up button on the lead's page.
+  const [followUp, setFollowUp] = useState<FollowUpChoice | null>("tomorrow");
+  const [followUpDate, setFollowUpDate] = useState("");
   const busy = create.isPending || update.isPending;
 
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -121,6 +127,7 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
       requirements: values.requirements,
       ...(canAssign && values.assignedToUserId ? { assignedToUserId: values.assignedToUserId } : {}),
       custom: customPayload(fields, custom),
+      ...(lead ? {} : { nextFollowUpAt: followUpFor(followUp, followUpDate) }),
     };
     const check = validate(createLeadInput, payload);
     const customErrors = checkDraft(fields, custom);
@@ -143,7 +150,10 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
       <TextField label="Name" value={values.name} onChange={set("name")} error={errors.name} placeholder="Neha Kapoor" autoFocus={!lead} />
-      <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
+      <div className="space-y-2">
+        <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
+        {!lead && <PhoneMatchNote phone={values.phone} />}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <SelectField label="Event" value={values.eventType} onChange={set("eventType")} error={errors.eventType}>
           <option value="">Not sure yet</option>
@@ -154,6 +164,7 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
           ))}
         </SelectField>
         <TextField label="Event date" type="date" value={values.eventDate} onChange={set("eventDate")} error={errors.eventDate} />
+        {values.eventDate && <DateCheck dates={[values.eventDate]} excludeEventId={lead?.eventId} className="col-span-2 -mt-1" />}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <TextField
@@ -214,6 +225,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
           ))}
         </SelectField>
       )}
+
+      {!lead && <FollowUpChips label="Follow up" value={followUp} onChange={setFollowUp} pickedDate={followUpDate} onPickedDate={setFollowUpDate} />}
 
       <CustomFieldInputs fields={fields} draft={custom} onChange={setCustom} errors={errors} />
 
