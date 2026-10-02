@@ -1,7 +1,7 @@
 "use client";
 
 import { can, eventScope, firstName, formatMoney, formatMoneyShort, greeting, leadScope, todayIn, type Role } from "@wedding-yantra/core";
-import { useHome, useMyDay } from "@wedding-yantra/api-client/react";
+import { useHome } from "@wedding-yantra/api-client/react";
 import type { HomeSummary } from "@wedding-yantra/types";
 import {
   AlarmClock,
@@ -33,7 +33,7 @@ import { ExpenseSheet } from "@/components/money/expense-sheet";
 import { DueRow } from "@/components/money/rows";
 import { LeadCard } from "@/components/sales/lead-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
-import { MyDayCard, myDayHasContent } from "@/components/tasks/my-day";
+import { DailyReport } from "@/components/tasks/daily-report";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, EmptyState, Eyebrow, GradientTile, IconSquare, NextStepCard, Notice, PageHeader, ProgressBar } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
@@ -80,15 +80,10 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
   // Setup steps are the owner's and manager's job; others never see a to-do they can't do.
   const showSetup = can(role, "workspace.update") && home.setupDone < home.setupTotal;
   const works = can(role, "tasks.work");
-  const myDay = useMyDay(workspace.id, works);
-  const day = myDay.data && myDayHasContent(myDay.data) ? myDay.data : null;
-  // `tasks` can be missing for a minute while a new web version waits on the API's deploy.
-  const teamLate = home.tasks?.teamOverdue ?? 0;
   // After 5 pm, until today's summary has been sent from this device.
   const [summarySent] = useState(() => summarySentOn(workspace.id) === todayIn(workspace.timezone));
   const offerSummary = can(role, "team.review") && new Date().getHours() >= 17 && !summarySent;
-  // Events already in "Your day" aren't listed twice.
-  const coming = home.upcomingEvents.filter((e) => !day?.events.some((d) => d.id === e.id));
+  const coming = home.upcomingEvents;
   const sells = leadScope(role) !== "none";
 
   return (
@@ -102,11 +97,6 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
       {home.money && home.money.pendingExpenses > 0 && (
         <Banner href="/app/money/expenses" icon={ReceiptText}>
           {home.money.pendingExpenses} expense{home.money.pendingExpenses === 1 ? "" : "s"} from your team to approve
-        </Banner>
-      )}
-      {teamLate > 0 && (
-        <Banner href="/app/tasks?view=team" icon={AlarmClock} tone="danger">
-          {teamLate} team task{teamLate === 1 ? " is" : "s are"} late
         </Banner>
       )}
 
@@ -126,16 +116,17 @@ function HomeContent({ home, role }: { home: HomeSummary; role: Role }) {
         </Banner>
       )}
 
+      {/* The day's work: your tasks, the tasks you've given, and the team. */}
+      {works && <DailyReport />}
+
       {(sells || home.money) && <Numbers home={home} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
         <div className="space-y-6">
-          {day && <MyDayCard day={day} />}
           {sells ? (
             <FollowUps home={home} />
           ) : (
-            !day &&
-            !(works && myDay.isPending) && (
+            !works && (
               <Card>
                 <EmptyState icon={Inbox} title="Nothing needs you today">
                   Your events and tasks will show up here, so you know what to do first each morning.
