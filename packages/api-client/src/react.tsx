@@ -148,6 +148,9 @@ export const queryKeys = {
   event: (id: string, eventId: string) => ["workspace", id, "bookings", "event", eventId] as const,
   calendar: (id: string, month: string) => ["workspace", id, "bookings", "calendar", month] as const,
   clashes: (id: string, dates: string, exclude: string) => ["workspace", id, "bookings", "clashes", dates, exclude] as const,
+  dateCheck: (id: string, dates: string, exclude: string) => ["workspace", id, "bookings", "date-check", dates, exclude] as const,
+  search: (id: string, q: string) => ["workspace", id, "search", q] as const,
+  phoneMatch: (id: string, phone: string) => ["workspace", id, "sales", "phone-match", phone] as const,
   publicQuote: (token: string) => ["public-quote", token] as const,
   /** Money lives under bookings too: a change to an event or a quote can change what's due. */
   moneyOverview: (id: string) => ["workspace", id, "bookings", "money"] as const,
@@ -766,6 +769,41 @@ export function useClashes(workspaceId: string, dates: string[], excludeEventId?
     queryKey: queryKeys.clashes(workspaceId, key, excludeEventId ?? ""),
     queryFn: () => api.events.clashes(workspaceId, key.split(","), excludeEventId),
     enabled: key.length > 0,
+  });
+}
+
+/** How full these days are: other events booked against how many the business can take. */
+export function useDateCheck(workspaceId: string, dates: string[], excludeEventId?: string) {
+  const api = useApi();
+  const key = [...new Set(dates.filter(Boolean))].sort().join(",");
+  return useQuery({
+    queryKey: queryKeys.dateCheck(workspaceId, key, excludeEventId ?? ""),
+    queryFn: () => api.dateCheck(workspaceId, key.split(","), excludeEventId),
+    enabled: key.length > 0,
+  });
+}
+
+/** The search box: runs once at least 2 letters are typed. */
+export function useSearch(workspaceId: string, q: string) {
+  const api = useApi();
+  const query = q.trim();
+  return useQuery({
+    queryKey: queryKeys.search(workspaceId, query),
+    queryFn: () => api.search(workspaceId, query),
+    enabled: query.length >= 2,
+    staleTime: 15_000,
+  });
+}
+
+/** Someone with this phone number already on file (enquiries and clients). */
+export function usePhoneMatch(workspaceId: string, phone: string) {
+  const api = useApi();
+  const digits = phone.replace(/\D/g, "");
+  return useQuery({
+    queryKey: queryKeys.phoneMatch(workspaceId, digits),
+    queryFn: () => api.phoneMatch(workspaceId, phone),
+    enabled: digits.length >= 10,
+    staleTime: 30_000,
   });
 }
 

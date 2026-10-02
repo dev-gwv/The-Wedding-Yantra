@@ -24,6 +24,7 @@ export * from "./points.js";
 export * from "./reports.js";
 export * from "./review.js";
 export * from "./sales.js";
+export * from "./search.js";
 export * from "./tasks.js";
 export * from "./team.js";
 export * from "./vendors.js";

@@ -23,6 +23,10 @@ import {
   Undo2,
   Upload,
   type LucideIcon,
+  FileCheck2,
+  FileX2,
+  Inbox,
+  PhoneCall,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -51,6 +55,10 @@ const KIND_ICON: Record<NotificationKind, { icon: LucideIcon; tone: string }> = 
   "digest.morning": { icon: Sun, tone: "bg-sun-50 text-brand-strong" },
   "digest.evening": { icon: Moon, tone: "bg-cream text-ink" },
   "points.recognised": { icon: Award, tone: "bg-success-soft text-success" },
+  "lead.new": { icon: Inbox, tone: "bg-sun-100 text-brand-strong" },
+  "lead.follow_up": { icon: PhoneCall, tone: "bg-sun-100 text-brand-strong" },
+  "quote.accepted": { icon: FileCheck2, tone: "bg-success-soft text-success" },
+  "quote.declined": { icon: FileX2, tone: "bg-danger-soft text-danger" },
   test: { icon: Bell, tone: "bg-cream text-ink-muted" },
 };
 

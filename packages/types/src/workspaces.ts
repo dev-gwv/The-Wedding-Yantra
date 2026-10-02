@@ -91,6 +91,8 @@ export const updateWorkspaceInput = z
       .transform((v) => (v === "" ? null : v))
       .nullable()
       .optional(),
+    /** How many weddings the business can take on one day (teams, crews); more than this is a clash */
+    eventsPerDay: z.number("Enter a number").int("Use a whole number").min(1, "At least 1").max(50, "That's a lot: up to 50").optional(),
     /** Starts every bill number: INV/26-27/0001 */
     billPrefix: z
       .string()
@@ -124,6 +126,8 @@ export const workspace = z.object({
   quoteTerms: z.string().nullable(),
   upiId: z.string().nullable(),
   billPrefix: z.string(),
+  /** How many weddings the business can take on one day */
+  eventsPerDay: z.number(),
   billTerms: z.string().nullable(),
   invoiceDesign: z.enum(INVOICE_DESIGNS),
   invoiceAccent: z.string(),

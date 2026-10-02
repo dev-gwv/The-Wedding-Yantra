@@ -297,6 +297,29 @@ export interface EventSummary {
   functionCount: number;
 }
 
+/**
+ * One day's bookings against how many the business can take. Events are listed only for
+ * people who see every event; others get the counts.
+ */
+export interface DateCheck {
+  date: string;
+  /** Other events already on that day */
+  booked: number;
+  /** How many the business can take in a day */
+  capacity: number;
+  /** Booked to capacity: one more would be over */
+  full: boolean;
+  events: EventClash[];
+}
+
+export const dateCheckQuery = z.object({
+  dates: z
+    .string()
+    .transform((v) => v.split(",").map((d) => d.trim()).filter(Boolean))
+    .pipe(z.array(z.iso.date()).min(1).max(31)),
+  excludeEventId: z.uuid().optional(),
+});
+
 /** Another event on the same day as one of this event's functions. */
 export interface EventClash {
   date: string;

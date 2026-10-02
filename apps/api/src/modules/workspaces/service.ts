@@ -34,6 +34,7 @@ interface WorkspaceRow {
   invoice_design: InvoiceDesign;
   invoice_accent: string;
   review_url: string | null;
+  events_per_day: number;
   logo_file_id: string | null;
   timezone: string;
   created_at: Date;
@@ -57,6 +58,7 @@ const toWorkspace = (row: WorkspaceRow, access: PersonAccess): Workspace => ({
   invoiceDesign: row.invoice_design,
   invoiceAccent: row.invoice_accent,
   reviewUrl: row.review_url,
+  eventsPerDay: row.events_per_day,
   logoUrl: logoPath(row.id, row.logo_file_id),
   timezone: row.timezone,
   createdAt: row.created_at.toISOString(),
@@ -68,7 +70,7 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
   const { rows } = await db.query<WorkspaceRow>(
     `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
             bt.icon AS business_type_icon, w.city,
-            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.invoice_design, w.invoice_accent, w.review_url, w.logo_file_id, w.timezone, w.created_at
+            w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.invoice_design, w.invoice_accent, w.review_url, w.events_per_day, w.logo_file_id, w.timezone, w.created_at
        FROM workspaces w
        JOIN business_types bt ON bt.id = w.business_type_id
       WHERE w.id = $1 AND w.deleted_at IS NULL`,
@@ -138,6 +140,7 @@ const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "prices
   invoiceDesign: "invoice_design",
   invoiceAccent: "invoice_accent",
   reviewUrl: "review_url",
+  eventsPerDay: "events_per_day",
 };
 
 /** How invoices look and are numbered: part of the Payments & invoices screen, not Business settings. */
@@ -146,7 +149,7 @@ export const INVOICE_FIELDS = ["billPrefix", "billTerms", "invoiceDesign", "invo
 export async function updateWorkspace(
   db: Db,
   ctx: MemberContext,
-  input: Partial<Record<keyof typeof COLUMNS, string | null>> & { logoFileId?: string | null; pricesConfirmed?: true },
+  input: Partial<Record<keyof typeof COLUMNS, string | number | null>> & { logoFileId?: string | null; pricesConfirmed?: true },
 ): Promise<Workspace> {
   const sets: string[] = [];
   const values: unknown[] = [ctx.workspaceId];

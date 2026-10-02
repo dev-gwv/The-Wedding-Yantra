@@ -29,6 +29,7 @@ import { reportRoutes } from "./modules/reports/routes.js";
 import { reviewRoutes } from "./modules/review/routes.js";
 import { bookingRoutes } from "./modules/bookings/routes.js";
 import { salesRoutes } from "./modules/sales/routes.js";
+import { searchRoutes } from "./modules/search/routes.js";
 import { taskRoutes } from "./modules/tasks/routes.js";
 import { teamRoutes } from "./modules/team/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/routes.js";
@@ -145,6 +146,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       workspaceRoutes(v1, { db, config });
       teamRoutes(v1, { db });
       salesRoutes(v1, { db });
+      searchRoutes(v1, { db });
       bookingRoutes(v1, { db });
       moneyRoutes(v1, { db, files });
       fileRoutes(v1, { db, files });

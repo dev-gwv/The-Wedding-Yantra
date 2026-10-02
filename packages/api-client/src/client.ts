@@ -1,4 +1,7 @@
 import type {
+  DateCheck,
+  PhoneMatch,
+  SearchResults,
   DepartmentAccess,
   DepartmentAccessInput,
   MemberAccessInput,
@@ -296,6 +299,13 @@ export function createApiClient(options: ApiClientOptions) {
       applyDepartments: (workspaceId: string, memberIds: string[]) =>
         request<{ applied: number }>("POST", `${ws(workspaceId)}/departments/apply`, { memberIds }),
     },
+    /** One box that finds people and records by name or phone, within the person's screens */
+    search: (workspaceId: string, q: string) => request<SearchResults>("GET", `${ws(workspaceId)}/search${qs({ q })}`),
+    /** Enquiries and clients already on file with this phone number */
+    phoneMatch: (workspaceId: string, phone: string) => request<PhoneMatch>("GET", `${ws(workspaceId)}/phone-match${qs({ phone })}`),
+    /** How full these days are, against how many weddings the business can take in a day */
+    dateCheck: (workspaceId: string, dates: string[], excludeEventId?: string) =>
+      request<DateCheck[]>("GET", `${ws(workspaceId)}/date-check${qs({ dates: dates.join(","), excludeEventId })}`),
     leads: {
       list: (workspaceId: string, query: LeadListQuery = {}) =>
         request<LeadList>("GET", `${ws(workspaceId)}/leads${qs(query)}`),
