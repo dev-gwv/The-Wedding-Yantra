@@ -64,10 +64,12 @@ describe("departments", () => {
     expect((await members()).find((m) => m.id === arfin.id)!.department).toBeNull();
   });
 
-  it("keeps setting someone's department with the owner, and checks it's the business's own", async () => {
+  it("keeps departments and setting someone's department with the owner, and checks it's the business's own", async () => {
     const { owner, manager, staff, ws, arfin } = await team("933");
-    // Managers look after the list, like every other list, but don't change someone's details.
-    expect((await call(t.app, "POST", `/workspaces/${ws}/options`, { token: manager, body: { list: "department", label: "Events" } })).status).toBe(201);
+    // A department decides which screens people see, so only the owner adds or changes them.
+    expect((await call(t.app, "POST", `/workspaces/${ws}/options`, { token: manager, body: { list: "department", label: "Events" } })).status).toBe(403);
+    const sales = (await departments(ws, owner)).find((d) => d.key === "sales")!;
+    expect((await call(t.app, "PATCH", `/workspaces/${ws}/options/${sales.id}`, { token: manager, body: { label: "Admin" } })).status).toBe(403);
     expect((await call(t.app, "PUT", `/workspaces/${ws}/members/${arfin.id}/details`, { token: manager, body: { department: "sales" } })).status).toBe(403);
     expect((await call(t.app, "POST", `/workspaces/${ws}/options`, { token: staff, body: { list: "department", label: "Mine" } })).status).toBe(403);
 

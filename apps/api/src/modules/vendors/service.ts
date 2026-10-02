@@ -9,7 +9,7 @@ import { assertOption, optionJoin } from "../options/service.js";
 
 /** Vendors and what they're owed: owners and managers run it, the accountant reads it. */
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "expenses.approve")) throw forbidden("Only the owner or a manager can do this");
+  if (!can(ctx, "expenses.approve")) throw forbidden("Only the owner or a manager can do this");
 };
 
 // ---------------------------------------------------------------------------

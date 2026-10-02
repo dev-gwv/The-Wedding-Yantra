@@ -4,9 +4,9 @@ import type { Db, Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 
-const manages = (ctx: MemberContext) => can(ctx.role, "tasks.manage");
+const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
-  if (!can(ctx.role, "tasks.work")) throw forbidden("Your role doesn't include tasks");
+  if (!can(ctx, "tasks.work")) throw forbidden("Your role doesn't include tasks");
 };
 
 interface RuleRow {

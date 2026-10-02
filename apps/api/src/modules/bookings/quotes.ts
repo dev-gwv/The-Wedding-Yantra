@@ -18,10 +18,10 @@ import { upsertClientForLead } from "../sales/leads.js";
 import { logoPath } from "../files/logo.js";
 
 const requireView = (ctx: MemberContext) => {
-  if (!can(ctx.role, "quotes.view")) throw forbidden("Your role doesn't include quotes");
+  if (!can(ctx, "quotes.view")) throw forbidden("Your role doesn't include quotes");
 };
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "quotes.manage")) throw forbidden("Only the owner or a manager can make quotes");
+  if (!can(ctx, "quotes.manage")) throw forbidden("Only the owner or a manager can make quotes");
 };
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import type { MemberContext } from "../auth/guard.js";
 import { listStages } from "./leads.js";
 
 const requireSettings = (ctx: MemberContext) => {
-  if (!can(ctx.role, "workspace.update")) throw forbidden("Only the owner or a manager can change sales settings");
+  if (!can(ctx, "workspace.update")) throw forbidden("Only the owner or a manager can change sales settings");
 };
 
 // ---- Sales stages -----------------------------------------------------------
@@ -80,7 +80,7 @@ export async function saveStages(
 // ---- WhatsApp quick replies -------------------------------------------------
 
 export async function listTemplates(db: Db, ctx: MemberContext): Promise<WhatsAppTemplate[]> {
-  if (!can(ctx.role, "leads.work")) throw forbidden();
+  if (!can(ctx, "leads.work")) throw forbidden();
   const { rows } = await db.query<WhatsAppTemplate>(
     `SELECT id, title, body, position FROM whatsapp_templates WHERE workspace_id = $1 ORDER BY position, created_at`,
     [ctx.workspaceId],
@@ -123,7 +123,7 @@ export async function deleteTemplate(db: Db, ctx: MemberContext, id: string) {
 // ---- Enquiry form -----------------------------------------------------------
 
 export async function getLeadForm(db: Db, ctx: MemberContext): Promise<LeadFormSettings> {
-  if (!can(ctx.role, "leads.work")) throw forbidden();
+  if (!can(ctx, "leads.work")) throw forbidden();
   const { rows } = await db.query<LeadFormSettings>(`SELECT slug, enabled FROM lead_forms WHERE workspace_id = $1`, [
     ctx.workspaceId,
   ]);

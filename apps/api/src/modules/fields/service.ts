@@ -31,7 +31,7 @@ export async function saveFields(
   ctx: MemberContext,
   input: { entity: CustomFieldEntity; fields: { id?: string; label: string; kind: CustomFieldKind; options?: string[] }[] },
 ): Promise<CustomField[]> {
-  if (!can(ctx.role, "workspace.update")) throw forbidden("Only the owner or a manager can change the fields");
+  if (!can(ctx, "workspace.update")) throw forbidden("Only the owner or a manager can change the fields");
   return withTransaction(db, async (tx) => {
     const current = await listFields(tx, ctx.workspaceId, input.entity);
     const known = new Set(current.map((f) => f.id));

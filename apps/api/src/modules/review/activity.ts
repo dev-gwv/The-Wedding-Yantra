@@ -5,7 +5,7 @@ import { AppError, forbidden } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 
 export const requireReview = (ctx: MemberContext) => {
-  if (!can(ctx.role, "team.review")) throw forbidden("Only the owner or a manager can see this");
+  if (!can(ctx, "team.review")) throw forbidden("Only the owner or a manager can see this");
 };
 
 const PAGE = 40;

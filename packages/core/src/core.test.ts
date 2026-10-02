@@ -13,6 +13,7 @@ import {
   localISODate,
   maskPhone,
   normalizePhone,
+  roleCan,
   whatsappLink,
 } from "./index.js";
 
@@ -75,9 +76,9 @@ describe("formatDate", () => {
 
 describe("roles", () => {
   it("grants owners everything and freelancers nothing", () => {
-    expect(can("owner", "billing.manage")).toBe(true);
-    expect(can("manager", "billing.manage")).toBe(false);
-    expect(can("freelancer", "members.view")).toBe(false);
+    expect(roleCan("owner", "billing.manage")).toBe(true);
+    expect(roleCan("manager", "billing.manage")).toBe(false);
+    expect(roleCan("freelancer", "members.view")).toBe(false);
   });
 
   it("never lets anyone create a second owner", () => {
@@ -94,28 +95,30 @@ describe("roles", () => {
   });
 });
 
-import { eventScope, leadScope, renderTemplate } from "./index.js";
+import { eventScope, leadScope, renderTemplate, resolveAccess, type Role } from "./index.js";
+
+const asRole = (role: Role) => resolveAccess({ role, department: null, departmentOn: false, departmentAreas: null, extraAreas: [] });
 
 describe("events and tasks", () => {
-  it("shows freelancers only the events they work on, and lets everyone but the accountant do tasks", () => {
-    expect(eventScope("owner")).toBe("all");
-    expect(eventScope("staff")).toBe("all");
-    expect(eventScope("freelancer")).toBe("own");
-    expect(eventScope("accountant")).toBe("all");
-    expect(can("freelancer", "tasks.work")).toBe(true);
-    expect(can("staff", "tasks.manage")).toBe(false);
-    expect(can("manager", "tasks.manage")).toBe(true);
-    expect(can("accountant", "tasks.work")).toBe(false);
+  it("shows freelancers only the events they work on, and lets everyone but the view-only role do tasks", () => {
+    expect(eventScope(asRole("owner"))).toBe("all");
+    expect(eventScope(asRole("staff"))).toBe("all");
+    expect(eventScope(asRole("freelancer"))).toBe("own");
+    expect(eventScope(asRole("accountant"))).toBe("all");
+    expect(can(asRole("freelancer"), "tasks.work")).toBe(true);
+    expect(can(asRole("staff"), "tasks.manage")).toBe(false);
+    expect(can(asRole("manager"), "tasks.manage")).toBe(true);
+    expect(can(asRole("accountant"), "tasks.work")).toBe(false);
   });
 });
 
 describe("leads", () => {
   it("shows staff only their own leads and freelancers none", () => {
-    expect(leadScope("owner")).toBe("all");
-    expect(leadScope("manager")).toBe("all");
-    expect(leadScope("staff")).toBe("own");
-    expect(leadScope("freelancer")).toBe("none");
-    expect(leadScope("accountant")).toBe("none");
+    expect(leadScope(asRole("owner"))).toBe("all");
+    expect(leadScope(asRole("manager"))).toBe("all");
+    expect(leadScope(asRole("staff"))).toBe("own");
+    expect(leadScope(asRole("freelancer"))).toBe("none");
+    expect(leadScope(asRole("accountant"))).toBe("none");
   });
 
   it("fills quick replies and never leaves raw placeholders", () => {
@@ -728,5 +731,109 @@ describe("points", () => {
   it("coaches in one line", () => {
     expect(coachingLine({ lateNow: 2, onTime: 92, gap: 0, nextBand: null, rank: 2, ranked: 3, onTimeTaskPoints: 7 })).toBe("2 late tasks: finish them today to keep your on-time at 92%.");
     expect(coachingLine({ lateNow: 0, onTime: 100, gap: 8, nextBand: "Excellent", rank: 2, ranked: 3, onTimeTaskPoints: 7 })).toBe("8 points to Excellent: about 2 tasks finished on time.");
+  });
+});
+
+import { AREAS, areaNeeds, beyond, PERMISSIONS, quoteScope, ROLE_GRANTS, ROLES, teamScope } from "./index.js";
+
+describe("department access", () => {
+  const sorted = (list: readonly string[]) => [...list].sort();
+  const inDept = (role: Role, department: string, extraAreas: string[] = [], departmentAreas: string[] | null = null) =>
+    resolveAccess({ role, department, departmentOn: true, departmentAreas, extraAreas });
+
+  it("keeps everyone's usual access when they have no department", () => {
+    for (const role of ROLES) {
+      if (role === "owner") continue;
+      expect(sorted(asRole(role).permissions)).toEqual(sorted(ROLE_GRANTS[role]));
+      expect(asRole(role).source).toBe("role");
+    }
+    expect(asRole("owner").permissions).toEqual([...PERMISSIONS]);
+  });
+
+  it("keeps people placed before departments decided screens on their usual access until it's turned on", () => {
+    const placed = resolveAccess({ role: "staff", department: "accountant", departmentOn: false, departmentAreas: null, extraAreas: [] });
+    expect(sorted(placed.permissions)).toEqual(sorted(ROLE_GRANTS.staff));
+    expect(placed.source).toBe("role");
+  });
+
+  it("gives a manager with every screen exactly today's manager access", () => {
+    const all = inDept("manager", "manager");
+    expect(sorted(all.permissions)).toEqual(sorted(ROLE_GRANTS.manager));
+    expect(all.areas).toEqual([...AREAS]);
+  });
+
+  it("gives Sales staff leads, quotes and events, and no money", () => {
+    const sales = inDept("staff", "sales");
+    expect(sales.areas).toEqual(["leads", "quotes", "events"]);
+    expect(can(sales, "leads.work")).toBe(true);
+    expect(can(sales, "quotes.manage")).toBe(true);
+    expect(can(sales, "events.view")).toBe(true);
+    expect(can(sales, "finance.view")).toBe(false);
+    expect(can(sales, "clients.view")).toBe(false);
+    expect(can(sales, "events.manage")).toBe(false);
+    expect(leadScope(sales)).toBe("own");
+    expect(quoteScope(sales)).toBe("own");
+    expect(teamScope(sales)).toBe("self");
+  });
+
+  it("gives Accountant staff payments, invoices and tasks, and no leads", () => {
+    const accounts = inDept("staff", "accountant");
+    expect(accounts.areas).toEqual(["clients", "events", "money"]);
+    for (const p of ["finance.view", "bills.manage", "payments.record", "expenses.approve", "tasks.work"] as const) {
+      expect(can(accounts, p)).toBe(true);
+    }
+    expect(leadScope(accounts)).toBe("none");
+    expect(quoteScope(accounts)).toBe("none");
+  });
+
+  it("lets a view-only person in Accountant look but not change anything", () => {
+    const ca = inDept("accountant", "accountant");
+    expect(sorted(ca.permissions)).toEqual(sorted(["members.view", "finance.view", "clients.view", "events.view"]));
+    expect(can(ca, "tasks.work")).toBe(false);
+  });
+
+  it("limits a manager in Sales to Sales, running the tasks of their own department", () => {
+    const head = inDept("manager", "sales");
+    expect(can(head, "leads.view_all")).toBe(true);
+    expect(can(head, "catalogue.manage")).toBe(true);
+    expect(can(head, "finance.view")).toBe(false);
+    expect(can(head, "workspace.update")).toBe(false);
+    expect(teamScope(head)).toBe("department");
+    expect(teamScope(inDept("manager", "sales", ["team"]))).toBe("all");
+    expect(teamScope(asRole("manager"))).toBe("all");
+  });
+
+  it("adds extra screens, capped by the role, and drops screens that give nothing", () => {
+    const extra = inDept("staff", "sales", ["money", "team", "settings"]);
+    expect(can(extra, "finance.view")).toBe(true);
+    expect(extra.extraAreas).toEqual(["money"]);
+    expect(can(extra, "members.invite")).toBe(false);
+    expect(areaNeeds("team")).toBe("manager");
+    expect(areaNeeds("leads")).toBe("staff");
+    expect(areaNeeds("money")).toBe("accountant");
+    // Extras also work for someone with no department, on top of their usual access.
+    const plain = resolveAccess({ role: "staff", department: null, departmentOn: false, departmentAreas: null, extraAreas: ["money"] });
+    expect(can(plain, "leads.work")).toBe(true);
+    expect(can(plain, "payments.record")).toBe(true);
+  });
+
+  it("uses the owner's own screens for a department, and starts new departments with events", () => {
+    expect(inDept("staff", "sales", [], ["leads"]).areas).toEqual(["leads"]);
+    expect(inDept("staff", "x_1a2b", []).areas).toEqual(["events"]);
+  });
+
+  it("never gives pay or the plan through screens", () => {
+    for (const role of ["manager", "staff", "accountant"] as const) {
+      const all = inDept(role, "admin", [...AREAS]);
+      expect(can(all, "members.hr")).toBe(false);
+      expect(can(all, "billing.manage")).toBe(false);
+    }
+    expect(inDept("freelancer", "admin").permissions).toEqual([...ROLE_GRANTS.freelancer]);
+    expect(inDept("owner", "sales").permissions).toEqual([...PERMISSIONS]);
+  });
+
+  it("finds what someone would give away beyond their own access", () => {
+    expect(beyond(inDept("manager", "sales", ["team"]), ROLE_GRANTS.staff)).toEqual([]);
+    expect(beyond(inDept("manager", "sales", ["team"]), ROLE_GRANTS.accountant)).toEqual(["finance.view", "clients.view"]);
   });
 });

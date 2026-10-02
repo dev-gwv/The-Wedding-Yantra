@@ -11,9 +11,9 @@ import { moveTask } from "./delegation.js";
 import { writeCustom } from "../fields/service.js";
 import { assertOption, optionJoin } from "../options/service.js";
 
-export const manages = (ctx: MemberContext) => can(ctx.role, "tasks.manage");
+export const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
-  if (!can(ctx.role, "tasks.work")) throw forbidden("Your role doesn't include tasks");
+  if (!can(ctx, "tasks.work")) throw forbidden("Your role doesn't include tasks");
 };
 const requireManage = (ctx: MemberContext) => {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager can do this");
@@ -155,7 +155,7 @@ export async function seesEvent(db: Queryable, ctx: MemberContext, eventId: stri
     [eventId, ctx.workspaceId, ctx.userId],
   );
   if (!rows[0]) return false;
-  return eventScope(ctx.role) === "all" || rows[0].on_team;
+  return eventScope(ctx) === "all" || rows[0].on_team;
 }
 
 /** A task is visible to managers, to whoever it's for or who made it, and to anyone who can see its event. */
@@ -629,7 +629,7 @@ export async function myDay(db: Db, ctx: MemberContext): Promise<MyDay> {
 }
 
 export async function homeTasks(db: Queryable, ctx: MemberContext): Promise<{ overdue: number; dueToday: number; teamOverdue: number | null }> {
-  if (!can(ctx.role, "tasks.work")) return { overdue: 0, dueToday: 0, teamOverdue: null };
+  if (!can(ctx, "tasks.work")) return { overdue: 0, dueToday: 0, teamOverdue: null };
   await makeDueRepeats(db, ctx.workspaceId);
   const { rows } = await db.query<{ overdue: string; due_today: string; team_overdue: string }>(
     `WITH today AS (SELECT (now() AT TIME ZONE timezone)::date AS d FROM workspaces WHERE id = $1)

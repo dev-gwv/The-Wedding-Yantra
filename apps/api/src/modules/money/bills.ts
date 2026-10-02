@@ -237,7 +237,7 @@ async function saveDeliverables(
 ) {
   if (list === undefined) return;
   await tx.query(`DELETE FROM bill_deliverables WHERE bill_id = $1`, [billId]);
-  const canTrack = track && !!eventId && can(ctx.role, "events.manage");
+  const canTrack = track && !!eventId && can(ctx, "events.manage");
   for (const [i, item] of list.entries()) {
     let deliverableId = item.deliverableId ?? null;
     if (deliverableId) {

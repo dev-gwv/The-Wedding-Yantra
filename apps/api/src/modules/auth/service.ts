@@ -2,6 +2,7 @@ import type { AuthSession, Me, OtpRequestResult, User } from "@wedding-yantra/ty
 import type { Db, Queryable } from "../../db.js";
 import { otpCode, randomToken, sha256 } from "../../lib/crypto.js";
 import { AppError } from "../../lib/http.js";
+import { ACCESS_COLUMNS, ACCESS_JOINS, accessFields, accessFrom, type AccessRow } from "./access.js";
 import type { OtpSender } from "./otp-sender.js";
 import { logoPath } from "../files/logo.js";
 
@@ -153,20 +154,23 @@ export async function getUser(db: Queryable, userId: string): Promise<User> {
 
 export async function getMe(db: Db, userId: string): Promise<Me> {
   const user = await getUser(db, userId);
-  const { rows } = await db.query<{
-    id: string;
-    name: string;
-    business_type_id: string;
-    business_type_name: string;
-    business_type_icon: string;
-    timezone: string;
-    logo_file_id: string | null;
-    role: Me["workspaces"][number]["role"];
-  }>(
-    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, w.logo_file_id, m.role
+  const { rows } = await db.query<
+    AccessRow & {
+      id: string;
+      name: string;
+      business_type_id: string;
+      business_type_name: string;
+      business_type_icon: string;
+      timezone: string;
+      logo_file_id: string | null;
+    }
+  >(
+    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, w.logo_file_id,
+            ${ACCESS_COLUMNS}
        FROM memberships m
        JOIN workspaces w ON w.id = m.workspace_id AND w.deleted_at IS NULL
        JOIN business_types bt ON bt.id = w.business_type_id
+       ${ACCESS_JOINS}
       WHERE m.user_id = $1 AND m.removed_at IS NULL
       ORDER BY m.created_at`,
     [userId],
@@ -182,6 +186,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       timezone: r.timezone,
       logoUrl: logoPath(r.id, r.logo_file_id),
       role: r.role,
+      ...accessFields(accessFrom(r)),
     })),
   };
 }

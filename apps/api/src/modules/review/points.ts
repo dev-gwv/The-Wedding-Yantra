@@ -152,7 +152,7 @@ export async function awardStreaks(db: Queryable, workspaceId: string, today: st
 
 /** An owner or manager recognises someone's work: points, and an alert saying why. */
 export async function recognise(db: Queryable, ctx: MemberContext, input: { userId: string; note: string }): Promise<number> {
-  if (!can(ctx.role, "team.review")) throw forbidden("Only the owner or a manager can recognise work");
+  if (!can(ctx, "team.review")) throw forbidden("Only the owner or a manager can recognise work");
   if (input.userId === ctx.userId) throw new AppError(400, "VALIDATION_ERROR", "Recognise someone else's work", { userId: "Choose someone else" });
   const member = await db.query<{ name: string | null }>(
     `SELECT u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NULL`,
@@ -204,7 +204,7 @@ async function monthBounds(db: Queryable, workspaceId: string, month: string) {
 /** Everyone's points this month, ranked. Everyone sees the board; details of others are for owners and managers. */
 export async function leaderboard(db: Queryable, ctx: MemberContext, month: string): Promise<Leaderboard> {
   const { start, end, today, tz } = await monthBounds(db, ctx.workspaceId, month);
-  const all = can(ctx.role, "team.review");
+  const all = can(ctx, "team.review");
   const s = await settings(db, ctx.workspaceId);
   const { rows } = await db.query<{
     user_id: string;
@@ -288,7 +288,7 @@ export async function leaderboard(db: Queryable, ctx: MemberContext, month: stri
 /** How someone's points this month were earned. Your own, or anyone's for owners and managers. */
 export async function ledger(db: Queryable, ctx: MemberContext, q: { userId?: string; month: string }): Promise<Ledger> {
   const userId = q.userId ?? ctx.userId;
-  if (userId !== ctx.userId && !can(ctx.role, "team.review")) throw forbidden("You can see only your own points");
+  if (userId !== ctx.userId && !can(ctx, "team.review")) throw forbidden("You can see only your own points");
   const person = await db.query<{ name: string | null }>(
     `SELECT u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.workspace_id = $1 AND m.user_id = $2`,
     [ctx.workspaceId, userId],
@@ -351,7 +351,7 @@ export async function getPointSettings(db: Queryable, ctx: MemberContext): Promi
 
 /** The owner changes the rules. Changes count from now on; points already paid stay. */
 export async function savePointSettings(db: Queryable, ctx: MemberContext, input: SavePointSettingsInput): Promise<PointSettings> {
-  if (!can(ctx.role, "workspace.update")) throw forbidden("Only the owner can change how points work");
+  if (!can(ctx, "workspace.update")) throw forbidden("Only the owner can change how points work");
   const overrides: PointRuleOverrides = {};
   for (const r of input.rules) {
     const info = POINT_RULE_INFO[r.key];

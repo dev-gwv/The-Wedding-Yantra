@@ -16,10 +16,10 @@ import type { MemberContext } from "../auth/guard.js";
 
 /** Whoever makes invoices picks from these; the accountant sees them too. */
 const requireView = (ctx: MemberContext) => {
-  if (!can(ctx.role, "bills.manage") && !can(ctx.role, "finance.view")) throw forbidden("Your role doesn't include invoices");
+  if (!can(ctx, "bills.manage") && !can(ctx, "finance.view")) throw forbidden("Your role doesn't include invoices");
 };
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "bills.manage")) throw forbidden("Only the owner or a manager can change invoice settings");
+  if (!can(ctx, "bills.manage")) throw forbidden("Only the owner or a manager can change invoice settings");
 };
 
 // ---------------------------------------------------------------------------

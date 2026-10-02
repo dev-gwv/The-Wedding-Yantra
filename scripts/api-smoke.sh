@@ -61,7 +61,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master 0034_services_and_packages 0035_partner_qr 0036_departments; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master 0034_services_and_packages 0035_partner_qr 0036_departments 0037_access; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"

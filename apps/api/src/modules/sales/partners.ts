@@ -15,7 +15,7 @@ import { listLeads } from "./leads.js";
  * Owners and managers run them.
  */
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "leads.view_all")) throw forbidden("Only the owner or a manager can manage partners");
+  if (!can(ctx, "leads.view_all")) throw forbidden("Only the owner or a manager can manage partners");
 };
 
 interface PartnerRow {

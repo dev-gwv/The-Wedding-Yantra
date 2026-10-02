@@ -8,10 +8,10 @@ import { assertOption, optionJoin } from "../options/service.js";
 
 /** Everyone who sees all events sees the venues; owners and managers keep them. */
 const requireView = (ctx: MemberContext) => {
-  if (!can(ctx.role, "events.view")) throw forbidden("You can't see the venue list");
+  if (!can(ctx, "events.view")) throw forbidden("You can't see the venue list");
 };
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "events.manage")) throw forbidden("Only the owner or a manager can do this");
+  if (!can(ctx, "events.manage")) throw forbidden("Only the owner or a manager can do this");
 };
 
 interface VenueRow {

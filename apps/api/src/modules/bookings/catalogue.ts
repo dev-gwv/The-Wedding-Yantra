@@ -36,7 +36,7 @@ const FROM = `catalogue_items ci ${optionJoin("sc", "service_category", "ci.work
 
 /** Everyone who can work on leads or quotes can read the price list. */
 export function canRead(ctx: MemberContext) {
-  return can(ctx.role, "leads.work") || can(ctx.role, "quotes.view");
+  return can(ctx, "leads.work") || can(ctx, "quotes.view");
 }
 
 export async function listCatalogue(db: Db, ctx: MemberContext, includeArchived = false): Promise<CatalogueItem[]> {
@@ -61,7 +61,7 @@ export async function createCatalogueItem(
   ctx: MemberContext,
   input: { name: string; category?: string | null; description?: string | null; unit: ServiceUnit; price: number; taxRate: number; sac?: string | null },
 ): Promise<CatalogueItem> {
-  if (!can(ctx.role, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
+  if (!can(ctx, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
   if (input.category) await assertOption(db, ctx.workspaceId, "service_category", input.category, "category");
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO catalogue_items (workspace_id, name, category, description, unit, price, tax_rate, sac, position)
@@ -87,7 +87,7 @@ export async function updateCatalogueItem(
     active: boolean;
   }>,
 ): Promise<CatalogueItem> {
-  if (!can(ctx.role, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
+  if (!can(ctx, "catalogue.manage")) throw forbidden("Only the owner or a manager can change the price list");
   if (input.category) {
     const was = await db.query<{ category: string | null }>(`SELECT category FROM catalogue_items WHERE id = $1 AND workspace_id = $2`, [id, ctx.workspaceId]);
     await assertOption(db, ctx.workspaceId, "service_category", input.category, "category", was.rows[0]?.category);

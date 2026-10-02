@@ -85,7 +85,7 @@ export const toSummary = (r: SummaryRow): LeadSummary => ({
 
 /** Adds the "which leads can this person see" condition. Returns the SQL to AND in. */
 export function scopeCondition(ctx: MemberContext, params: unknown[]): string {
-  const scope = leadScope(ctx.role);
+  const scope = leadScope(ctx);
   if (scope === "none") throw forbidden("Your role doesn't include leads");
   if (scope === "all") return "TRUE";
   params.push(ctx.userId);
@@ -330,7 +330,7 @@ const COLUMNS: [keyof LeadFields, string][] = [
 /** A referrer must be one of this business's clients, picked by someone who can see clients. */
 async function assertReferrer(db: Queryable, ctx: MemberContext, clientId: string | null | undefined): Promise<void> {
   if (!clientId) return;
-  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  if (!can(ctx, "clients.view")) throw forbidden("Your role doesn't include clients");
   const { rowCount } = await db.query(`SELECT 1 FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [
     clientId,
     ctx.workspaceId,
@@ -341,7 +341,7 @@ async function assertReferrer(db: Queryable, ctx: MemberContext, clientId: strin
 }
 
 export async function createLead(db: Db, ctx: MemberContext, input: LeadFields): Promise<Lead> {
-  if (!can(ctx.role, "leads.work")) throw forbidden("Your role doesn't include leads");
+  if (!can(ctx, "leads.work")) throw forbidden("Your role doesn't include leads");
 
   return withTransaction(db, async (tx) => {
     await assertReferrer(tx, ctx, input.referredByClientId);
@@ -353,7 +353,7 @@ export async function createLead(db: Db, ctx: MemberContext, input: LeadFields):
     // New leads belong to whoever adds them, unless a manager gives them to someone.
     let assignee: string | null = ctx.userId;
     if (input.assignedToUserId !== undefined && input.assignedToUserId !== ctx.userId) {
-      if (!can(ctx.role, "leads.assign")) throw forbidden("Only the owner or a manager can give leads to others");
+      if (!can(ctx, "leads.assign")) throw forbidden("Only the owner or a manager can give leads to others");
       if (input.assignedToUserId) await assertMember(tx, ctx.workspaceId, input.assignedToUserId);
       assignee = input.assignedToUserId;
     }
@@ -408,7 +408,7 @@ export async function upsertClientForLead(
 }
 
 export async function updateLead(db: Db, ctx: MemberContext, leadId: string, input: LeadFields): Promise<Lead> {
-  if (!can(ctx.role, "leads.work")) throw forbidden("Your role doesn't include leads");
+  if (!can(ctx, "leads.work")) throw forbidden("Your role doesn't include leads");
 
   return withTransaction(db, async (tx) => {
     const current = await loadVisible(tx, ctx, leadId);
@@ -477,7 +477,7 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
 
     // Giving the lead to someone else
     if (input.assignedToUserId !== undefined && input.assignedToUserId !== current.assigned_to) {
-      if (!can(ctx.role, "leads.assign")) throw forbidden("Only the owner or a manager can give leads to others");
+      if (!can(ctx, "leads.assign")) throw forbidden("Only the owner or a manager can give leads to others");
       const toName = input.assignedToUserId ? await assertMember(tx, ctx.workspaceId, input.assignedToUserId) : null;
       set("assigned_to", input.assignedToUserId);
       await addActivityRow(tx, ctx, leadId, "assigned", null, { to: input.assignedToUserId, toName });
@@ -495,7 +495,7 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
 }
 
 export async function deleteLead(db: Db, ctx: MemberContext, leadId: string): Promise<void> {
-  if (!can(ctx.role, "leads.delete")) throw forbidden("Only the owner or a manager can delete leads");
+  if (!can(ctx, "leads.delete")) throw forbidden("Only the owner or a manager can delete leads");
   await loadVisible(db, ctx, leadId);
   await db.query(`UPDATE leads SET deleted_at = now() WHERE id = $1 AND workspace_id = $2`, [leadId, ctx.workspaceId]);
 }
@@ -506,7 +506,7 @@ export async function addActivity(
   leadId: string,
   input: { kind: "note" | "call" | "whatsapp"; body?: string },
 ): Promise<Lead> {
-  if (!can(ctx.role, "leads.work")) throw forbidden("Your role doesn't include leads");
+  if (!can(ctx, "leads.work")) throw forbidden("Your role doesn't include leads");
   await loadVisible(db, ctx, leadId);
   if (input.kind === "note" && !input.body) {
     throw new AppError(400, "VALIDATION_ERROR", "Write a note", { body: "Write a note" });
@@ -518,7 +518,7 @@ export async function addActivity(
 
 /** Numbers and the short to-do list for the Home screen. */
 export async function salesSummary(db: Db, ctx: MemberContext) {
-  const scope = leadScope(ctx.role);
+  const scope = leadScope(ctx);
   if (scope === "none") return { overdue: 0, dueToday: 0, newLeads: 0, openValue: 0, monthEnquiries: 0, monthBooked: 0, monthBookedValue: 0, due: [] };
 
   const params: unknown[] = [ctx.workspaceId];

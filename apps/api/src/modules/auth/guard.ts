@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { Role } from "@wedding-yantra/core";
+import { teamScope, type Access, type Area, type Permission, type Role } from "@wedding-yantra/core";
 import type { Db } from "../../db.js";
 import { AppError, assertId } from "../../lib/http.js";
+import { ACCESS_COLUMNS, ACCESS_JOINS, accessFrom, type AccessRow, type PersonAccess } from "./access.js";
 import { authenticate } from "./service.js";
 
 export interface AuthContext {
@@ -34,10 +35,21 @@ export function requireUser(request: FastifyRequest): AuthContext {
   return request.auth;
 }
 
-export interface MemberContext extends AuthContext {
+export interface MemberContext extends AuthContext, Access {
   workspaceId: string;
   membershipId: string;
   role: Role;
+  /** What they may do: worked out from their role, department and extra screens on every request */
+  permissions: Permission[];
+  /** The screens they can open */
+  areas: Area[];
+  /** Their department's key, and whether its screens are on */
+  department: string | null;
+  departmentOn: boolean;
+  /** Whose work they run: everyone, their own department, or only themselves */
+  teamScope: "all" | "department" | "self";
+  /** Everything about their access, for the apps */
+  access: PersonAccess;
 }
 
 /**
@@ -47,14 +59,27 @@ export interface MemberContext extends AuthContext {
 export async function requireMember(db: Db, request: FastifyRequest, workspaceId: string): Promise<MemberContext> {
   const auth = requireUser(request);
   assertId(workspaceId, "This business");
-  const { rows } = await db.query<{ id: string; role: Role }>(
-    `SELECT m.id, m.role
+  const { rows } = await db.query<AccessRow & { id: string }>(
+    `SELECT m.id, ${ACCESS_COLUMNS}
        FROM memberships m
        JOIN workspaces w ON w.id = m.workspace_id AND w.deleted_at IS NULL
+       ${ACCESS_JOINS}
       WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NULL`,
     [workspaceId, auth.userId],
   );
   const membership = rows[0];
   if (!membership) throw new AppError(404, "NOT_FOUND", "This business was not found");
-  return { ...auth, workspaceId, membershipId: membership.id, role: membership.role };
+  const access = accessFrom(membership);
+  return {
+    ...auth,
+    workspaceId,
+    membershipId: membership.id,
+    role: membership.role,
+    permissions: access.permissions,
+    areas: access.areas,
+    department: access.department,
+    departmentOn: access.departmentOn,
+    teamScope: teamScope(access),
+    access,
+  };
 }

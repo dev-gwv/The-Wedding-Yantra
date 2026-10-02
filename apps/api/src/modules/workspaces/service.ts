@@ -1,9 +1,10 @@
-import { eventScope, type Role } from "@wedding-yantra/core";
+import { eventScope } from "@wedding-yantra/core";
 import type { HomeSummary, InvoiceDesign, StarterPack, UpdateWorkspaceInput, Workspace } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { accessFields, accessFrom, type PersonAccess } from "../auth/access.js";
 import { installSalesDefaults } from "../sales/defaults.js";
 import { salesSummary } from "../sales/leads.js";
 import { listEvents } from "../bookings/events.js";
@@ -38,7 +39,7 @@ interface WorkspaceRow {
   created_at: Date;
 }
 
-const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
+const toWorkspace = (row: WorkspaceRow, access: PersonAccess): Workspace => ({
   id: row.id,
   name: row.name,
   businessTypeId: row.business_type_id,
@@ -59,7 +60,8 @@ const toWorkspace = (row: WorkspaceRow, role: Role): Workspace => ({
   logoUrl: logoPath(row.id, row.logo_file_id),
   timezone: row.timezone,
   createdAt: row.created_at.toISOString(),
-  role,
+  role: access.role,
+  ...accessFields(access),
 });
 
 async function loadWorkspace(db: Queryable, workspaceId: string): Promise<WorkspaceRow> {
@@ -113,12 +115,13 @@ export async function createWorkspace(
       entityType: "workspace",
       entityId: workspaceId,
     });
-    return toWorkspace(await loadWorkspace(tx, workspaceId), "owner");
+    const owner = accessFrom({ role: "owner", department: null, department_on: false, department_areas: null, extra_areas: [], department_label: null });
+    return toWorkspace(await loadWorkspace(tx, workspaceId), owner);
   });
 }
 
-export async function getWorkspace(db: Db, workspaceId: string, role: Role): Promise<Workspace> {
-  return toWorkspace(await loadWorkspace(db, workspaceId), role);
+export async function getWorkspace(db: Db, ctx: MemberContext): Promise<Workspace> {
+  return toWorkspace(await loadWorkspace(db, ctx.workspaceId), ctx.access);
 }
 
 const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "pricesConfirmed">, string> = {
@@ -137,9 +140,12 @@ const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "prices
   reviewUrl: "review_url",
 };
 
+/** How invoices look and are numbered: part of the Payments & invoices screen, not Business settings. */
+export const INVOICE_FIELDS = ["billPrefix", "billTerms", "invoiceDesign", "invoiceAccent", "upiId"] as const;
+
 export async function updateWorkspace(
   db: Db,
-  ctx: { workspaceId: string; userId: string; role: Role },
+  ctx: MemberContext,
   input: Partial<Record<keyof typeof COLUMNS, string | null>> & { logoFileId?: string | null; pricesConfirmed?: true },
 ): Promise<Workspace> {
   const sets: string[] = [];
@@ -174,7 +180,7 @@ export async function updateWorkspace(
       meta: { fields: Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined) },
     });
   }
-  return getWorkspace(db, ctx.workspaceId, ctx.role);
+  return getWorkspace(db, ctx);
 }
 
 /** Everything the Home screen needs, worked out here so every app shows the same thing. */
@@ -261,7 +267,7 @@ export async function getHome(db: Db, ctx: MemberContext, config: Config): Promi
 
 /** Confirmed events with a function in the next 14 days (business time zone). Freelancers see the ones they're on. */
 async function upcomingEvents(db: Db, ctx: MemberContext) {
-  if (eventScope(ctx.role) === "none") return [];
+  if (eventScope(ctx) === "none") return [];
   const { rows } = await db.query<{ today: string; until: string }>(
     `SELECT (now() AT TIME ZONE timezone)::date::text AS today,
             ((now() AT TIME ZONE timezone)::date + 14)::text AS until

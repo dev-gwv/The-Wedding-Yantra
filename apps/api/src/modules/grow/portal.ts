@@ -9,7 +9,7 @@ import { logoPath } from "../files/logo.js";
 import { optionJoin } from "../options/service.js";
 
 const requireShare = (ctx: MemberContext) => {
-  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can share a client's page");
+  if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can share a client's page");
 };
 
 /** Letters and digits that can't be mistaken for each other when read out. */

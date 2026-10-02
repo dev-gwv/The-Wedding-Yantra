@@ -5,7 +5,7 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can send messages to clients");
+  if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can send messages to clients");
 };
 
 interface PersonRow {

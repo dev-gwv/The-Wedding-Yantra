@@ -1,17 +1,29 @@
 /**
  * Who can do what. The API enforces these rules; the apps use the same rules only to
  * decide which buttons to show. Changing a rule here changes it everywhere.
+ *
+ * A role is how much someone can do. Which screens they get comes from their department
+ * (see access.ts); with no department, a role gets the grants below, as it always has.
  */
 
 export const ROLES = ["owner", "manager", "staff", "freelancer", "accountant"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_INFO: Record<Role, { label: string; description: string }> = {
-  owner: { label: "Owner", description: "Everything, including the plan and billing" },
-  manager: { label: "Manager", description: "Runs the business day to day: everything except the plan and billing" },
-  staff: { label: "Staff", description: "Works their own enquiries and tasks, sees every event, adds expenses" },
+  owner: { label: "Owner", description: "Everything, always, including the plan and everyone's pay" },
+  manager: {
+    label: "Manager",
+    description: "Full control of their department's screens, and gives tasks to their team. With no department: everything but the plan and pay",
+  },
+  staff: {
+    label: "Staff",
+    description: "Does the work on their department's screens, with only their own leads. With no department: own leads, every event, tasks",
+  },
   freelancer: { label: "Freelancer", description: "Sees only the events they're booked on, and their tasks" },
-  accountant: { label: "Accountant", description: "Sees the money, read-only, and downloads the spreadsheets" },
+  accountant: {
+    label: "View only",
+    description: "Looks at their department's screens but changes nothing, and has no tasks. With no department: sees the money, read-only (for your CA)",
+  },
 };
 
 export const PERMISSIONS = [
@@ -55,7 +67,8 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const GRANTS: Record<Role, readonly Permission[]> = {
+/** What each role gets when no department decides their screens. */
+export const ROLE_GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   manager: [
     "workspace.update",
@@ -88,8 +101,28 @@ const GRANTS: Record<Role, readonly Permission[]> = {
   accountant: ["members.view", "finance.view", "clients.view", "quotes.view", "events.view"],
 };
 
-export function can(role: Role, permission: Permission): boolean {
-  return GRANTS[role].includes(permission);
+/**
+ * What someone can do: their role, and the permissions worked out for them (see
+ * resolveAccess in access.ts). The API's member context and the web's workspace both fit.
+ */
+export interface Access {
+  role: Role;
+  permissions: readonly Permission[];
+}
+
+/** Whether this person may do something. */
+export function can(who: Access, permission: Permission): boolean {
+  return who.permissions.includes(permission);
+}
+
+/** Whether a role, with no department, may do something. Only for role defaults. */
+export function roleCan(role: Role, permission: Permission): boolean {
+  return ROLE_GRANTS[role].includes(permission);
+}
+
+/** The owner and managers: the people who check others' work, such as approving expenses. */
+export function isOwnerOrManager(role: Role): boolean {
+  return role === "owner" || role === "manager";
 }
 
 /**
@@ -113,9 +146,9 @@ export function canManageMember(actor: Role, target: Role): boolean {
  * Which leads someone sees: every lead, only the ones they created or were given, or none.
  * Staff see their own so each person's list stays short and theirs.
  */
-export function leadScope(role: Role): "all" | "own" | "none" {
-  if (can(role, "leads.view_all")) return "all";
-  if (can(role, "leads.work")) return "own";
+export function leadScope(who: Access): "all" | "own" | "none" {
+  if (can(who, "leads.view_all")) return "all";
+  if (can(who, "leads.work")) return "own";
   return "none";
 }
 
@@ -123,8 +156,26 @@ export function leadScope(role: Role): "all" | "own" | "none" {
  * Which events someone sees: all of them, only the ones they're on the team for
  * (freelancers), or none.
  */
-export function eventScope(role: Role): "all" | "own" | "none" {
-  if (can(role, "events.view")) return "all";
-  if (can(role, "tasks.work")) return "own";
+export function eventScope(who: Access): "all" | "own" | "none" {
+  if (can(who, "events.view")) return "all";
+  if (can(who, "tasks.work")) return "own";
   return "none";
+}
+
+/**
+ * Which quotes someone sees: people who see only their own leads see only the quotes they
+ * made or that are on their own leads; everyone else with quotes sees them all.
+ */
+export function quoteScope(who: Access): "all" | "own" | "none" {
+  if (!can(who, "quotes.view")) return "none";
+  return leadScope(who) === "own" ? "own" : "all";
+}
+
+/**
+ * Whose work someone runs: everyone (the owner, and managers with the Team screen or no
+ * department), the people in their own department (other managers), or only themselves.
+ */
+export function teamScope(who: Access): "all" | "department" | "self" {
+  if (!can(who, "tasks.manage")) return "self";
+  return can(who, "members.manage") ? "all" : "department";
 }

@@ -2,7 +2,9 @@ import { z } from "zod";
 import { phone, personName } from "./auth.js";
 import { optionalText } from "./common.js";
 import { IFSC_PATTERN } from "./invoicing.js";
-import { role, UPI_ID_PATTERN } from "./workspaces.js";
+import { area, role, UPI_ID_PATTERN, type permission } from "./workspaces.js";
+
+type Area = z.infer<typeof area>;
 
 export const EMPLOYMENT_TYPES = ["full_time", "part_time", "freelance"] as const;
 export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
@@ -30,11 +32,23 @@ export interface Member {
   designation: string | null;
   /** The designation's name */
   designationLabel: string | null;
-  /** A key from the business's "department" list: how the team is organised, not what they can see */
+  /** A key from the business's "department" list: the department decides which screens they see */
   department: string | null;
   /** The department's name */
   departmentLabel: string | null;
+  /** False for people placed before departments decided screens, until the owner turns it on */
+  departmentOn: boolean;
   employmentType: EmploymentType | null;
+  /** What they can do, worked out from their role, department and extra screens */
+  permissions: z.infer<typeof permission>[];
+  /** The screens they can open */
+  areas: Area[];
+  /** Where their screens come from */
+  accessSource: "owner" | "role" | "department";
+  /** Screens from their department that their role can use */
+  departmentAreas: Area[];
+  /** Extra screens the owner switched on for them, that their role can use */
+  extraAreas: Area[];
 }
 
 /** Someone who has left the team. Their details stay on record. */
@@ -121,6 +135,9 @@ export interface Invitation {
   name: string;
   phone: string;
   role: z.infer<typeof role>;
+  /** The department they'll join, and its name */
+  department: string | null;
+  departmentLabel: string | null;
   invitedByName: string | null;
   createdAt: string;
   expiresAt: string;
@@ -138,6 +155,8 @@ export const createInvitationInput = z.object({
   name: personName,
   phone,
   role,
+  /** Only the owner chooses it. A manager re-sending an invite keeps the one it had. */
+  department: z.string().trim().max(40).nullable().optional(),
 });
 export type CreateInvitationInput = z.input<typeof createInvitationInput>;
 
@@ -149,6 +168,29 @@ export interface CreatedInvitation {
 
 export const updateMemberInput = z.object({ role });
 export type UpdateMemberInput = z.input<typeof updateMemberInput>;
+
+/** The owner sets someone's department and extra screens. Leaving a field out keeps it. */
+export const memberAccessInput = z.object({
+  department: z.string().trim().max(40).nullable().optional(),
+  extraAreas: z.array(area).max(20).optional(),
+});
+export type MemberAccessInput = z.input<typeof memberAccessInput>;
+
+/** The owner chooses a department's screens. */
+export const departmentAccessInput = z.object({ areas: z.array(area).max(20) });
+export type DepartmentAccessInput = z.input<typeof departmentAccessInput>;
+
+/** The owner turns on department screens for people placed before departments decided screens. */
+export const applyDepartmentsInput = z.object({ memberIds: z.array(z.uuid()).min(1).max(200) });
+export type ApplyDepartmentsInput = z.input<typeof applyDepartmentsInput>;
+
+/** A department's screens: what the owner chose, or its starting screens. */
+export interface DepartmentAccess {
+  department: string;
+  areas: Area[];
+  /** True while it uses its starting screens */
+  isDefault: boolean;
+}
 
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
 

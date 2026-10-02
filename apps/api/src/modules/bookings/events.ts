@@ -18,21 +18,21 @@ import { venuesNamed } from "../venues/service.js";
 
 /** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
-  if (eventScope(ctx.role) === "none") throw forbidden("Your role doesn't include events");
+  if (eventScope(ctx) === "none") throw forbidden("Your role doesn't include events");
 };
 const requireViewAll = (ctx: MemberContext) => {
-  if (eventScope(ctx.role) !== "all") throw forbidden("Your role doesn't include all events");
+  if (eventScope(ctx) !== "all") throw forbidden("Your role doesn't include all events");
 };
 /** SQL to AND in: only events this person may see. */
 function scopeSql(ctx: MemberContext, add: (v: unknown) => string, alias = "e"): string {
-  if (eventScope(ctx.role) === "all") return "TRUE";
+  if (eventScope(ctx) === "all") return "TRUE";
   return `${alias}.id IN (SELECT event_id FROM event_team WHERE user_id = ${add(ctx.userId)})`;
 }
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "events.manage")) throw forbidden("Only the owner or a manager can change events");
+  if (!can(ctx, "events.manage")) throw forbidden("Only the owner or a manager can change events");
 };
 /** Booking values are money: staff see the dates and venues, not what the job is worth. */
-const seesMoney = (ctx: MemberContext) => can(ctx.role, "quotes.view") || can(ctx.role, "finance.view");
+const seesMoney = (ctx: MemberContext) => can(ctx, "quotes.view") || can(ctx, "finance.view");
 
 interface SummaryRow {
   id: string;
@@ -164,7 +164,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
   const r = rows[0];
   if (!r) throw notFound("This event");
   const team = await eventTeam(db, eventId);
-  const all = eventScope(ctx.role) === "all";
+  const all = eventScope(ctx) === "all";
   // Freelancers see only the events they're on, and not the client's number.
   if (!all && !team.some((m) => m.userId === ctx.userId)) throw notFound("This event");
 
@@ -192,7 +192,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
     notes: f.notes,
   }));
 
-  const quote = can(ctx.role, "quotes.view")
+  const quote = can(ctx, "quotes.view")
     ? (
         await db.query<{ id: string; number: number }>(
           `SELECT id, number FROM quotes WHERE event_id = $1 AND deleted_at IS NULL AND status = 'accepted'
@@ -202,7 +202,7 @@ export async function getEvent(db: Queryable, ctx: MemberContext, eventId: strin
       ).rows[0]
     : undefined;
   // Same rule as the leads list: staff open only the leads they added or were given.
-  const scope = leadScope(ctx.role);
+  const scope = leadScope(ctx);
   const opensLead =
     r.live_lead_id !== null &&
     (scope === "all" || (scope === "own" && (r.lead_assigned_to === ctx.userId || r.lead_created_by === ctx.userId)));

@@ -1,9 +1,29 @@
 import { z } from "zod";
-import { ROLES } from "@wedding-yantra/core";
+import { AREAS, PERMISSIONS, ROLES } from "@wedding-yantra/core";
 import { optionalText } from "./common.js";
 import { INVOICE_DESIGNS, invoiceAccent } from "./invoice-look.js";
 
 export const role = z.enum(ROLES);
+export const permission = z.enum(PERMISSIONS);
+export const area = z.enum(AREAS);
+
+/**
+ * What the signed-in person can do in a business, worked out by the server from their
+ * role, department and extra screens. The apps use it to choose what to show.
+ */
+export const workspaceAccess = {
+  /** Everything they may do; the menu and buttons follow this */
+  permissions: z.array(permission),
+  /** The screens they can open */
+  areas: z.array(area),
+  /** Where their screens come from: everything (the owner), their role's usual access, or their department */
+  accessSource: z.enum(["owner", "role", "department"]),
+  /** Their department's key and name, if they're in one */
+  department: z.string().nullable(),
+  departmentLabel: z.string().nullable(),
+  /** False for people placed in a department before departments decided screens, until the owner turns it on */
+  departmentOn: z.boolean(),
+};
 
 export const workspaceSummary = z.object({
   id: z.uuid(),
@@ -17,6 +37,7 @@ export const workspaceSummary = z.object({
   /** API path of the logo, when there is one */
   logoUrl: z.string().nullable(),
   role,
+  ...workspaceAccess,
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummary>;
 
@@ -114,5 +135,6 @@ export const workspace = z.object({
   createdAt: z.string(),
   /** The signed-in person's role in this business. */
   role,
+  ...workspaceAccess,
 });
 export type Workspace = z.infer<typeof workspace>;

@@ -18,7 +18,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
     [ws, date ?? null],
   );
   const { day, tomorrow, tz } = rows[0]!;
-  const seesMoney = can(ctx.role, "finance.view");
+  const seesMoney = can(ctx, "finance.view");
 
   const [received, sales, done, late, waiting, events, dueTomorrow, off] = await Promise.all([
     db.query<{ total: string; count: number }>(
@@ -81,7 +81,7 @@ export async function dailySummary(db: Queryable, ctx: Parameters<typeof require
     booked: Number(sales.rows[0]!.booked),
     tasksDone: Number(done.rows[0]!.count),
     lateTasks: late.rows.map((r) => ({ name: r.name, count: Number(r.count) })),
-    expensesWaiting: can(ctx.role, "expenses.approve") ? Number(waiting.rows[0]!.count) : null,
+    expensesWaiting: can(ctx, "expenses.approve") ? Number(waiting.rows[0]!.count) : null,
     tomorrow: {
       date: tomorrow,
       events: events.rows.map((e) => ({ title: e.title, functions: e.functions ?? [], team: e.team })),

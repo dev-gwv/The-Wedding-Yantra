@@ -7,7 +7,7 @@ import type { MemberContext } from "../auth/guard.js";
 import { getEvent } from "../bookings/events.js";
 
 const requireGrow = (ctx: MemberContext) => {
-  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can ask clients for reviews");
+  if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can ask clients for reviews");
 };
 
 /**

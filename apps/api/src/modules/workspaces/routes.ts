@@ -20,13 +20,18 @@ export function workspaceRoutes(app: FastifyInstance, deps: { db: Db; config: Co
 
   app.get<WsParams>("/workspaces/:workspaceId", async (request) => {
     const member = await requireMember(db, request, request.params.workspaceId);
-    return ok(await workspaces.getWorkspace(db, member.workspaceId, member.role));
+    return ok(await workspaces.getWorkspace(db, member));
   });
 
   app.patch<WsParams>("/workspaces/:workspaceId", async (request) => {
     const member = await requireMember(db, request, request.params.workspaceId);
-    if (!can(member.role, "workspace.update")) throw forbidden("Only the owner or a manager can change business details");
-    return ok(await workspaces.updateWorkspace(db, member, parse(updateWorkspaceInput, request.body)));
+    const input = parse(updateWorkspaceInput, request.body);
+    const fields = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+    const invoice = fields.filter((f) => (workspaces.INVOICE_FIELDS as readonly string[]).includes(f));
+    // How invoices look and are numbered belongs to Payments & invoices; the rest to Business settings.
+    if (invoice.length && !can(member, "bills.manage")) throw forbidden("Ask the owner for the Payments & invoices screen to change invoices");
+    if (fields.length > invoice.length && !can(member, "workspace.update")) throw forbidden("Ask the owner for the Business settings screen to change these");
+    return ok(await workspaces.updateWorkspace(db, member, input));
   });
 
   app.get<WsParams>("/workspaces/:workspaceId/home", async (request) => {

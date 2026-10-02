@@ -77,8 +77,9 @@ export async function listOptions(db: Queryable, workspaceId: string, list?: Opt
 }
 
 export async function addOption(db: Db, ctx: MemberContext, input: { list: OptionList; label: string }): Promise<CustomOption> {
-  if (!can(ctx.role, "workspace.update") && !ADD_RIGHT[input.list].some((p) => can(ctx.role, p))) {
-    throw forbidden("Your role can't add to this list");
+  // Departments decide who sees which screens, so only the owner adds, renames or hides them.
+  if (input.list === "department" ? !can(ctx, "members.hr") : !can(ctx, "workspace.update") && !ADD_RIGHT[input.list].some((p) => can(ctx, p))) {
+    throw forbidden(input.list === "department" ? "Only the owner adds departments" : "Your role can't add to this list");
   }
   return withTransaction(db, async (tx) => {
     // The same name in other capitals is the same option: bring it back instead of adding another.
@@ -106,13 +107,23 @@ export async function addOption(db: Db, ctx: MemberContext, input: { list: Optio
   });
 }
 
-const requireEdit = (ctx: MemberContext) => {
-  if (!can(ctx.role, "workspace.update")) throw forbidden("Only the owner or a manager can change these lists");
+const requireEdit = (ctx: MemberContext, list?: OptionList) => {
+  if (list === "department") {
+    if (!can(ctx, "members.hr")) throw forbidden("Only the owner changes departments");
+    return;
+  }
+  if (!can(ctx, "workspace.update")) throw forbidden("Only the owner or a manager can change these lists");
 };
+
+async function listOf(db: Queryable, workspaceId: string, id: string): Promise<OptionList> {
+  const { rows } = await db.query<{ list: OptionList }>(`SELECT list FROM custom_options WHERE id = $1 AND workspace_id = $2`, [id, workspaceId]);
+  if (!rows[0]) throw notFound("This option");
+  return rows[0].list;
+}
 
 /** Rename or hide/show. Records keep the key, so a rename shows everywhere at once. */
 export async function updateOption(db: Db, ctx: MemberContext, id: string, input: { label?: string; archived?: boolean }): Promise<CustomOption> {
-  requireEdit(ctx);
+  requireEdit(ctx, await listOf(db, ctx.workspaceId, id));
   const sets: string[] = [];
   const values: unknown[] = [id, ctx.workspaceId];
   if (input.label !== undefined) {
@@ -142,7 +153,7 @@ export async function updateOption(db: Db, ctx: MemberContext, id: string, input
 }
 
 export async function reorderOptions(db: Db, ctx: MemberContext, input: { list: OptionList; ids: string[] }): Promise<CustomOption[]> {
-  requireEdit(ctx);
+  requireEdit(ctx, input.list);
   await withTransaction(db, async (tx) => {
     for (const [position, id] of input.ids.entries()) {
       await tx.query(`UPDATE custom_options SET position = $3 WHERE id = $1 AND workspace_id = $2 AND list = $4`, [id, ctx.workspaceId, position, input.list]);

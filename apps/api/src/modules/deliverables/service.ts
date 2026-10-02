@@ -6,12 +6,12 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 
 /** Owners and managers plan deliverables; whoever makes one keeps it up to date. */
-const manages = (ctx: MemberContext) => can(ctx.role, "events.manage");
+const manages = (ctx: MemberContext) => can(ctx, "events.manage");
 const requireManage = (ctx: MemberContext) => {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager can plan deliverables");
 };
 const requireView = (ctx: MemberContext) => {
-  if (eventScope(ctx.role) === "none") throw forbidden("Your role doesn't include events");
+  if (eventScope(ctx) === "none") throw forbidden("Your role doesn't include events");
 };
 
 interface Row {
@@ -69,7 +69,7 @@ const toDeliverable = (ctx: MemberContext, r: Row): Deliverable => ({
 });
 
 /** Everyone who sees all events sees their deliverables; freelancers only their events' and their own. */
-const visibleSql = (ctx: MemberContext) => (eventScope(ctx.role) === "all" ? "TRUE" : "(d.assignee_id = $2 OR EXISTS (SELECT 1 FROM event_team t WHERE t.event_id = d.event_id AND t.user_id = $2))");
+const visibleSql = (ctx: MemberContext) => (eventScope(ctx) === "all" ? "TRUE" : "(d.assignee_id = $2 OR EXISTS (SELECT 1 FROM event_team t WHERE t.event_id = d.event_id AND t.user_id = $2))");
 
 async function load(db: Queryable, ctx: MemberContext, id: string, lock = false): Promise<Row> {
   requireView(ctx);
@@ -203,7 +203,7 @@ export async function deleteDeliverable(db: Db, ctx: MemberContext, id: string):
 
 /** For Home: late and due this week. Everyone's for owners and managers, your own otherwise. */
 export async function homeDeliverables(db: Queryable, ctx: MemberContext): Promise<{ late: number; dueThisWeek: number } | null> {
-  if (eventScope(ctx.role) === "none") return null;
+  if (eventScope(ctx) === "none") return null;
   const { rows } = await db.query<{ late: string; week: string }>(
     `WITH today AS (SELECT (now() AT TIME ZONE timezone)::date AS d FROM workspaces WHERE id = $1)
      SELECT count(*) FILTER (WHERE x.due_date < today.d) AS late,

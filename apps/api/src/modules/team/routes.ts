@@ -1,5 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { createInvitationInput, employeeDetailsInput, updateMemberInput } from "@wedding-yantra/types";
+import {
+  applyDepartmentsInput,
+  createInvitationInput,
+  departmentAccessInput,
+  employeeDetailsInput,
+  memberAccessInput,
+  updateMemberInput,
+} from "@wedding-yantra/types";
 import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember, requireUser } from "../auth/guard.js";
@@ -9,6 +16,7 @@ type WsParams = { Params: { workspaceId: string } };
 type MemberParams = { Params: { workspaceId: string; memberId: string } };
 type InviteParams = { Params: { workspaceId: string; invitationId: string } };
 type TokenParams = { Params: { token: string } };
+type DepartmentParams = { Params: { workspaceId: string; key: string } };
 
 export function teamRoutes(app: FastifyInstance, deps: { db: Db }) {
   const { db } = deps;
@@ -48,6 +56,35 @@ export function teamRoutes(app: FastifyInstance, deps: { db: Db }) {
     const ctx = await requireMember(db, request, request.params.workspaceId);
     const input = parse(employeeDetailsInput, request.body);
     return ok(await team.updateEmployeeDetails(db, ctx, assertId(request.params.memberId, "This team member"), input));
+  });
+
+  // Access: which screens each department gets, and each person's department and extra screens.
+  app.get<WsParams>("/workspaces/:workspaceId/departments/access", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    return ok(await team.listDepartmentAccess(db, ctx));
+  });
+
+  app.put<DepartmentParams>("/workspaces/:workspaceId/departments/:key/access", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    const { areas } = parse(departmentAccessInput, request.body);
+    return ok(await team.setDepartmentAccess(db, ctx, request.params.key, areas));
+  });
+
+  app.delete<DepartmentParams>("/workspaces/:workspaceId/departments/:key/access", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    return ok(await team.setDepartmentAccess(db, ctx, request.params.key, null));
+  });
+
+  app.post<WsParams>("/workspaces/:workspaceId/departments/apply", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    const { memberIds } = parse(applyDepartmentsInput, request.body);
+    return ok(await team.applyDepartments(db, ctx, memberIds));
+  });
+
+  app.put<MemberParams>("/workspaces/:workspaceId/members/:memberId/access", async (request) => {
+    const ctx = await requireMember(db, request, request.params.workspaceId);
+    const input = parse(memberAccessInput, request.body);
+    return ok(await team.setMemberAccess(db, ctx, assertId(request.params.memberId, "This team member"), input));
   });
 
   app.delete<MemberParams>("/workspaces/:workspaceId/members/:memberId", async (request) => {

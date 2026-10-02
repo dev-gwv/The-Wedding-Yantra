@@ -79,7 +79,7 @@ async function eventsThisYear(db: Queryable, workspaceId: string): Promise<numbe
 }
 
 export async function billingOverview(db: Queryable, ctx: MemberContext, config: Config): Promise<BillingOverview> {
-  if (!can(ctx.role, "billing.manage")) throw forbidden("Only the owner sees the plan and billing");
+  if (!can(ctx, "billing.manage")) throw forbidden("Only the owner sees the plan and billing");
   const s = await standing(db, ctx.workspaceId);
   const limits = PLAN_INFO[s.limitsOf ?? "starter"];
   return {
@@ -102,7 +102,7 @@ export async function billingOverview(db: Queryable, ctx: MemberContext, config:
 
 /** For Home: the owner's plan at a glance. */
 export async function homeBilling(db: Queryable, ctx: MemberContext, config: Config) {
-  if (!can(ctx.role, "billing.manage")) return null;
+  if (!can(ctx, "billing.manage")) return null;
   const s = await standing(db, ctx.workspaceId);
   return { status: s.status, trialDaysLeft: daysLeft(s.trialEndsAt), enforced: config.billing.enforced };
 }
@@ -139,7 +139,7 @@ export async function startCheckout(
   gateway: PaymentGateway | null,
   input: { plan: Plan; period: BillingPeriod },
 ): Promise<Checkout> {
-  if (!can(ctx.role, "billing.manage")) throw forbidden("Only the owner can choose a plan");
+  if (!can(ctx, "billing.manage")) throw forbidden("Only the owner can choose a plan");
   const planId = config.billing.razorpay?.plans[`${input.plan}:${input.period}`];
   if (!gateway || !planId) {
     throw new AppError(503, "BILLING_UNAVAILABLE", "Paying online isn't switched on yet. Your trial keeps going in the meantime.");

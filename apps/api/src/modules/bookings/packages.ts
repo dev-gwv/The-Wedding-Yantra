@@ -33,7 +33,7 @@ interface ItemRow {
 }
 
 const requireManage = (ctx: MemberContext) => {
-  if (!can(ctx.role, "catalogue.manage")) throw forbidden("Only the owner or a manager can change packages");
+  if (!can(ctx, "catalogue.manage")) throw forbidden("Only the owner or a manager can change packages");
 };
 
 async function load(db: Queryable, workspaceId: string, where: string, params: unknown[]): Promise<ServicePackage[]> {

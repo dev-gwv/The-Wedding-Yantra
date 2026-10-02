@@ -20,7 +20,7 @@ export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; 
   department: {
     title: "Departments",
     one: "department",
-    about: "How your team is organised: admin, accounts, sales. A department doesn't change what anyone can see in the app; their role does.",
+    about: "How your team is organised: admin, accounts, sales. Each department decides which screens its people see.",
   },
 };
 

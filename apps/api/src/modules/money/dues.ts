@@ -134,7 +134,7 @@ export async function moneyOverview(db: Queryable, ctx: MemberContext): Promise<
 
 /** What Home shows about money: only for roles that see money. */
 export async function homeMoney(db: Queryable, ctx: MemberContext): Promise<HomeSummary["money"]> {
-  if (!can(ctx.role, "finance.view")) return null;
+  if (!can(ctx, "finance.view")) return null;
   const [overview, pendingExpenses, month] = await Promise.all([
     moneyOverview(db, ctx),
     pendingExpenseCount(db, ctx),

@@ -8,14 +8,14 @@ import { assertWorkspaceFile, toUploaded } from "../files/service.js";
 import { assertOption, optionJoin } from "../options/service.js";
 
 /** Seeing money: everything. Everyone else who can add expenses sees only their own. */
-const seesAll = (ctx: MemberContext) => can(ctx.role, "finance.view") || can(ctx.role, "expenses.approve");
+const seesAll = (ctx: MemberContext) => can(ctx, "finance.view") || can(ctx, "expenses.approve");
 const requireSubmit = (ctx: MemberContext) => {
-  if (!can(ctx.role, "expenses.submit") && !can(ctx.role, "finance.view")) throw forbidden("Your role doesn't include expenses");
+  if (!can(ctx, "expenses.submit") && !can(ctx, "finance.view")) throw forbidden("Your role doesn't include expenses");
 };
 /** Approvers change any expense; others only their own. The accountant only looks. */
 const requireChange = (ctx: MemberContext, row: { submitted_by: string | null }) => {
-  if (can(ctx.role, "expenses.approve")) return;
-  if (can(ctx.role, "expenses.submit") && row.submitted_by === ctx.userId) return;
+  if (can(ctx, "expenses.approve")) return;
+  if (can(ctx, "expenses.submit") && row.submitted_by === ctx.userId) return;
   throw forbidden("Only the owner, a manager or the person who added it can change this expense");
 };
 
@@ -193,7 +193,7 @@ export async function expensesSummary(db: Queryable, ctx: MemberContext, filters
 
 /** The person who paid from their own pocket got their money back (or not, to undo). */
 export async function reimburseExpense(db: Db, secret: Buffer, ctx: MemberContext, id: string, reimbursed: boolean): Promise<Expense> {
-  if (!can(ctx.role, "expenses.approve")) throw forbidden("Only the owner or a manager can mark money paid back");
+  if (!can(ctx, "expenses.approve")) throw forbidden("Only the owner or a manager can mark money paid back");
   const current = await loadRow(db, ctx, id);
   if (!current.paid_by) throw new AppError(409, "PAID_BY_BUSINESS", "The business paid this one, so nobody is owed.");
   await db.query(
@@ -244,7 +244,7 @@ async function checkLinks(db: Queryable, ctx: MemberContext, input: Partial<Expe
   }
   if (input.paidBy) {
     // The team pays from their own pocket for themselves; owners and managers note it for anyone.
-    if (input.paidBy !== ctx.userId && !can(ctx.role, "expenses.approve")) {
+    if (input.paidBy !== ctx.userId && !can(ctx, "expenses.approve")) {
       throw forbidden("You can only note money you paid yourself");
     }
     const m = await db.query(`SELECT 1 FROM memberships WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NULL`, [ctx.workspaceId, input.paidBy]);
@@ -265,12 +265,12 @@ function checkGst(amount: number, gst: number) {
 
 /** The owner's and managers' expenses count straight away; the team's wait for approval. */
 export async function createExpense(db: Db, secret: Buffer, ctx: MemberContext, input: ExpenseFields): Promise<Expense> {
-  if (!can(ctx.role, "expenses.submit")) throw forbidden("Your role can't add expenses");
+  if (!can(ctx, "expenses.submit")) throw forbidden("Your role can't add expenses");
   return withTransaction(db, async (tx) => {
     await checkLinks(tx, ctx, input);
     await assertOption(tx, ctx.workspaceId, "expense_category", input.category, "category");
     if (input.method) await assertOption(tx, ctx.workspaceId, "payment_method", input.method, "method");
-    const approver = can(ctx.role, "expenses.approve");
+    const approver = can(ctx, "expenses.approve");
     const gstAmount = gstFor(input.amount, input.gstRate, input.gstAmount);
     checkGst(input.amount, gstAmount);
     const { rows } = await tx.query<{ id: string }>(
@@ -329,7 +329,7 @@ export async function updateExpense(db: Db, secret: Buffer, ctx: MemberContext, 
     const current = await loadRow(tx, ctx, id, true);
     requireChange(ctx, current);
     await requireNotPayout(tx, id);
-    const approver = can(ctx.role, "expenses.approve");
+    const approver = can(ctx, "expenses.approve");
     if (!approver && current.status === "approved") {
       throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to change it.");
     }
@@ -381,7 +381,7 @@ export async function reviewExpense(
   id: string,
   decision: { approve: boolean; reason?: string | null },
 ): Promise<Expense> {
-  if (!can(ctx.role, "expenses.approve")) throw forbidden("Only the owner or a manager can approve expenses");
+  if (!can(ctx, "expenses.approve")) throw forbidden("Only the owner or a manager can approve expenses");
   await loadRow(db, ctx, id);
   await db.query(
     `UPDATE expenses SET status = $2, reject_reason = $3, reviewed_by = $4, reviewed_at = now() WHERE id = $1`,
@@ -402,7 +402,7 @@ export async function deleteExpense(db: Db, ctx: MemberContext, id: string): Pro
   requireSubmit(ctx);
   const current = await loadRow(db, ctx, id);
   requireChange(ctx, current);
-  if (!can(ctx.role, "expenses.approve") && current.status === "approved") {
+  if (!can(ctx, "expenses.approve") && current.status === "approved") {
     throw new AppError(409, "EXPENSE_APPROVED", "This expense is approved. Ask the owner to remove it.");
   }
   await requireNotPayout(db, id);
@@ -455,7 +455,7 @@ export async function eventSpend(db: Queryable, eventId: string): Promise<{ spen
 }
 
 export async function pendingExpenseCount(db: Queryable, ctx: MemberContext): Promise<number> {
-  if (!can(ctx.role, "expenses.approve")) return 0;
+  if (!can(ctx, "expenses.approve")) return 0;
   const { rows } = await db.query<{ count: string }>(
     `SELECT count(*) AS count FROM expenses WHERE workspace_id = $1 AND status = 'pending' AND deleted_at IS NULL`,
     [ctx.workspaceId],

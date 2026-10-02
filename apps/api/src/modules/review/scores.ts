@@ -19,7 +19,7 @@ const ACTIVE_EVENT = "(t.event_id IS NULL OR (e.status <> 'cancelled' AND e.dele
  * the business as a whole; everyone else sees only themselves.
  */
 export async function teamScores(db: Queryable, ctx: MemberContext, month: string): Promise<TeamScores> {
-  const all = can(ctx.role, "team.review");
+  const all = can(ctx, "team.review");
   // The month and today, counted in the business's time zone.
   const { rows } = await db.query<{ start: string; end: string; today: string; tz: string }>(
     `SELECT to_date($2, 'YYYY-MM')::text AS start, (to_date($2, 'YYYY-MM') + interval '1 month')::date::text AS end,

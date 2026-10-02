@@ -77,7 +77,7 @@ function duplicate(err: unknown): never {
 }
 
 export async function listClients(db: Db, ctx: MemberContext, q?: string, archived = false): Promise<ClientSummary[]> {
-  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  if (!can(ctx, "clients.view")) throw forbidden("Your role doesn't include clients");
   const params: unknown[] = [ctx.workspaceId];
   let filter = archived ? " AND c.archived_at IS NOT NULL" : " AND c.archived_at IS NULL";
   if (q) {
@@ -106,14 +106,14 @@ async function listContacts(db: Queryable, clientId: string): Promise<ClientCont
 }
 
 export async function getClient(db: Db, ctx: MemberContext, clientId: string): Promise<Client> {
-  if (!can(ctx.role, "clients.view")) throw forbidden("Your role doesn't include clients");
+  if (!can(ctx, "clients.view")) throw forbidden("Your role doesn't include clients");
   const { rows } = await db.query<ClientRow>(`${SELECT} WHERE c.workspace_id = $1 AND c.id = $2 AND c.deleted_at IS NULL`, [ctx.workspaceId, clientId]);
   const row = rows[0];
   if (!row) throw notFound("This client");
 
   // Their own enquiries, and the ones they sent our way.
   const leadsWhere = async (column: "client_id" | "referred_by_client_id") => {
-    if (leadScope(ctx.role) === "none") return [];
+    if (leadScope(ctx) === "none") return [];
     const params: unknown[] = [ctx.workspaceId, clientId];
     const scope = scopeCondition(ctx, params);
     const result = await db.query<SummaryRow>(
@@ -143,7 +143,7 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     custom: row.custom,
     noMessages: row.no_messages,
     // The page link lets anyone see the client's bills, so only those who share it see it.
-    portalToken: can(ctx.role, "clients.manage") ? row.portal_token : null,
+    portalToken: can(ctx, "clients.manage") ? row.portal_token : null,
   };
 }
 
@@ -208,7 +208,7 @@ async function saveContacts(db: Queryable, workspaceId: string, clientId: string
 }
 
 export async function createClient(db: Db, ctx: MemberContext, input: Required<Pick<ClientFields, "name">> & ClientFields) {
-  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can add clients");
+  if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can add clients");
   await checkRelations(db, ctx.workspaceId, input);
   const id = await withTransaction(db, async (tx) => {
     const cols = columnsOf(input);
@@ -237,7 +237,7 @@ const SECTION_OF: Record<string, string> = {
 };
 
 export async function updateClient(db: Db, ctx: MemberContext, clientId: string, input: ClientFields) {
-  if (!can(ctx.role, "clients.manage")) throw forbidden("Only the owner or a manager can change clients");
+  if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can change clients");
   const current = await db.query<{ name: string; relation: string | null; archived_at: Date | null }>(
     `SELECT name, relation, archived_at FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
     [clientId, ctx.workspaceId],
