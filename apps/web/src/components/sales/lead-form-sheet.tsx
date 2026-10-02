@@ -14,18 +14,20 @@ import {
   type PersonRef,
 } from "@wedding-yantra/types";
 import { ChevronDown } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type SetStateAction } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { checkDraft, CustomFieldInputs, customPayload, toDraft, useEntityFields } from "@/components/app/custom-fields";
 import { Notice } from "@/components/ui/misc";
-import { Sheet } from "@/components/ui/sheet";
+import { DraftRestored, Sheet } from "@/components/ui/sheet";
+import { MoneyInput } from "@/components/ui/money-input";
 import { DateCheck } from "@/components/bookings/date-check";
 import { ClientPicker } from "./client-picker";
 import { FollowUpChips, followUpFor, type FollowUpChoice } from "./follow-up-chips";
 import { PhoneMatchNote } from "./phone-match";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
+import { discardDraft, useDraft } from "@/lib/use-draft";
 
 interface Values {
   name: string;
@@ -75,15 +77,35 @@ export function LeadFormSheet({
   lead?: Lead;
   onSaved: (lead: Lead) => void;
 }) {
+  const { workspace } = useCurrentWorkspace();
+  const [dirty, setDirty] = useState(false);
+  // A new lead is kept as a draft until it's added; editing one isn't.
+  const draftKey = lead ? null : `lead.${workspace.id}`;
   // Re-mount the form each time it opens so it starts from the latest values.
   return (
-    <Sheet open={open} onClose={onClose} title={lead ? "Edit lead" : "Add a lead"}>
-      {open && <LeadForm lead={lead} onSaved={onSaved} />}
+    <Sheet open={open} onClose={onClose} title={lead ? "Edit lead" : "Add a lead"} dirty={dirty} onDiscard={() => discardDraft(draftKey)}>
+      {open && <LeadForm lead={lead} draftKey={draftKey} onDirty={setDirty} onSaved={onSaved} />}
     </Sheet>
   );
 }
 
-function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => void }) {
+interface Draft {
+  values: Values;
+  followUp: FollowUpChoice | null;
+  followUpDate: string;
+}
+
+function LeadForm({
+  lead,
+  draftKey,
+  onDirty,
+  onSaved,
+}: {
+  lead?: Lead;
+  draftKey: string | null;
+  onDirty: (dirty: boolean) => void;
+  onSaved: (lead: Lead) => void;
+}) {
   const { workspace } = useCurrentWorkspace();
   const canAssign = can(workspace, "leads.assign");
   // Naming a client as the referrer needs the client list, which staff don't see.
@@ -94,14 +116,22 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
   const handlers = (team.data?.members ?? []).filter((m) => m.permissions.includes("leads.work") || m.userId === lead?.assignedTo?.id);
   const create = useCreateLead(workspace.id);
   const update = useUpdateLead(workspace.id, lead?.id ?? "");
-  const [values, setValues] = useState<Values>(() => initial(lead));
+  // New leads only: editing has its own follow-up button on the lead's page.
+  const [start] = useState<Draft>(() => ({ values: initial(lead), followUp: "tomorrow", followUpDate: "" }));
+  const [draft, setDraft, clearDraft, restored] = useDraft<Draft>(draftKey, start);
+  const { values, followUp, followUpDate } = draft;
+  const setValues = (next: SetStateAction<Values>) =>
+    setDraft((d) => ({ ...d, values: typeof next === "function" ? next(d.values) : next }));
+  const setFollowUp = (followUp: FollowUpChoice | null) => setDraft((d) => ({ ...d, followUp }));
+  const setFollowUpDate = (followUpDate: string) => setDraft((d) => ({ ...d, followUpDate }));
   const [more, setMore] = useState(() => !!lead && !!(lead.email || lead.venue || lead.requirements || lead.referredBy));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fields = useEntityFields("lead");
   const [custom, setCustom] = useState(() => toDraft(lead?.custom));
-  // New leads only: editing has its own follow-up button on the lead's page.
-  const [followUp, setFollowUp] = useState<FollowUpChoice | null>("tomorrow");
-  const [followUpDate, setFollowUpDate] = useState("");
+  const [startCustom] = useState(() => JSON.stringify(custom));
+  const dirty = JSON.stringify(draft) !== JSON.stringify(start) || JSON.stringify(custom) !== startCustom;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
   const busy = create.isPending || update.isPending;
 
   const set = (key: keyof Values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -140,6 +170,8 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
     setErrors({});
     try {
       const saved = lead ? await update.mutateAsync(payload) : await create.mutateAsync(payload);
+      onDirty(false);
+      if (!lead) clearDraft();
       onSaved(saved);
     } catch (err) {
       const fields = apiFieldErrors(err);
@@ -149,6 +181,7 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
+      {restored && <DraftRestored onClear={clearDraft} />}
       <TextField label="Name" value={values.name} onChange={set("name")} error={errors.name} placeholder="Neha Kapoor" autoFocus={!lead} />
       <div className="space-y-2">
         <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
@@ -167,11 +200,10 @@ function LeadForm({ lead, onSaved }: { lead?: Lead; onSaved: (lead: Lead) => voi
         {values.eventDate && <DateCheck dates={[values.eventDate]} excludeEventId={lead?.eventId} className="col-span-2 -mt-1" />}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <TextField
-          label="Budget (₹)"
-          inputMode="numeric"
-          value={values.budget}
-          onChange={(e) => setValues((v) => ({ ...v, budget: e.target.value.replace(/[^\d]/g, "") }))}
+        <MoneyInput
+          label="Budget"
+          value={values.budget ? Number(values.budget) : null}
+          onChange={(n) => setValues((v) => ({ ...v, budget: n == null ? "" : String(n) }))}
           error={errors.budget}
           placeholder="1,50,000"
         />

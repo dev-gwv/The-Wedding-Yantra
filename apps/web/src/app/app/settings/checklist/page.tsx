@@ -29,7 +29,7 @@ export default function ChecklistPage() {
   const checklist = useChecklist(workspace.id, allowed);
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader
         title="Event checklist"
         subtitle="What gets done for every event. Add it to an event in one tap; each step gets its date from the event's functions."

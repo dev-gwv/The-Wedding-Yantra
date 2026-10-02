@@ -21,7 +21,7 @@ export default function ListsPage() {
   const options = useOptions(workspace.id);
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Your lists" subtitle="Name things your way. Renaming changes old records too; hiding keeps them as they were." />
       {!can(workspace, "workspace.update") && <Notice>Ask the owner to add the Business settings screen for you.</Notice>}
       {options.isPending && (

@@ -48,7 +48,7 @@ export default function InvoiceSettingsPage() {
   const allowed = can(workspace, "bills.manage") || can(workspace, "finance.view");
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Invoice settings" subtitle="Set these once. Every new invoice picks them up, and you can change them on any invoice." />
       {!allowed && <Notice>Invoice settings are for the owner and managers.</Notice>}
       {allowed && details.isPending && (

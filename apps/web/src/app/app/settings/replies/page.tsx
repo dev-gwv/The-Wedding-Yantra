@@ -24,7 +24,7 @@ export default function RepliesPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader
         title="WhatsApp replies"
         subtitle="Ready-made messages you send from a lead in one tap."

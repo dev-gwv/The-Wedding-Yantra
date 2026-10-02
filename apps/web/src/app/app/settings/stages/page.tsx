@@ -30,7 +30,7 @@ export default function StagesPage() {
   const leads = useLeads(workspace.id, {}, seesLeads);
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Sales stages" subtitle="The steps every lead moves through, from first enquiry to booked." />
       {!seesLeads && (
         <Card>

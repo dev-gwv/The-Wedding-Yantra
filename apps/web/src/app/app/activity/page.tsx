@@ -40,7 +40,7 @@ export default function ActivityPage() {
   if (!allowed) {
     return (
       <>
-        <BackLink href="/app/more" label="More" />
+        <BackLink href="/app/settings" label="Settings" />
         <PageHeader title="Activity" />
         <Card>
           <EmptyState icon={Lock} title="The activity log is for the owner and managers">
@@ -56,7 +56,7 @@ export default function ActivityPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Activity" subtitle="Who did what, newest first." />
       {members.length > 1 && (
         <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="tablist" aria-label="Whose activity">

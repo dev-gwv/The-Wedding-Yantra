@@ -43,7 +43,7 @@ export default function CustomFieldsPage() {
   const fields = useCustomFields(workspace.id);
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Your own fields" subtitle="Add the details your business always asks for. They show on the forms and pages, for the whole team." />
       {fields.isPending && (
         <div className="flex justify-center py-16 text-brand">

@@ -36,7 +36,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Your profile" subtitle="The same across every business you work with." />
       <form onSubmit={submit} className="space-y-6" noValidate>
         <Card className="space-y-5 p-5">

@@ -42,7 +42,7 @@ export default function EnquiryFormPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Enquiry form" subtitle="A link anyone can fill in. Every enquiry becomes a lead that's due today." />
       {form.isPending && (
         <div className="flex justify-center py-16 text-brand">

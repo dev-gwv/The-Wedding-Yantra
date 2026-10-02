@@ -32,7 +32,7 @@ function BusinessProfile() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Business profile" subtitle="Shown on your quotes and bills." />
       {details.isPending && (
         <div className="flex justify-center py-16 text-brand">

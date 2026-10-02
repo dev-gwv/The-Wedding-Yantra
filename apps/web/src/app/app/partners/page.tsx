@@ -27,7 +27,7 @@ export default function PartnersPage() {
   if (!allowed)
     return (
       <>
-        <BackLink href="/app/more" label="More" />
+        <BackLink href="/app/settings" label="Settings" />
         <PageHeader title="Partner QR codes" />
         <Card>
           <EmptyState icon={Lock} title="Partner QR codes aren't on your screens">
@@ -42,7 +42,7 @@ export default function PartnersPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader
         title="Partner QR codes"
         subtitle="Give each partner you collaborate with their own QR code. Every enquiry through it is credited to them, and they see their enquiries on their own page."

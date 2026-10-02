@@ -109,7 +109,7 @@ export default function MastersPage() {
 
   return (
     <>
-      <BackLink href="/app/more" label="More" />
+      <BackLink href="/app/settings" label="Settings" />
       <PageHeader title="Master data" subtitle="The records everything else is built on. Keep them right once, and quotes, invoices and events fill themselves in." />
       <div className="grid gap-3 sm:grid-cols-2">
         {tiles
