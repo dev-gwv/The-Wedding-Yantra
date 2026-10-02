@@ -32,7 +32,7 @@ export default function PersonTasksPage() {
   );
   const [giving, setGiving] = useState(false);
   const back = manages ? (
-    <BackLink href="/app/tasks?view=team" label="Team board" />
+    <BackLink href="/app/tasks/team" label="Team board" />
   ) : (
     <BackLink href="/app/my-day" label="My day" />
   );

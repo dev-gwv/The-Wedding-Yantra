@@ -241,7 +241,7 @@ export function DailyReport() {
                   <Send className="size-4" /> Give a task
                 </Button>
                 <Link
-                  href="/app/tasks?view=given"
+                  href="/app/tasks/given"
                   className="inline-flex items-center gap-1 text-sm font-bold text-brand-strong hover:text-brand-deep"
                 >
                   See all <ChevronRight className="size-4" />
@@ -287,7 +287,7 @@ export function DailyReport() {
                 ))}
                 {attention.length > SHOWN && (
                   <More
-                    href="/app/tasks?view=given"
+                    href="/app/tasks/given"
                     n={attention.length - SHOWN}
                   />
                 )}
@@ -315,7 +315,7 @@ export function DailyReport() {
               </p>
             </div>
             <Link
-              href="/app/tasks?view=team"
+              href="/app/tasks/team"
               className="inline-flex items-center gap-1 text-sm font-bold text-brand-strong hover:text-brand-deep"
             >
               Team board <ChevronRight className="size-4" />

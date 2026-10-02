@@ -188,7 +188,7 @@ describe("push to phones", () => {
 });
 
 describe("scheduled alerts", () => {
-  it("sends the morning plan, the overdue alert, due-in-an-hour and the evening round-up, once each", async () => {
+  it("sends the morning plan, reminders, due-in-an-hour and the evening round-up, once each", async () => {
     const { owner, staff, other, ws, ids } = await team("825");
     const today = day(0);
     const make = (body: Record<string, unknown>) => call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/tasks`, { token: owner, body });
@@ -205,15 +205,20 @@ describe("scheduled alerts", () => {
     const plan = staffBox.items.find((a) => a.kind === "digest.morning")!;
     expect(plan).toMatchObject({ title: "Your day: 3 tasks", link: "/app/my-day" });
     expect(plan.body).toBe("2 late · 1 due today\nStart with: Old one");
-    // Only yesterday's miss gets its own alert, once.
+    // Every late task is reminded, with how late it is; the one due today too.
     const overdue = staffBox.items.filter((a) => a.kind === "task.overdue");
-    expect(overdue).toHaveLength(1);
-    expect(overdue[0]!.link).toBe(`/app/tasks?open=${late.body.data.id}`);
-    expect((await inbox(ws, other)).items.some((a) => a.kind === "digest.morning")).toBe(false);
+    expect(overdue.map((a) => [a.title, a.body]).sort()).toEqual([
+      ["Late by 1 day: still not done", "Send the teaser"],
+      ["Late by 5 days: still not done", "Old one"],
+    ]);
+    expect(overdue.find((a) => a.body === "Send the teaser")!.link).toBe(`/app/tasks?open=${late.body.data.id}`);
+    expect(staffBox.items.filter((a) => a.kind === "task.reminder").map((a) => [a.title, a.body])).toEqual([["Due today", "Pick album photos"]]);
+    // Neha is off today: no plan and no reminders.
+    expect((await inbox(ws, other)).items.some((a) => a.kind === "digest.morning" || a.kind === "task.reminder")).toBe(false);
 
     // Running again the same morning sends nothing new.
     const again = await runSchedule(t.db, at(today, "08:31"));
-    expect(again.morning + again.overdue).toBe(0);
+    expect(again.morning + again.reminders).toBe(0);
     expect((await inbox(ws, staff)).items.length).toBe(staffBox.items.length);
 
     // Half an hour before 3 pm.
@@ -223,6 +228,14 @@ describe("scheduled alerts", () => {
     expect(reminder).toMatchObject({ title: "Due at 3 pm", body: "Call the florist", link: `/app/tasks?open=${timed.body.data.id}` });
     await runSchedule(t.db, at(today, "14:40"));
     expect((await inbox(ws, other)).items.filter((a) => a.kind === "task.due_soon")).toHaveLength(1);
+
+    // The afternoon round reminds again about what's still open today or late.
+    const afternoon = await runSchedule(t.db, at(today, "16:30"));
+    expect(afternoon.reminders).toBe(3);
+    const pm = (await inbox(ws, staff)).items.filter((a) => a.kind === "task.reminder" || a.kind === "task.overdue");
+    expect(pm.filter((a) => a.body === "Old one")).toHaveLength(2);
+    expect(pm.some((a) => a.title === "Still open, due today")).toBe(true);
+    expect((await runSchedule(t.db, at(today, "16:45"))).reminders).toBe(0);
 
     // Evening: owners and managers get the team's day.
     const evening = await runSchedule(t.db, at(today, "19:15"));
@@ -237,6 +250,60 @@ describe("scheduled alerts", () => {
     await t.db.query(`DELETE FROM notifications WHERE workspace_id = $1 AND kind = 'digest.evening'`, [ws]);
     const tooLate = await runSchedule(t.db, at(today, "23:30"));
     expect(tooLate.evening).toBe(0);
+  });
+});
+
+describe("task reminders", () => {
+  it("reminds the day before, keeps reminding while late, and nudges undated tasks every few days", async () => {
+    const { owner, staff, ws, ids } = await team("827");
+    const today = day(0);
+    const make = (body: Record<string, unknown>, token = owner) => call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/tasks`, { token, body });
+    await make({ title: "Confirm the band", assigneeId: ids.staff, dueDate: day(1) });
+    await make({ title: "Next week's job", assigneeId: ids.staff, dueDate: day(7) });
+    const undated = await make({ title: "Sort the props cupboard", assigneeId: ids.staff });
+    const fresh = await make({ title: "Brand new idea", assigneeId: ids.staff });
+    const stuck = await make({ title: "Get the tent quote", assigneeId: ids.staff, dueDate: day(-2) });
+    await call(t.app, "POST", `/workspaces/${ws}/tasks/${stuck.body.data.id}/move`, { token: staff, body: { status: "waiting", reason: "Vendor not answering" } });
+    // The owner's own task is reminded too.
+    await make({ title: "Pay the venue deposit", dueDate: today });
+    // Open for exactly three days.
+    await t.db.query(`UPDATE tasks SET created_at = now() - interval '3 days' WHERE id = $1`, [undated.body.data.id]);
+    await t.db.query(`UPDATE tasks SET created_at = now() - interval '1 day' WHERE id = $1`, [fresh.body.data.id]);
+
+    await runSchedule(t.db, at(today, "09:00"));
+    const mine = (await inbox(ws, staff)).items.filter((a) => a.kind === "task.reminder" || a.kind === "task.overdue");
+    expect(mine.map((a) => `${a.title} | ${a.body}`).sort()).toEqual([
+      "Due tomorrow | Confirm the band",
+      "Late by 2 days: still not done | Get the tent quote · stuck: Vendor not answering",
+      "Still pending | Sort the props cupboard · open for 3 days",
+    ]);
+    const ownerBox = (await inbox(ws, owner)).items.filter((a) => a.kind === "task.reminder");
+    expect(ownerBox.map((a) => `${a.title} | ${a.body}`)).toEqual(["Due today | Pay the venue deposit"]);
+
+    // Done: no more reminders about it.
+    await call(t.app, "POST", `/workspaces/${ws}/tasks/${stuck.body.data.id}/done`, { token: staff, body: { done: true } });
+    await runSchedule(t.db, at(today, "16:30"));
+    const after = (await inbox(ws, staff)).items.filter((a) => a.kind === "task.overdue");
+    expect(after).toHaveLength(1);
+
+    // Switching reminders off in alert settings stops them.
+    await call(t.app, "PUT", `/workspaces/${ws}/notifications/prefs`, { token: owner, body: { off: ["reminders"], push: true, quietFrom: null, quietTo: null } });
+    await t.db.query(`DELETE FROM job_runs WHERE workspace_id = $1`, [ws]);
+    await t.db.query(`DELETE FROM notifications WHERE workspace_id = $1 AND user_id = $2`, [ws, ids.owner]);
+    await runSchedule(t.db, at(day(1), "09:00"));
+    expect((await inbox(ws, owner)).items.filter((a) => a.kind === "task.reminder" || a.kind === "task.overdue")).toHaveLength(0);
+  });
+
+  it("sends no more than five reminders a round per person, most urgent first", async () => {
+    const { owner, staff, ws, ids } = await team("828");
+    const today = day(0);
+    for (let i = 1; i <= 7; i++) {
+      await call(t.app, "POST", `/workspaces/${ws}/tasks`, { token: owner, body: { title: `Late task ${i}`, assigneeId: ids.staff, dueDate: day(-i) } });
+    }
+    const run = await runSchedule(t.db, at(today, "09:00"));
+    expect(run.reminders).toBe(5);
+    const titles = (await inbox(ws, staff)).items.filter((a) => a.kind === "task.overdue").map((a) => a.body);
+    expect(titles.sort()).toEqual(["Late task 3", "Late task 4", "Late task 5", "Late task 6", "Late task 7"]);
   });
 });
 

@@ -1,12 +1,13 @@
 "use client";
 
 import { can } from "@wedding-yantra/core";
-import { CalendarDays, ChevronDown, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronDown, ClipboardList, Database, House, IndianRupee, Inbox, Menu, Sun, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { MONEY_SECTIONS, moneySectionOf } from "@/components/money/money-page";
 import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
+import { taskSectionOf, taskSections } from "./task-sections";
 import { cn } from "@/lib/cn";
 import { AlertBell } from "./alert-bell";
 import { BusinessMark } from "./business-mark";
@@ -55,7 +56,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active = isActive(pathname, href);
             if (href === "/app/money" && can(workspace.role, "finance.view"))
               return <NavGroup key={href} label={label} icon={Icon} href={href} sections={MONEY_SECTIONS} current={moneySectionOf(pathname)} active={active} />;
-            return <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
+            const link = <NavLink key={href} href={href} label={label} icon={Icon} active={active} />;
+            if (href !== "/app/events" || !can(workspace.role, "tasks.work")) return link;
+            // Tasks come right after Events: a group for those who give tasks, one link for everyone else.
+            const tasks = taskSections(workspace.role);
+            return (
+              <Fragment key={href}>
+                {link}
+                {tasks.length > 1 ? (
+                  <NavGroup
+                    label="Team Task Management"
+                    icon={ClipboardList}
+                    href="/app/tasks"
+                    sections={tasks}
+                    current={taskSectionOf(pathname)}
+                    active={taskSectionOf(pathname) !== null}
+                  />
+                ) : (
+                  <NavLink href="/app/tasks" label="My tasks" icon={ClipboardList} active={taskSectionOf(pathname) !== null} />
+                )}
+              </Fragment>
+            );
           })}
           <NavGroup
             label="Master data"
@@ -80,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             href="/app/more"
             label="More"
             icon={Menu}
-            active={isActive(pathname, "/app/more") && !inMasterData(pathname) && !pathname.startsWith("/app/my-day") && !pathname.startsWith("/app/notifications")}
+            active={isActive(pathname, "/app/more") && !inMasterData(pathname) && taskSectionOf(pathname) === null && !pathname.startsWith("/app/my-day") && !pathname.startsWith("/app/notifications")}
           />
         </div>
       </aside>

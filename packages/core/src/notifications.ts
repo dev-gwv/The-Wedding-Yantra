@@ -9,6 +9,7 @@ export const NOTIFICATION_KINDS = [
   "task.assigned",
   "task.due_soon",
   "task.overdue",
+  "task.reminder",
   "task.submitted",
   "task.approved",
   "task.sent_back",
@@ -26,7 +27,12 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 /** What people switch on and off: a handful of plain groups, not every kind. */
 export const NOTIFICATION_GROUPS = [
   { key: "assigned", label: "New tasks for you", about: "When someone gives you a task", kinds: ["task.assigned"] },
-  { key: "reminders", label: "Due soon and late", about: "An hour before a task's time, and the morning after it's missed", kinds: ["task.due_soon", "task.overdue"] },
+  {
+    key: "reminders",
+    label: "Reminders until it's done",
+    about: "The day before and on the day a task is due, morning and afternoon while it's late, an hour before its time, and every few days for open tasks with no date",
+    kinds: ["task.due_soon", "task.overdue", "task.reminder"],
+  },
   { key: "checks", label: "Hand-ins and checks", about: "Work handed in to you, and your work approved or sent back", kinds: ["task.submitted", "task.approved", "task.sent_back"] },
   { key: "updates", label: "Finished and stuck", about: "When a task you gave is done, or someone is stuck on it", kinds: ["task.done", "task.stuck"] },
   { key: "talk", label: "Comments and mentions", about: "Comments on your tasks, and when someone @mentions you", kinds: ["task.commented", "task.mentioned"] },
@@ -95,6 +101,37 @@ export function taskAlertText(kind: NotificationKind, f: TaskAlertFacts): { titl
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Where an open task stands, for a reminder. */
+export type ReminderState = "due_tomorrow" | "due_today" | "late" | "pending";
+
+export interface ReminderFacts {
+  title: string;
+  state: ReminderState;
+  /** Morning or afternoon round */
+  slot: "am" | "pm";
+  daysLate?: number;
+  /** Open this many days, for a task with no date */
+  ageDays?: number;
+  /** Stuck on something: say what, so the reminder isn't just nagging */
+  stuckReason?: string | null;
+}
+
+/** A reminder about one open task, repeated until it's done. */
+export function taskReminderText(f: ReminderFacts): { title: string; body: string } {
+  const t = clip(f.title, 90);
+  const stuck = f.stuckReason ? ` · stuck: ${clip(f.stuckReason, 80)}` : "";
+  switch (f.state) {
+    case "due_tomorrow":
+      return { title: "Due tomorrow", body: `${t}${stuck}` };
+    case "due_today":
+      return { title: f.slot === "am" ? "Due today" : "Still open, due today", body: `${t}${stuck}` };
+    case "late":
+      return { title: `Late by ${plural(f.daysLate ?? 1, "day")}: still not done`, body: `${t}${stuck}` };
+    default:
+      return { title: "Still pending", body: `${t} · open for ${plural(f.ageDays ?? 0, "day")}${stuck}` };
+  }
+}
 
 export interface MorningFacts {
   late: number;

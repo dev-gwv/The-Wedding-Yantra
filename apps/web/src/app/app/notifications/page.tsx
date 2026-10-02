@@ -40,6 +40,7 @@ const KIND_ICON: Record<NotificationKind, { icon: LucideIcon; tone: string }> = 
   "task.assigned": { icon: ClipboardList, tone: "bg-sun-50 text-brand-strong" },
   "task.due_soon": { icon: AlarmClock, tone: "bg-sun-50 text-brand-strong" },
   "task.overdue": { icon: TriangleAlert, tone: "bg-danger-soft text-danger" },
+  "task.reminder": { icon: BellRing, tone: "bg-sun-50 text-brand-strong" },
   "task.submitted": { icon: Upload, tone: "bg-[#EEF2FF] text-[#4338CA]" },
   "task.approved": { icon: CircleCheck, tone: "bg-success-soft text-success" },
   "task.sent_back": { icon: Undo2, tone: "bg-warning-soft text-warning" },

@@ -169,7 +169,7 @@ function PersonCard({ person }: { person: PersonScore }) {
         </ul>
       )}
       {person.lateNow > 0 && (
-        <Link href="/app/tasks?view=team" className="mt-4 inline-flex rounded-full bg-danger-soft px-3 py-1 text-xs font-bold text-danger">
+        <Link href="/app/tasks/team" className="mt-4 inline-flex rounded-full bg-danger-soft px-3 py-1 text-xs font-bold text-danger">
           {person.lateNow} task{person.lateNow === 1 ? "" : "s"} late right now
         </Link>
       )}

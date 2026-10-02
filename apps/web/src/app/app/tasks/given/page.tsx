@@ -4,10 +4,10 @@ import { Suspense } from "react";
 import { TasksScreen } from "@/components/tasks/tasks-screen";
 import { Splash } from "@/components/ui/spinner";
 
-export default function TasksMinePage() {
+export default function TasksGivenPage() {
   return (
     <Suspense fallback={<Splash />}>
-      <TasksScreen tab="mine" />
+      <TasksScreen tab="given" />
     </Suspense>
   );
 }

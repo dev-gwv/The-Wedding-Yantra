@@ -640,7 +640,7 @@ describe("delegation rules", () => {
   });
 });
 
-import { dayReportText, eveningDigestText, groupOf, inQuietHours, morningDigestText, taskAlertText } from "./notifications.js";
+import { dayReportText, eveningDigestText, groupOf, inQuietHours, morningDigestText, taskAlertText, taskReminderText } from "./notifications.js";
 
 describe("alerts", () => {
   it("quiet hours cross midnight", () => {
@@ -656,6 +656,13 @@ describe("alerts", () => {
     expect(groupOf("test")).toBeNull();
   });
   it("words task alerts", () => {
+    expect(taskReminderText({ title: "Album", state: "late", slot: "pm", daysLate: 3, stuckReason: "Waiting for photos" })).toEqual({
+      title: "Late by 3 days: still not done",
+      body: "Album · stuck: Waiting for photos",
+    });
+    expect(taskReminderText({ title: "Album", state: "due_today", slot: "pm" }).title).toBe("Still open, due today");
+    expect(taskReminderText({ title: "Props", state: "pending", slot: "am", ageDays: 6 }).body).toBe("Props · open for 6 days");
+    expect(groupOf("task.reminder")).toBe("reminders");
     expect(taskAlertText("task.assigned", { who: "Rohit Sharma", title: "Album layout" })).toEqual({ title: "New task from Rohit", body: "Album layout" });
     expect(taskAlertText("task.sent_back", { who: "Anu", title: "Album", reason: "Warmer colours" }).body).toBe("Album: Warmer colours");
     expect(taskAlertText("task.due_soon", { title: "Call florist", dueTime: "17:00" }).title).toBe("Due at 5 pm");

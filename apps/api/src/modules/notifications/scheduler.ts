@@ -1,4 +1,4 @@
-import { eveningDigestText, morningDigestText, taskAlertText } from "@wedding-yantra/core";
+import { eveningDigestText, morningDigestText, taskAlertText, taskReminderText, type ReminderState } from "@wedding-yantra/core";
 import type { Queryable } from "../../db.js";
 import { awardStreaks } from "../review/points.js";
 import { makeDueRepeats } from "../tasks/repeats.js";
@@ -16,7 +16,9 @@ export const SCHEDULE = {
   /** Streak points for the seven days up to yesterday */
   streak: { from: "00:10", until: "06:00" },
   morning: { from: "08:00", until: "11:00" },
-  overdue: { from: "08:05", until: "12:00" },
+  /** Reminders for every open task until it's done: a morning round and an afternoon round */
+  remindAm: { from: "08:05", until: "12:00" },
+  remindPm: { from: "16:00", until: "19:00" },
   evening: { from: "19:00", until: "22:00" },
 } as const;
 type Job = keyof typeof SCHEDULE;
@@ -27,14 +29,15 @@ const LIVE_EVENT = "(t.event_id IS NULL OR EXISTS (SELECT 1 FROM events e WHERE 
 export interface ScheduleResult {
   dueSoon: number;
   morning: number;
-  overdue: number;
+  /** Task reminders sent (due tomorrow, due today, late, long open) */
+  reminders: number;
   evening: number;
   /** Streak points paid */
   streak: number;
 }
 
 export async function runSchedule(db: Queryable, now: Date = new Date()): Promise<ScheduleResult> {
-  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), morning: 0, overdue: 0, evening: 0, streak: 0 };
+  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), morning: 0, reminders: 0, evening: 0, streak: 0 };
   const { rows } = await db.query<{ id: string; clock: string; today: string }>(
     `SELECT id, to_char($1::timestamptz AT TIME ZONE timezone, 'HH24:MI') AS clock, ($1::timestamptz AT TIME ZONE timezone)::date::text AS today
        FROM workspaces WHERE deleted_at IS NULL`,
@@ -46,7 +49,7 @@ export async function runSchedule(db: Queryable, now: Date = new Date()): Promis
       if (ws.clock < from || ws.clock >= until) continue;
       if (!(await claim(db, job, ws.id, ws.today))) continue;
       if (job === "morning") result.morning += await morning(db, ws.id, ws.today);
-      else if (job === "overdue") result.overdue += await overdue(db, ws.id, ws.today);
+      else if (job === "remindAm" || job === "remindPm") result.reminders += await reminders(db, ws.id, ws.today, job === "remindAm" ? "am" : "pm");
       else if (job === "streak") result.streak += await awardStreaks(db, ws.id, ws.today, now);
       else result.evening += await evening(db, ws.id, ws.today);
     }
@@ -130,27 +133,72 @@ async function morning(db: Queryable, workspaceId: string, today: string): Promi
   return notify(db, items);
 }
 
-/** The morning after a task was due and not finished, to whoever it's for. Once per task and date. */
-async function overdue(db: Queryable, workspaceId: string, today: string): Promise<number> {
-  const { rows } = await db.query<{ id: string; assignee_id: string; title: string; due_date: string }>(
-    `SELECT t.id, t.assignee_id, t.title, t.due_date::text AS due_date FROM tasks t
-      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND ${OPEN} AND t.assignee_id IS NOT NULL
-        AND t.due_date = $2::date - 1 AND ${LIVE_EVENT}`,
+/** At most this many reminders per person per round, most urgent first: the rest are on My day. */
+const REMINDERS_PER_ROUND = 5;
+/** A task with no date is mentioned again every this many days while it's open. */
+const NO_DATE_EVERY = 3;
+
+const STATE_RANK: Record<ReminderState, number> = { late: 0, due_today: 1, due_tomorrow: 2, pending: 3 };
+
+/**
+ * Reminders until it's done, to whoever the task is for (the owner too, for their own):
+ * due tomorrow (morning), due today (morning and afternoon), late (morning and afternoon,
+ * every day, with how many days), and no date (every few days). Not on a day off.
+ */
+async function reminders(db: Queryable, workspaceId: string, today: string, slot: "am" | "pm"): Promise<number> {
+  const { rows } = await db.query<{
+    id: string;
+    assignee_id: string;
+    title: string;
+    due_date: string | null;
+    days_late: number | null;
+    age: number;
+    status: string;
+    waiting_reason: string | null;
+    priority: string;
+  }>(
+    `SELECT t.id, t.assignee_id, t.title, t.due_date::text AS due_date, ($2::date - t.due_date) AS days_late,
+            ($2::date - (t.created_at AT TIME ZONE w.timezone)::date) AS age, t.status, t.waiting_reason, t.priority
+       FROM tasks t JOIN workspaces w ON w.id = t.workspace_id
+      WHERE t.workspace_id = $1 AND t.deleted_at IS NULL AND ${OPEN} AND t.assignee_id IS NOT NULL AND ${LIVE_EVENT}
+        AND (t.due_date IS NULL OR t.due_date <= $2::date + 1)
+        AND EXISTS (SELECT 1 FROM memberships m WHERE m.workspace_id = $1 AND m.user_id = t.assignee_id AND m.removed_at IS NULL)
+        AND NOT EXISTS (SELECT 1 FROM time_off o WHERE o.workspace_id = $1 AND o.user_id = t.assignee_id AND o.deleted_at IS NULL
+                         AND $2::date BETWEEN o.start_date AND o.end_date)`,
     [workspaceId, today],
   );
-  return notify(
-    db,
-    rows.map((t) => ({
-      workspaceId,
-      userId: t.assignee_id,
-      kind: "task.overdue" as const,
-      ...taskAlertText("task.overdue", { title: t.title }),
-      link: `/app/tasks?open=${t.id}`,
-      entityType: "task",
-      entityId: t.id,
-      dedupeKey: `overdue:${t.id}:${t.due_date}`,
-    })),
-  );
+  const due = rows.flatMap((t) => {
+    let state: ReminderState;
+    if (t.due_date === null) {
+      if (slot !== "am" || t.age < NO_DATE_EVERY || t.age % NO_DATE_EVERY !== 0) return [];
+      state = "pending";
+    } else if (t.days_late! > 0) state = "late";
+    else if (t.days_late === 0) state = "due_today";
+    else if (slot === "am") state = "due_tomorrow";
+    else return [];
+    return [{ t, state }];
+  });
+  const rank = (p: string) => (p === "urgent" ? 0 : p === "high" ? 1 : p === "normal" ? 2 : 3);
+  due.sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || (b.t.days_late ?? 0) - (a.t.days_late ?? 0) || rank(a.t.priority) - rank(b.t.priority));
+  const perPerson = new Map<string, number>();
+  const items = due.flatMap(({ t, state }) => {
+    const n = perPerson.get(t.assignee_id) ?? 0;
+    if (n >= REMINDERS_PER_ROUND) return [];
+    perPerson.set(t.assignee_id, n + 1);
+    return [
+      {
+        workspaceId,
+        userId: t.assignee_id,
+        kind: state === "late" ? ("task.overdue" as const) : ("task.reminder" as const),
+        ...taskReminderText({ title: t.title, state, slot, daysLate: t.days_late ?? undefined, ageDays: t.age, stuckReason: t.status === "waiting" ? t.waiting_reason : null }),
+        link: `/app/tasks?open=${t.id}`,
+        entityType: "task",
+        entityId: t.id,
+        dedupeKey: `remind:${t.id}:${today}:${slot}`,
+      },
+    ];
+  });
+  return notify(db, items);
 }
 
 /** The team's day for owners and managers: done, late by person, stuck, waiting for a check. */
@@ -185,7 +233,7 @@ async function evening(db: Queryable, workspaceId: string, today: string): Promi
       userId: b.user_id,
       kind: "digest.evening" as const,
       ...text,
-      link: "/app/tasks?view=team",
+      link: "/app/tasks/team",
       dedupeKey: `evening:${workspaceId}:${today}`,
     })),
   );
