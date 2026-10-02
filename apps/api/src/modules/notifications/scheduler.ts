@@ -2,6 +2,7 @@ import { eveningDigestText, morningDigestText, taskAlertText, taskReminderText, 
 import type { Queryable } from "../../db.js";
 import { loadAccess } from "../auth/access.js";
 import { awardStreaks } from "../review/points.js";
+import { enquiryLine, salesAlert } from "../sales/alerts.js";
 import { makeDueRepeats } from "../tasks/repeats.js";
 import { notify } from "./service.js";
 
@@ -29,6 +30,8 @@ const LIVE_EVENT = "(t.event_id IS NULL OR EXISTS (SELECT 1 FROM events e WHERE 
 
 export interface ScheduleResult {
   dueSoon: number;
+  /** "Follow-up due" alerts sent for leads */
+  followUps: number;
   morning: number;
   /** Task reminders sent (due tomorrow, due today, late, long open) */
   reminders: number;
@@ -38,7 +41,7 @@ export interface ScheduleResult {
 }
 
 export async function runSchedule(db: Queryable, now: Date = new Date()): Promise<ScheduleResult> {
-  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), morning: 0, reminders: 0, evening: 0, streak: 0 };
+  const result: ScheduleResult = { dueSoon: await dueSoon(db, now), followUps: await followUps(db, now), morning: 0, reminders: 0, evening: 0, streak: 0 };
   const { rows } = await db.query<{ id: string; clock: string; today: string }>(
     `SELECT id, to_char($1::timestamptz AT TIME ZONE timezone, 'HH24:MI') AS clock, ($1::timestamptz AT TIME ZONE timezone)::date::text AS today
        FROM workspaces WHERE deleted_at IS NULL`,
@@ -92,6 +95,45 @@ async function dueSoon(db: Queryable, now: Date): Promise<number> {
       dedupeKey: `due:${t.id}:${t.due_date} ${t.due_time}`,
     })),
   );
+}
+
+/**
+ * When a lead's follow-up time arrives, to whoever has the lead (the owner if nobody does).
+ * Open leads only. `follow_up_alerted_for` remembers which follow-up time was alerted, so
+ * each one goes out once, and moving the follow-up alerts again at the new time.
+ */
+async function followUps(db: Queryable, now: Date): Promise<number> {
+  const { rows } = await db.query<{ id: string; workspace_id: string; name: string; assigned_to: string | null; at: Date; event_type: string | null; city: string | null }>(
+    `SELECT l.id, l.workspace_id, l.name, l.assigned_to, l.next_follow_up_at AS at, l.event_type, l.city
+       FROM leads l
+       JOIN pipeline_stages s ON s.id = l.stage_id AND s.kind = 'open'
+       JOIN workspaces w ON w.id = l.workspace_id AND w.deleted_at IS NULL
+      WHERE l.deleted_at IS NULL AND l.next_follow_up_at <= $1
+        AND l.follow_up_alerted_for IS DISTINCT FROM l.next_follow_up_at
+      ORDER BY l.next_follow_up_at LIMIT 500`,
+    [now],
+  );
+  let sent = 0;
+  for (const l of rows) {
+    sent += await salesAlert(db, {
+      workspaceId: l.workspace_id,
+      kind: "lead.follow_up",
+      to: [l.assigned_to],
+      facts: { name: l.name, detail: enquiryLine({ eventType: l.event_type, city: l.city }) || null },
+      link: `/app/leads/${l.id}`,
+      entityType: "lead",
+      entityId: l.id,
+      dedupeKey: `follow_up:${l.id}:${l.at.toISOString()}`,
+    });
+  }
+  // Marks the time that was alerted, not whatever it is now: a follow-up moved meanwhile still alerts.
+  if (rows.length) {
+    await db.query(
+      `UPDATE leads l SET follow_up_alerted_for = v.at FROM unnest($1::uuid[], $2::timestamptz[]) AS v(id, at) WHERE l.id = v.id`,
+      [rows.map((l) => l.id), rows.map((l) => l.at)],
+    );
+  }
+  return sent;
 }
 
 /** "Your day" for everyone who works tasks and has something on, unless they're off today. */

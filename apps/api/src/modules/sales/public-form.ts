@@ -1,11 +1,20 @@
 import type { PublicLeadForm } from "@wedding-yantra/types";
 import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { AppError, notFound } from "../../lib/http.js";
+import { enquiryLine, salesAlert } from "./alerts.js";
 import { firstOpenStage } from "./leads.js";
 import { findPartnerByCode } from "./partners.js";
 import { logoPath } from "../files/logo.js";
 
 const MAX_PER_IP_PER_HOUR = 10;
+
+/**
+ * The last 10 digits of a number: how a repeat enquiry finds its lead, and how the
+ * "already on file" check matches, whether it was typed with +91, a 0 or spaces.
+ */
+export const phoneKey = (phone: string) => phone.replace(/\D/g, "").slice(-10);
+/** The same, worked out in SQL on a phone column. */
+export const phoneKeySql = (column: string) => `right(regexp_replace(${column}, '\\D', '', 'g'), 10)`;
 
 interface FormRow {
   workspace_id: string;
@@ -96,18 +105,29 @@ export async function submitPublicForm(
     await tx.query(`INSERT INTO lead_form_submissions (workspace_id, ip) VALUES ($1, $2)`, [form.workspace_id, ip]);
     const note = [input.message, input.eventDate ? `Event date: ${input.eventDate}` : null].filter(Boolean).join("\n");
 
-    const existing = await tx.query<{ id: string }>(
-      `SELECT l.id FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id
-        WHERE l.workspace_id = $1 AND l.phone = $2 AND l.deleted_at IS NULL AND s.kind = 'open'
+    const existing = await tx.query<{ id: string; name: string; assigned_to: string | null }>(
+      `SELECT l.id, l.name, l.assigned_to FROM leads l JOIN pipeline_stages s ON s.id = l.stage_id
+        WHERE l.workspace_id = $1 AND ${phoneKeySql("l.phone")} = $2 AND l.deleted_at IS NULL AND s.kind = 'open'
           AND l.created_at > now() - interval '1 day'
         ORDER BY l.created_at DESC LIMIT 1`,
-      [form.workspace_id, input.phone],
+      [form.workspace_id, phoneKey(input.phone)],
     );
-    if (existing.rows[0]) {
+    const lead = existing.rows[0];
+    if (lead) {
       await tx.query(
         `INSERT INTO lead_activities (workspace_id, lead_id, kind, body, meta) VALUES ($1, $2, 'note', $3, $4)`,
-        [form.workspace_id, existing.rows[0].id, note || "Sent the enquiry form again", { via: "enquiry_form" }],
+        [form.workspace_id, lead.id, note || "Sent the enquiry form again", { via: "enquiry_form" }],
       );
+      // Whoever has the lead hears they asked again, once for this submission.
+      await salesAlert(tx, {
+        workspaceId: form.workspace_id,
+        kind: "lead.new",
+        to: [lead.assigned_to],
+        facts: { name: lead.name, again: true, detail: input.message || enquiryLine(input) || "Sent the enquiry form again" },
+        link: `/app/leads/${lead.id}`,
+        entityType: "lead",
+        entityId: lead.id,
+      });
       return;
     }
 
@@ -118,8 +138,8 @@ export async function submitPublicForm(
     const stage = await firstOpenStage(tx, form.workspace_id);
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO leads (workspace_id, stage_id, name, phone, event_type, event_date, city, requirements,
-                          source, referred_by, referred_by_client_id, partner_id, assigned_to, next_follow_up_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
+                          source, referred_by, referred_by_client_id, partner_id, assigned_to, next_follow_up_at, follow_up_alerted_for)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), now())
        RETURNING id`,
       [
         form.workspace_id,
@@ -154,6 +174,20 @@ export async function submitPublicForm(
       `INSERT INTO lead_activities (workspace_id, lead_id, kind, meta) VALUES ($1, $2, 'follow_up_set', jsonb_build_object('at', now()))`,
       [form.workspace_id, rows[0]!.id],
     );
+    // Whoever has it (the owner) hears about it. This also counts as the alert for that first
+    // follow-up (`follow_up_alerted_for` above), so the follow-up job doesn't send a second one.
+    await salesAlert(tx, {
+      workspaceId: form.workspace_id,
+      kind: "lead.new",
+      to: [form.owner_id],
+      facts: {
+        name: input.name,
+        detail: enquiryLine(input, partner ? `via ${partner.name}` : referrer ? `recommended by ${referrer.name}` : null),
+      },
+      link: `/app/leads/${rows[0]!.id}`,
+      entityType: "lead",
+      entityId: rows[0]!.id,
+    });
   });
   return { received: true };
 }

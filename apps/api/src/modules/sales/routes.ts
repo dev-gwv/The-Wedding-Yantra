@@ -5,6 +5,7 @@ import {
   createLeadInput,
   leadListQuery,
   partnerInput,
+  phoneMatchQuery,
   saveStagesInput,
   submitLeadFormInput,
   templateInput,
@@ -20,6 +21,7 @@ import { requireMember } from "../auth/guard.js";
 import * as clients from "./clients.js";
 import * as leads from "./leads.js";
 import * as partners from "./partners.js";
+import * as phoneMatch from "./phone-match.js";
 import * as publicForm from "./public-form.js";
 import * as settings from "./settings.js";
 
@@ -66,6 +68,13 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
     const id = assertId(request.params.id, "This lead");
     const lead = await leads.addActivity(db, ctx, id, parse(addActivityInput, request.body));
     return reply.status(201).send(ok(lead));
+  });
+
+  /** Who already has this number, before someone adds them again. */
+  app.get<Ws>("/workspaces/:workspaceId/phone-match", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const { phone } = parse(phoneMatchQuery, request.query);
+    return ok(await phoneMatch.phoneMatch(db, ctx, phone));
   });
 
   // ---- Sales stages ---------------------------------------------------------

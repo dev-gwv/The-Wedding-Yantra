@@ -14,6 +14,7 @@ import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
+import { salesAlert } from "../sales/alerts.js";
 import { scopeCondition, upsertClientForLead } from "../sales/leads.js";
 import { logoPath } from "../files/logo.js";
 
@@ -582,11 +583,32 @@ export async function getPublicQuote(db: Db, token: string): Promise<PublicQuote
   };
 }
 
+/**
+ * The client answered a quote online: whoever made it and whoever has the lead hear about
+ * it (the owner when there's nobody). Only the first answer alerts; pressing again doesn't.
+ */
+async function quoteAnswered(tx: Queryable, quote: QuoteRow, kind: "quote.accepted" | "quote.declined", reason: string | null = null) {
+  const { rows } = await tx.query<{ created_by: string | null; assigned_to: string | null }>(
+    `SELECT q.created_by, l.assigned_to FROM quotes q LEFT JOIN leads l ON l.id = q.lead_id WHERE q.id = $1`,
+    [quote.id],
+  );
+  await salesAlert(tx, {
+    workspaceId: quote.workspace_id,
+    kind,
+    to: [rows[0]?.created_by, rows[0]?.assigned_to],
+    facts: { name: quote.customer_name, detail: `${quoteNumber(quote.number)} · ${quote.title}`, reason },
+    link: `/app/quotes/${quote.id}`,
+    entityType: "quote",
+    entityId: quote.id,
+  });
+}
+
 export async function acceptPublicQuote(db: Db, token: string, name: string): Promise<PublicQuote> {
   await withTransaction(db, async (tx) => {
     const row = await loadByToken(tx, token, true);
     if (row.expired) throw new AppError(410, "QUOTE_EXPIRED", "This quote has expired. Please ask for a new one.");
     await book(tx, row, name, null);
+    if (row.status !== "accepted") await quoteAnswered(tx, row, "quote.accepted");
   });
   return getPublicQuote(db, token);
 }
@@ -595,6 +617,7 @@ export async function declinePublicQuote(db: Db, token: string, reason: string |
   await withTransaction(db, async (tx) => {
     const row = await loadByToken(tx, token, true);
     await decline(tx, row, reason, null);
+    if (row.status !== "declined") await quoteAnswered(tx, row, "quote.declined", reason);
   });
   return getPublicQuote(db, token);
 }

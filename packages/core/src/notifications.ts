@@ -110,6 +110,35 @@ export function taskAlertText(kind: NotificationKind, f: TaskAlertFacts): { titl
   }
 }
 
+export interface SalesAlertFacts {
+  /** The enquiry's or the client's name */
+  name: string;
+  /** A line under it: where the enquiry came from, or which quote */
+  detail?: string | null;
+  /** The same number enquiring again, added to their open lead */
+  again?: boolean;
+  /** For a declined quote: why */
+  reason?: string | null;
+}
+
+/** The title and line for an enquiry or quote alert. */
+export function salesAlertText(kind: NotificationKind, f: SalesAlertFacts): { title: string; body: string } {
+  const name = clip(f.name.trim() || "Someone", 60);
+  const detail = f.detail ? clip(f.detail) : "";
+  switch (kind) {
+    case "lead.new":
+      return { title: f.again ? `Enquired again: ${name}` : `New enquiry: ${name}`, body: detail };
+    case "lead.follow_up":
+      return { title: `Follow-up due: ${name}`, body: detail || "Time to get back to them" };
+    case "quote.accepted":
+      return { title: `Quote accepted by ${name}`, body: detail };
+    case "quote.declined":
+      return { title: `Quote declined by ${name}`, body: f.reason ? `${detail ? `${detail}: ` : ""}${clip(f.reason)}` : detail };
+    default:
+      return { title: name, body: detail };
+  }
+}
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** Where an open task stands, for a reminder. */

@@ -1,4 +1,4 @@
-import { can, leadScope } from "@wedding-yantra/core";
+import { can, firstName, leadScope } from "@wedding-yantra/core";
 import type {
   FollowUpState,
   Lead,
@@ -14,6 +14,7 @@ import { AppError, forbidden, notFound } from "../../lib/http.js";
 import { memberAccess } from "../auth/access.js";
 import type { MemberContext } from "../auth/guard.js";
 import { writeCustom } from "../fields/service.js";
+import { enquiryLine, salesAlert } from "./alerts.js";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -381,6 +382,20 @@ export async function createLead(db: Db, ctx: MemberContext, input: LeadFields):
     await addActivityRow(tx, ctx, id, "created", null, { source: input.source ?? "other" });
     // The first follow-up counts like any other (for "follow-ups kept").
     if (input.nextFollowUpAt) await addActivityRow(tx, ctx, id, "follow_up_set", null, { at: input.nextFollowUpAt });
+    // Given to someone else: they hear about it. Your own lead needs no alert.
+    if (assignee && assignee !== ctx.userId) {
+      const who = (await tx.query<{ name: string | null }>(`SELECT name FROM users WHERE id = $1`, [ctx.userId])).rows[0]?.name;
+      await salesAlert(tx, {
+        workspaceId: ctx.workspaceId,
+        kind: "lead.new",
+        to: [assignee],
+        facts: { name: input.name ?? "", detail: enquiryLine(input, who ? `from ${firstName(who)}` : null) },
+        link: `/app/leads/${id}`,
+        entityType: "lead",
+        entityId: id,
+        actorId: ctx.userId,
+      });
+    }
     return getLead(tx, ctx, id);
   });
 }
