@@ -30,6 +30,10 @@ export interface Member {
   designation: string | null;
   /** The designation's name */
   designationLabel: string | null;
+  /** A key from the business's "department" list: how the team is organised, not what they can see */
+  department: string | null;
+  /** The department's name */
+  departmentLabel: string | null;
   employmentType: EmploymentType | null;
 }
 
@@ -80,6 +84,7 @@ const optionalUpper = (pattern: RegExp, message: string) =>
 export const employeeDetailsInput = z
   .object({
     designation: z.string().trim().max(40).nullable().optional().transform(blankToNull),
+    department: z.string().trim().max(40).nullable().optional().transform(blankToNull),
     employmentType: z.enum(EMPLOYMENT_TYPES).nullable().optional(),
     joinedOn: z
       .union([z.literal(""), z.iso.date("Pick a valid date")])

@@ -57,16 +57,19 @@ interface MemberRow {
   removed_at: Date | null;
   designation: string | null;
   designation_label: string | null;
+  department: string | null;
+  department_label: string | null;
   employment_type: EmploymentType | null;
 }
 
 const MEMBER_SELECT = `
   SELECT m.id, m.user_id, u.name, u.phone, m.role, m.created_at, m.removed_at,
-         d.designation, dl.label AS designation_label, d.employment_type
+         d.designation, dl.label AS designation_label, d.department, dp.label AS department_label, d.employment_type
     FROM memberships m
     JOIN users u ON u.id = m.user_id
     LEFT JOIN member_details d ON d.membership_id = m.id
-    ${optionJoin("dl", "designation", "m.workspace_id", "d.designation")}`;
+    ${optionJoin("dl", "designation", "m.workspace_id", "d.designation")}
+    ${optionJoin("dp", "department", "m.workspace_id", "d.department")}`;
 
 const toMember = (r: MemberRow, ctx: MemberContext): Member => ({
   id: r.id,
@@ -78,6 +81,8 @@ const toMember = (r: MemberRow, ctx: MemberContext): Member => ({
   isYou: r.user_id === ctx.userId,
   designation: r.designation,
   designationLabel: r.designation_label ?? r.designation,
+  department: r.department,
+  departmentLabel: r.department_label ?? r.department,
   employmentType: r.employment_type,
 });
 
@@ -186,6 +191,7 @@ type DetailsInput = { [K in keyof EmployeeDetailsInput]?: EmployeeDetailsInput[K
 
 const DETAIL_COLUMNS: [keyof DetailsInput, string][] = [
   ["designation", "designation"],
+  ["department", "department"],
   ["employmentType", "employment_type"],
   ["joinedOn", "joined_on"],
   ["emergencyName", "emergency_name"],
@@ -201,8 +207,8 @@ const DETAIL_COLUMNS: [keyof DetailsInput, string][] = [
 /** Only the owner changes employee details. Fields left out keep what they had. */
 export async function updateEmployeeDetails(db: Db, ctx: MemberContext, memberId: string, input: DetailsInput): Promise<Employee> {
   if (!can(ctx.role, "members.hr")) throw forbidden("Only the owner can change employee details");
-  const { rows } = await db.query<{ name: string | null; designation: string | null }>(
-    `SELECT u.name, d.designation FROM memberships m JOIN users u ON u.id = m.user_id
+  const { rows } = await db.query<{ name: string | null; designation: string | null; department: string | null }>(
+    `SELECT u.name, d.designation, d.department FROM memberships m JOIN users u ON u.id = m.user_id
        LEFT JOIN member_details d ON d.membership_id = m.id
       WHERE m.id = $1 AND m.workspace_id = $2`,
     [memberId, ctx.workspaceId],
@@ -210,6 +216,7 @@ export async function updateEmployeeDetails(db: Db, ctx: MemberContext, memberId
   const was = rows[0];
   if (!was) throw notFound("This team member");
   if (input.designation) await assertOption(db, ctx.workspaceId, "designation", input.designation, "designation", was.designation);
+  if (input.department) await assertOption(db, ctx.workspaceId, "department", input.department, "department", was.department);
 
   const cols = DETAIL_COLUMNS.filter(([key]) => input[key] !== undefined);
   if (cols.length) {
@@ -422,9 +429,9 @@ export async function acceptInvitation(db: Db, auth: AuthContext, token: string)
     // Someone coming back keeps the details they had last time.
     if (joined.rows[0]) {
       await tx.query(
-        `INSERT INTO member_details (membership_id, workspace_id, designation, employment_type, joined_on, emergency_name,
+        `INSERT INTO member_details (membership_id, workspace_id, designation, department, employment_type, joined_on, emergency_name,
                                      emergency_phone, pay_type, pay_amount, upi_id, bank_account, ifsc, pan)
-         SELECT $3, d.workspace_id, d.designation, d.employment_type, d.joined_on, d.emergency_name,
+         SELECT $3, d.workspace_id, d.designation, d.department, d.employment_type, d.joined_on, d.emergency_name,
                 d.emergency_phone, d.pay_type, d.pay_amount, d.upi_id, d.bank_account, d.ifsc, d.pan
            FROM member_details d JOIN memberships m ON m.id = d.membership_id
           WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NOT NULL

@@ -1,7 +1,7 @@
 import { can, type Role } from "@wedding-yantra/core";
-import { HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { Building2, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
 
-export type MasterKey = "clients" | "employees" | "vendors" | "venues" | "services" | "lists";
+export type MasterKey = "clients" | "employees" | "departments" | "vendors" | "venues" | "services" | "lists";
 
 export interface MasterSection {
   key: MasterKey;
@@ -25,6 +25,7 @@ export function masterSections(role: Role): MasterSection[] {
       paths: ["/app/team"],
       show: true,
     },
+    { key: "departments", label: "Departments", href: "/app/departments", icon: Building2, paths: ["/app/departments"], show: can(role, "members.view") },
     { key: "vendors", label: "Vendors", href: "/app/vendors", icon: HandCoins, paths: ["/app/vendors"], show: can(role, "finance.view") },
     { key: "venues", label: "Venues", href: "/app/venues", icon: MapPin, paths: ["/app/venues"], show: can(role, "events.view") },
     {
@@ -43,6 +44,7 @@ export function masterSections(role: Role): MasterSection[] {
 const MASTER_PATHS: [MasterKey, string][] = [
   ["clients", "/app/clients"],
   ["employees", "/app/team"],
+  ["departments", "/app/departments"],
   ["vendors", "/app/vendors"],
   ["venues", "/app/venues"],
   ["services", "/app/services"],

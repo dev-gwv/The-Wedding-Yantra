@@ -25,7 +25,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; /** On the phone's t
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/partners", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/departments", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/partners", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
 }
@@ -210,7 +210,7 @@ function NavGroup({
       >
         <Link href={href} className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3">
           <Icon className="size-[18px] shrink-0" strokeWidth={2} />
-          <span className="truncate">{label}</span>
+          <span className="truncate tracking-[-0.01em]">{label}</span>
         </Link>
         {!active && (
           <button
@@ -218,12 +218,12 @@ function NavGroup({
             onClick={() => setPeek((p) => !p)}
             aria-expanded={open}
             aria-label={open ? `Hide the parts of ${label}` : `Show the parts of ${label}`}
-            className="mr-1 grid size-7 shrink-0 place-items-center rounded-lg hover:bg-sun-100"
+            className="mr-1 grid size-6 shrink-0 place-items-center rounded-md hover:bg-sun-100"
           >
             <ChevronDown className={cn("size-4 transition", open && "rotate-180")} />
           </button>
         )}
-        {active && <ChevronDown className="mr-3 size-4 shrink-0 rotate-180" aria-hidden />}
+        {active && <ChevronDown className="mr-2 size-4 shrink-0 rotate-180" aria-hidden />}
       </div>
       {open && (
         <ul className="ml-[22px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2" aria-label={label}>

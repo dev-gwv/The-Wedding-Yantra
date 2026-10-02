@@ -2,7 +2,7 @@
 
 import { can } from "@wedding-yantra/core";
 import { useClients, useTeam, useVendors, useVenues } from "@wedding-yantra/api-client/react";
-import { ChevronRight, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { Building2, ChevronRight, HandCoins, MapPin, Package, Tags, Users, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { BackLink } from "@/components/app/back-link";
 import { masterSections } from "@/components/app/master-sections";
@@ -57,6 +57,15 @@ export default function MastersPage() {
       status: "live",
       show: visible.has("employees"),
       count: team.data?.members.length ?? null,
+    },
+    {
+      key: "departments",
+      title: "Departments",
+      about: "How your team is organised: admin, accounts, sales, and any you add",
+      icon: Building2,
+      href: visible.get("departments") ?? null,
+      status: "live",
+      show: visible.has("departments"),
     },
     {
       key: "vendors",

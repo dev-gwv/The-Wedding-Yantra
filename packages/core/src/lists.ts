@@ -5,7 +5,7 @@
  * hidden option still shows its name on the records that use it.
  */
 
-export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category", "designation", "venue_type", "service_category"] as const;
+export const OPTION_LISTS = ["payment_method", "expense_category", "task_tag", "relation", "vendor_category", "designation", "venue_type", "service_category", "department"] as const;
 export type OptionList = (typeof OPTION_LISTS)[number];
 
 export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; about: string }> = {
@@ -17,6 +17,11 @@ export const OPTION_LIST_INFO: Record<OptionList, { title: string; one: string; 
   service_category: { title: "Service categories", one: "category", about: "How your price list is grouped: bridal, party, films, menus, add-ons. Each trade starts with its own." },
   venue_type: { title: "Venue types", one: "venue type", about: "Kinds of places your events happen: banquet hall, hotel, lawn, farmhouse." },
   designation: { title: "Designations", one: "designation", about: "What each person in your team does: photographer, editor, coordinator, driver." },
+  department: {
+    title: "Departments",
+    one: "department",
+    about: "How your team is organised: admin, accounts, sales. A department doesn't change what anyone can see in the app; their role does.",
+  },
 };
 
 export interface OptionSeed {
@@ -92,6 +97,12 @@ export const BUILTIN_OPTIONS: Record<OptionList, OptionSeed[]> = {
   ],
   // Each trade gets its own (see trades.ts); nothing is common to all.
   service_category: [],
+  department: [
+    { key: "admin", label: "Admin" },
+    { key: "accountant", label: "Accountant" },
+    { key: "sales", label: "Sales" },
+    { key: "manager", label: "Manager" },
+  ],
   venue_type: [
     { key: "banquet", label: "Banquet hall" },
     { key: "hotel", label: "Hotel" },

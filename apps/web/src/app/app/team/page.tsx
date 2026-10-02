@@ -27,6 +27,7 @@ export default function TeamPage() {
   const [inviting, setInviting] = useState(false);
   const [share, setShare] = useState<Share | null>(null);
   const [tab, setTab] = useState<"team" | "left">("team");
+  const [dept, setDept] = useState("all");
 
   if (!can(myRole, "members.view")) {
     return (
@@ -47,6 +48,10 @@ export default function TeamPage() {
   const invitations = team.data?.invitations ?? [];
   const former = team.data?.former ?? [];
   const showing = former.length > 0 ? tab : "team";
+  // Department chips: only the departments someone is in, plus anyone not placed yet.
+  const depts = [...new Map(members.filter((m) => m.department).map((m) => [m.department!, m.departmentLabel ?? m.department!])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const unplaced = members.some((m) => !m.department);
+  const shown = dept === "all" ? members : dept === "none" ? members.filter((m) => !m.department) : members.filter((m) => m.department === dept);
 
   return (
     <>
@@ -93,6 +98,26 @@ export default function TeamPage() {
             </div>
           )}
 
+          {showing === "team" && depts.length > 0 && (
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="tablist" aria-label="Department">
+              {[["all", "All departments"] as const, ...depts, ...(unplaced ? ([["none", "No department"]] as const) : [])].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={dept === key}
+                  onClick={() => setDept(key)}
+                  className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-bold", dept === key ? "bg-ink text-surface" : "text-ink-muted hover:bg-cream hover:text-ink")}
+                >
+                  {label}
+                </button>
+              ))}
+              <Link href="/app/departments" className="h-8 shrink-0 px-2 text-[13px] font-bold leading-8 text-brand-strong">
+                Departments
+              </Link>
+            </div>
+          )}
+
           {showing === "left" ? (
             <Card className="divide-y divide-line overflow-hidden">
               {former.map((f) => (
@@ -111,7 +136,7 @@ export default function TeamPage() {
             </Card>
           ) : (
             <Card className="divide-y divide-line overflow-hidden">
-              {members.map((m) => (
+              {shown.map((m) => (
                 <Link key={m.id} href={`/app/team/${m.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-cream">
                   <Avatar name={m.name} />
                   <span className="min-w-0 flex-1">
@@ -120,7 +145,7 @@ export default function TeamPage() {
                       {m.isYou && <span className="font-normal text-ink-muted"> (you)</span>}
                     </span>
                     <span className="block truncate text-sm text-ink-muted tabular">
-                      {[m.designationLabel, m.employmentType && EMPLOYMENT_TYPE_LABELS[m.employmentType], formatPhone(m.phone)].filter(Boolean).join(" · ")}
+                      {[m.departmentLabel, m.designationLabel, m.employmentType && EMPLOYMENT_TYPE_LABELS[m.employmentType], formatPhone(m.phone)].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   <Pill tone={m.role === "owner" ? "brand" : "neutral"}>{ROLE_INFO[m.role].label}</Pill>

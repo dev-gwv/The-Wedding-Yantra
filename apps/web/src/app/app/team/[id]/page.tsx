@@ -53,7 +53,7 @@ export default function EmployeePage() {
               {e.isYou && <span className="text-lg font-bold text-ink-muted"> (you)</span>}
             </h1>
             <p className="text-ink-muted tabular">
-              {[e.designationLabel, e.employmentType && EMPLOYMENT_TYPE_LABELS[e.employmentType], formatPhone(e.phone)].filter(Boolean).join(" · ")}
+              {[e.departmentLabel && `${e.departmentLabel} department`, e.designationLabel, e.employmentType && EMPLOYMENT_TYPE_LABELS[e.employmentType], formatPhone(e.phone)].filter(Boolean).join(" · ")}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               <Pill tone={e.role === "owner" ? "brand" : "neutral"}>{ROLE_INFO[e.role].label}</Pill>
@@ -128,6 +128,7 @@ export default function EmployeePage() {
 
 const isEmpty = (e: Employee) =>
   !e.designation &&
+  !e.department &&
   !e.employmentType &&
   !e.joinedOn &&
   !e.emergency?.name &&
@@ -152,6 +153,7 @@ function WorkCard({ e }: { e: Employee }) {
       <h2 className="mb-3 font-display text-lg font-extrabold">Work</h2>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[15px] sm:grid-cols-3">
         <Detail label="Designation">{e.designationLabel}</Detail>
+        <Detail label="Department">{e.departmentLabel}</Detail>
         <Detail label="Type">{e.employmentType && EMPLOYMENT_TYPE_LABELS[e.employmentType]}</Detail>
         <Detail label="Joining date">{e.joinedOn && formatDate(e.joinedOn)}</Detail>
         <Detail label="Role in the app">{ROLE_INFO[e.role].label}</Detail>
