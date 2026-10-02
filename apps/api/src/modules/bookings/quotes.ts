@@ -18,7 +18,7 @@ import { scopeCondition, upsertClientForLead } from "../sales/leads.js";
 import { logoPath } from "../files/logo.js";
 
 const requireView = (ctx: MemberContext) => {
-  if (!can(ctx, "quotes.view")) throw forbidden("Your role doesn't include quotes");
+  if (!can(ctx, "quotes.view")) throw forbidden("Quotes aren't on your screens. Ask the owner to add Quotes & prices for you");
 };
 const requireManage = (ctx: MemberContext) => {
   if (!can(ctx, "quotes.manage")) throw forbidden("Making quotes isn't on your screens. Ask the owner if you need it.");

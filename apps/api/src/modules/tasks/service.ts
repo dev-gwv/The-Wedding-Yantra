@@ -13,7 +13,7 @@ import { assertOption, optionJoin } from "../options/service.js";
 
 export const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
-  if (!can(ctx, "tasks.work")) throw forbidden("Your role doesn't include tasks");
+  if (!can(ctx, "tasks.work")) throw forbidden("Tasks aren't on your screens. Ask the owner if you need them");
 };
 const requireManage = (ctx: MemberContext) => {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager can do this");
@@ -56,14 +56,13 @@ export function workOfFilter(ctx: MemberContext, column: string, params: unknown
 
 /**
  * Whether this person runs a task as a manager: the owner and managers of the whole team run
- * every task; a department's manager runs the tasks of their own people (for them, or given
- * by them).
+ * every task; a department's manager runs the tasks for their own people, and the ones they
+ * gave themselves. The same rule as the team list.
  */
 async function runsTask(db: Queryable, ctx: MemberContext, row: { assignee_id: string | null; created_by: string | null }): Promise<boolean> {
   if (!manages(ctx)) return false;
-  if (ctx.teamScope === "all") return true;
-  if (row.assignee_id && (await runsWorkOf(db, ctx, row.assignee_id))) return true;
-  return row.created_by !== null && (await runsWorkOf(db, ctx, row.created_by));
+  if (ctx.teamScope === "all" || row.created_by === ctx.userId) return true;
+  return row.assignee_id !== null && (await runsWorkOf(db, ctx, row.assignee_id));
 }
 
 /** Giving a task to someone: a department's manager gives them only to their own people. */

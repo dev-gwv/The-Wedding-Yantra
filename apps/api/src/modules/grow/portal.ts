@@ -11,6 +11,7 @@ import { optionJoin } from "../options/service.js";
 const requireShare = (ctx: MemberContext) => {
   if (!can(ctx, "clients.manage")) throw forbidden("Only the owner or a manager can share a client's page");
   if (!can(ctx, "finance.view")) throw forbidden("The client page shows their invoices, so it needs the Payments & invoices screen");
+  if (!can(ctx, "quotes.view")) throw forbidden("The client page shows their quotes, so it needs the Quotes & prices screen");
 };
 
 /** Letters and digits that can't be mistaken for each other when read out. */

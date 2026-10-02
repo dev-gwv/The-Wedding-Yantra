@@ -58,7 +58,7 @@ export async function uploadFile(
   ctx: MemberContext,
   input: { contentType: UploadType; data: string; name?: string | null },
 ): Promise<UploadedFile> {
-  if (!can(ctx, "expenses.submit") && !can(ctx, "tasks.work")) throw forbidden("Your role can't upload files");
+  if (!can(ctx, "expenses.submit") && !can(ctx, "tasks.work")) throw forbidden("Adding files isn't on your screens. Ask the owner if you need it");
   const base64 = input.data.replace(/^data:[^;]+;base64,/, "");
   const data = Buffer.from(base64, "base64");
   if (data.length === 0) throw new AppError(400, "VALIDATION_ERROR", "That file is empty", { data: "That file is empty" });

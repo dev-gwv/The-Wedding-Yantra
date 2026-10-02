@@ -49,6 +49,8 @@ export interface Member {
   departmentAreas: Area[];
   /** Extra screens the owner switched on for them, that their role can use */
   extraAreas: Area[];
+  /** Every extra screen the owner switched on, even ones their department or role makes unused for now */
+  savedExtraAreas: Area[];
 }
 
 /** Someone who has left the team. Their details stay on record. */
@@ -156,7 +158,7 @@ export const createInvitationInput = z.object({
   phone,
   role,
   /** Only the owner chooses it. A manager re-sending an invite keeps the one it had. */
-  department: z.string().trim().max(40).nullable().optional(),
+  department: z.string().trim().max(40).nullable().optional().transform(blankToNull),
 });
 export type CreateInvitationInput = z.input<typeof createInvitationInput>;
 
@@ -171,7 +173,7 @@ export type UpdateMemberInput = z.input<typeof updateMemberInput>;
 
 /** The owner sets someone's department and extra screens. Leaving a field out keeps it. */
 export const memberAccessInput = z.object({
-  department: z.string().trim().max(40).nullable().optional(),
+  department: z.string().trim().max(40).nullable().optional().transform(blankToNull),
   extraAreas: z.array(area).max(20).optional(),
 });
 export type MemberAccessInput = z.input<typeof memberAccessInput>;

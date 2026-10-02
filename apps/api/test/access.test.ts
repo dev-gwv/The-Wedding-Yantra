@@ -354,6 +354,143 @@ describe("a department's manager", () => {
   });
 });
 
+describe("what the review found", () => {
+  it("staff with Quotes but not Leads change only their own quotes", async () => {
+    const b = await business("950");
+    const { owner, ws, arfin, kavya } = b;
+    await b.access(arfin, { department: "sales" });
+    await b.access(kavya, { department: "accountant", extraAreas: ["quotes"] });
+    const lead = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/leads`, { token: arfin.token, body: { name: "Neha Kapoor", phone: "9811122233" } });
+    const theirs = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/quotes`, {
+      token: arfin.token,
+      body: { leadId: lead.body.data.id, title: "Wedding makeup", items: LINES },
+    });
+    expect(theirs.status).toBe(201);
+    const id = theirs.body.data.id;
+    expect((await get(b, kavya.token, `/quotes/${id}`)).status).toBe(404);
+    expect((await call(t.app, "PATCH", `/workspaces/${ws}/quotes/${id}`, { token: kavya.token, body: { title: "Changed" } })).status).toBe(404);
+    expect((await call(t.app, "DELETE", `/workspaces/${ws}/quotes/${id}`, { token: kavya.token })).status).toBe(404);
+    // A quote for a client is theirs to make and change.
+    const client = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Mehra Family", phone: "9844455566" } });
+    const own = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/quotes`, {
+      token: kavya.token,
+      body: { clientId: client.body.data.id, title: "Decor", items: LINES },
+    });
+    expect(own.status).toBe(201);
+    expect((await get(b, kavya.token, `/quotes/${own.body.data.id}`)).status).toBe(200);
+  });
+
+  it("keeps the client page link, lost-enquiry messages and points with the right people", async () => {
+    const b = await business("951");
+    const { owner, ws, mona, arfin, kavya } = b;
+    await b.access(mona, { department: "sales" });
+    await b.access(arfin, { department: "sales" });
+    await b.access(kavya, { department: "accountant" });
+
+    // The client page shows quotes too, so the Accountant department (no Quotes) can't share it.
+    const client = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/clients`, { token: owner, body: { name: "Walk In", phone: "9844455577" } });
+    await call(t.app, "POST", `/workspaces/${ws}/clients/${client.body.data.id}/portal`, { token: owner });
+    const seen = await call<{ portalToken: string | null }>(t.app, "GET", `/workspaces/${ws}/clients/${client.body.data.id}`, { token: kavya.token });
+    expect(seen.status).toBe(200);
+    expect(seen.body.data.portalToken).toBeNull();
+    expect((await call(t.app, "POST", `/workspaces/${ws}/clients/${client.body.data.id}/portal`, { token: kavya.token })).status).toBe(403);
+
+    // A lost-enquiries message is out of the Accountant department's list and can't be deleted by it.
+    // (Made directly: this business has no lost enquiries to send it to.)
+    const msg = await t.db.query<{ id: string }>(
+      `INSERT INTO broadcasts (workspace_id, title, message, audience) VALUES ($1, 'Still planning?', 'Hello! We still have dates free.', 'lost_enquiries') RETURNING id`,
+      [ws],
+    );
+    const msgId = msg.rows[0]!.id;
+    const list = await call<{ id: string }[]>(t.app, "GET", `/workspaces/${ws}/broadcasts`, { token: kavya.token });
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((m) => m.id)).not.toContain(msgId);
+    expect((await call<{ id: string }[]>(t.app, "GET", `/workspaces/${ws}/broadcasts`, { token: owner })).body.data.map((m) => m.id)).toContain(msgId);
+    expect((await call(t.app, "DELETE", `/workspaces/${ws}/broadcasts/${msgId}`, { token: kavya.token })).status).toBe(403);
+
+    // Points: the Sales manager opens and recognises only Sales people.
+    type Board = { rows: { user: { id: string }; canOpen: boolean; onTime: number | null }[] };
+    const board = await call<Board>(t.app, "GET", `/workspaces/${ws}/points/leaderboard?month=2026-10`, { token: mona.token });
+    const row = (id: string) => board.body.data.rows.find((r) => r.user.id === id)!;
+    expect(row(arfin.userId).canOpen).toBe(true);
+    expect(row(kavya.userId).canOpen).toBe(false);
+    expect(row(mona.userId).canOpen).toBe(true);
+    expect((await get(b, mona.token, `/points/ledger?userId=${kavya.userId}&month=2026-10`)).status).toBe(404);
+    expect((await get(b, mona.token, `/points/ledger?userId=${arfin.userId}&month=2026-10`)).status).toBe(200);
+    const recognise = (userId: string) =>
+      call(t.app, "POST", `/workspaces/${ws}/points/recognise`, { token: mona.token, body: { userId, note: "Great work on the Sharma booking" } });
+    expect((await recognise(kavya.userId)).status).toBe(403);
+    expect([201, 409]).toContain((await recognise(arfin.userId)).status);
+  });
+
+  it("runs a task by who it's for, and lets only those who run it remove others' comments", async () => {
+    const b = await business("952");
+    const { owner, ws, mona, arfin, kavya } = b;
+    await b.access(mona, { department: "sales" });
+    await b.access(arfin, { department: "sales" });
+    await b.access(kavya, { department: "accountant" });
+    // Arfin's own task, handed to Kavya by the owner: no longer the Sales manager's to run.
+    const task = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/tasks`, { token: arfin.token, body: { title: "Chase the album printer" } });
+    expect((await call(t.app, "PATCH", `/workspaces/${ws}/tasks/${task.body.data.id}`, { token: owner, body: { assigneeId: kavya.userId } })).status).toBe(200);
+    expect((await get(b, mona.token, `/tasks/${task.body.data.id}`)).status).toBe(404);
+
+    // A task on an event the Sales manager can see: they can't remove Kavya's comment on it.
+    const event = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/events`, {
+      token: owner,
+      body: { newClient: { name: "Gupta Family", phone: "9833344466" }, title: "Gupta wedding", functions: [{ name: "Wedding", date: "2026-12-12" }] },
+    });
+    const onEvent = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/tasks`, {
+      token: owner,
+      body: { title: "Collect the advance", assigneeId: kavya.userId, eventId: event.body.data.id },
+    });
+    expect((await call(t.app, "POST", `/workspaces/${ws}/tasks/${onEvent.body.data.id}/comments`, { token: kavya.token, body: { body: "Asked them today" } })).status).toBe(201);
+    const { rows } = await t.db.query<{ id: string }>(`SELECT id FROM task_comments WHERE task_id = $1`, [onEvent.body.data.id]);
+    expect((await get(b, mona.token, `/tasks/${onEvent.body.data.id}`)).status).toBe(200);
+    expect((await call(t.app, "DELETE", `/workspaces/${ws}/tasks/${onEvent.body.data.id}/comments/${rows[0]!.id}`, { token: mona.token })).status).toBe(403);
+  });
+
+  it("treats a blank department as none, keeps a hidden department on a re-sent invite, and leaves the UPI ID with the business profile", async () => {
+    const b = await business("953");
+    const { owner, ws, mona, arfin } = b;
+    const blank = await b.access(arfin, { department: "" });
+    expect(blank.status).toBe(200);
+    expect((await b.me(arfin.token)).department).toBeNull();
+    expect((await b.me(arfin.token)).permissions).toContain("leads.work");
+
+    const invite = (department?: string) =>
+      call<{ invitation: Invitation }>(t.app, "POST", `/workspaces/${ws}/invitations`, {
+        token: owner,
+        body: { name: "Tara Singh", phone: "9530000099", role: "staff", ...(department !== undefined ? { department } : {}) },
+      });
+    expect((await invite("sales")).status).toBe(201);
+    const sales = (await call<{ id: string; list: string; key: string }[]>(t.app, "GET", `/workspaces/${ws}/options`, { token: owner })).body.data.find(
+      (o) => o.list === "department" && o.key === "sales",
+    )!;
+    await call(t.app, "PATCH", `/workspaces/${ws}/options/${sales.id}`, { token: owner, body: { archived: true } });
+    const again = await invite("sales");
+    expect(again.status).toBe(201);
+    expect(again.body.data.invitation.department).toBe("sales");
+
+    // A manager with Business settings but not Payments saves the business profile, UPI ID included.
+    await call(t.app, "POST", `/workspaces/${ws}/options`, { token: owner, body: { list: "department", label: "Office" } });
+    const office = (await call<{ list: string; key: string; label: string }[]>(t.app, "GET", `/workspaces/${ws}/options`, { token: owner })).body.data.find(
+      (o) => o.list === "department" && o.label === "Office",
+    )!;
+    await b.access(mona, { department: office.key, extraAreas: ["settings"] });
+    const save = await call(t.app, "PATCH", `/workspaces/${ws}`, { token: mona.token, body: { name: "953 Studio", upiId: "" } });
+    expect(save.status).toBe(200);
+    expect((await call(t.app, "PATCH", `/workspaces/${ws}`, { token: mona.token, body: { billPrefix: "INV" } })).status).toBe(403);
+
+    // An events-only manager's booking value is left out.
+    const event = await call<{ id: string }>(t.app, "POST", `/workspaces/${ws}/events`, {
+      token: mona.token,
+      body: { newClient: { name: "Rao Family", phone: "9833344477" }, title: "Rao wedding", value: "75000", functions: [{ name: "Wedding", date: "2026-12-14" }] },
+    });
+    expect(event.status).toBe(201);
+    expect((await call<{ value: number | null }>(t.app, "GET", `/workspaces/${ws}/events/${event.body.data.id}`, { token: owner })).body.data.value).toBeNull();
+  });
+});
+
 describe("extra screens and department screens", () => {
   it("an extra screen works straight away, and goes as soon as it's switched off", async () => {
     const b = await business("944");

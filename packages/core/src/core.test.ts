@@ -813,6 +813,9 @@ describe("department access", () => {
     }
     expect(leadScope(accounts)).toBe("none");
     expect(quoteScope(accounts)).toBe("none");
+    // Quotes as an extra, without Leads: only the quotes they make.
+    expect(quoteScope(inDept("staff", "accountant", ["quotes"]))).toBe("own");
+    expect(quoteScope(inDept("accountant", "accountant", ["quotes"]))).toBe("all");
   });
 
   it("lets a view-only person in Accountant look but not change anything", () => {

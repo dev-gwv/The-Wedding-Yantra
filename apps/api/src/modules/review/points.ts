@@ -22,6 +22,7 @@ import type { Queryable } from "../../db.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { notify } from "../notifications/service.js";
+import { runsWorkOf, workOfFilter } from "../tasks/service.js";
 
 /**
  * Points for finishing work well. Paid from task changes as they happen (inside the same
@@ -154,6 +155,7 @@ export async function awardStreaks(db: Queryable, workspaceId: string, today: st
 export async function recognise(db: Queryable, ctx: MemberContext, input: { userId: string; note: string }): Promise<number> {
   if (!can(ctx, "team.review")) throw forbidden("Only the owner or a manager can recognise work");
   if (input.userId === ctx.userId) throw new AppError(400, "VALIDATION_ERROR", "Recognise someone else's work", { userId: "Choose someone else" });
+  if (!(await runsWorkOf(db, ctx, input.userId))) throw forbidden("You recognise the people in your department");
   const member = await db.query<{ name: string | null }>(
     `SELECT u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.workspace_id = $1 AND m.user_id = $2 AND m.removed_at IS NULL`,
     [ctx.workspaceId, input.userId],
@@ -205,6 +207,18 @@ async function monthBounds(db: Queryable, workspaceId: string, month: string) {
 export async function leaderboard(db: Queryable, ctx: MemberContext, month: string): Promise<Leaderboard> {
   const { start, end, today, tz } = await monthBounds(db, ctx.workspaceId, month);
   const all = can(ctx, "team.review");
+  // A department's manager sees the details of their own people only.
+  const runs = new Set<string>();
+  if (all && ctx.teamScope === "department") {
+    const params: unknown[] = [ctx.workspaceId];
+    const theirs = workOfFilter(ctx, "m.user_id", params);
+    const { rows } = await db.query<{ user_id: string }>(
+      `SELECT m.user_id FROM memberships m WHERE m.workspace_id = $1 AND m.removed_at IS NULL${theirs ? ` AND ${theirs}` : ""}`,
+      params,
+    );
+    for (const r of rows) runs.add(r.user_id);
+  }
+  const sees = (id: string) => all && (ctx.teamScope !== "department" || runs.has(id));
   const s = await settings(db, ctx.workspaceId);
   const { rows } = await db.query<{
     user_id: string;
@@ -257,9 +271,10 @@ export async function leaderboard(db: Queryable, ctx: MemberContext, month: stri
       notRanked: p.notRanked,
       band: bandFor(p.points, s.bands).band.name,
       tasksDone: p.tasksDone,
-      // How someone else is doing in detail is for owners and managers.
-      onTime: all || mine ? p.onTime : null,
-      lateNow: all || mine ? p.row.late_now : 0,
+      // How someone else is doing in detail is for owners and managers (of their own people).
+      onTime: sees(p.id) || mine ? p.onTime : null,
+      lateNow: sees(p.id) || mine ? p.row.late_now : 0,
+      canOpen: sees(p.id) || mine,
     };
   });
   const meRow = out.find((r) => r.user.id === ctx.userId) ?? null;
@@ -289,6 +304,7 @@ export async function leaderboard(db: Queryable, ctx: MemberContext, month: stri
 export async function ledger(db: Queryable, ctx: MemberContext, q: { userId?: string; month: string }): Promise<Ledger> {
   const userId = q.userId ?? ctx.userId;
   if (userId !== ctx.userId && !can(ctx, "team.review")) throw forbidden("You can see only your own points");
+  if (userId !== ctx.userId && !(await runsWorkOf(db, ctx, userId))) throw notFound("This team member");
   const person = await db.query<{ name: string | null }>(
     `SELECT u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.workspace_id = $1 AND m.user_id = $2`,
     [ctx.workspaceId, userId],

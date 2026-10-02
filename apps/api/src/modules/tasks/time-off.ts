@@ -8,7 +8,7 @@ import { runsWorkOf, workOfFilter } from "./service.js";
 
 const manages = (ctx: MemberContext) => can(ctx, "tasks.manage");
 const requireWork = (ctx: MemberContext) => {
-  if (!can(ctx, "tasks.work")) throw forbidden("Your role doesn't include days off");
+  if (!can(ctx, "tasks.work")) throw forbidden("Days off aren't on your screens. Ask the owner if you need them");
 };
 
 interface Row {

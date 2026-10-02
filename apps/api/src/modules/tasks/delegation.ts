@@ -314,13 +314,13 @@ export async function addComment(db: Db, ctx: MemberContext, taskId: string, inp
 }
 
 export async function deleteComment(db: Db, ctx: MemberContext, taskId: string, commentId: string): Promise<void> {
-  await loadTask(db, ctx, taskId);
+  const row = await loadTask(db, ctx, taskId);
   const { rows } = await db.query<{ author_id: string }>(`SELECT author_id FROM task_comments WHERE id = $1 AND task_id = $2 AND deleted_at IS NULL`, [
     commentId,
     taskId,
   ]);
   if (!rows[0]) throw notFound("This comment");
-  if (rows[0].author_id !== ctx.userId && !manages(ctx)) throw forbidden("Only whoever wrote it can remove this comment");
+  if (rows[0].author_id !== ctx.userId && !roles(ctx, row).manages) throw forbidden("Only whoever wrote it can remove this comment");
   await db.query(`UPDATE task_comments SET deleted_at = now() WHERE id = $1`, [commentId]);
 }
 

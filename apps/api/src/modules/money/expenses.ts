@@ -10,7 +10,7 @@ import { assertOption, optionJoin } from "../options/service.js";
 /** Seeing money: everything. Everyone else who can add expenses sees only their own. */
 const seesAll = (ctx: MemberContext) => can(ctx, "finance.view") || can(ctx, "expenses.approve");
 const requireSubmit = (ctx: MemberContext) => {
-  if (!can(ctx, "expenses.submit") && !can(ctx, "finance.view")) throw forbidden("Your role doesn't include expenses");
+  if (!can(ctx, "expenses.submit") && !can(ctx, "finance.view")) throw forbidden("Expenses aren't on your screens. Ask the owner if you need them");
 };
 /** Approvers change any expense; others only their own. The accountant only looks. */
 const requireChange = (ctx: MemberContext, row: { submitted_by: string | null }) => {
@@ -269,7 +269,7 @@ function checkGst(amount: number, gst: number) {
 
 /** Expenses the owner or an approving manager adds count straight away; everyone else's wait for approval. */
 export async function createExpense(db: Db, secret: Buffer, ctx: MemberContext, input: ExpenseFields): Promise<Expense> {
-  if (!can(ctx, "expenses.submit")) throw forbidden("Your role can't add expenses");
+  if (!can(ctx, "expenses.submit")) throw forbidden("Adding expenses isn't on your screens. Ask the owner if you need it");
   return withTransaction(db, async (tx) => {
     await checkLinks(tx, ctx, input);
     await assertOption(tx, ctx.workspaceId, "expense_category", input.category, "category");
@@ -426,7 +426,7 @@ export async function deleteExpense(db: Db, ctx: MemberContext, id: string): Pro
 
 /** A month of spending for the Money tab. Money roles only. */
 export async function expenseMonth(db: Queryable, ctx: MemberContext, month: string): Promise<ExpenseMonth> {
-  if (!seesAll(ctx)) throw forbidden("Your role doesn't include money");
+  if (!seesAll(ctx)) throw forbidden("Payments and invoices aren't on your screens. Ask the owner to add them for you");
   const { rows } = await db.query<{ category: string; label: string; status: ExpenseStatus; total: string; count: string }>(
     `SELECT x.category, coalesce(xc.label, x.category) AS label, x.status, sum(x.amount) AS total, count(*) AS count FROM expenses x
        ${optionJoin("xc", "expense_category", "x.workspace_id", "x.category")}

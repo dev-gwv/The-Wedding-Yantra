@@ -16,6 +16,8 @@ export interface LeaderboardRow {
   /** Of finished tasks that had a day, how many by that day (0-100), or null */
   onTime: number | null;
   lateNow: number;
+  /** Whether the viewer may open their points and recognise them: their own row, or someone whose work they run */
+  canOpen: boolean;
 }
 
 export interface Leaderboard {

@@ -19,10 +19,10 @@ import { quoteScopeSql } from "./quotes.js";
 
 /** Everyone who works events can look at them; freelancers only at the ones they're on. */
 const requireView = (ctx: MemberContext) => {
-  if (eventScope(ctx) === "none") throw forbidden("Your role doesn't include events");
+  if (eventScope(ctx) === "none") throw forbidden("Events aren't on your screens. Ask the owner to add them for you");
 };
 const requireViewAll = (ctx: MemberContext) => {
-  if (eventScope(ctx) !== "all") throw forbidden("Your role doesn't include all events");
+  if (eventScope(ctx) !== "all") throw forbidden("This needs the Events & calendar screen. Ask the owner to add it for you");
 };
 /** SQL to AND in: only events this person may see. */
 function scopeSql(ctx: MemberContext, add: (v: unknown) => string, alias = "e"): string {
@@ -323,7 +323,8 @@ export async function createEvent(db: Db, ctx: MemberContext, input: EventFields
         input.leadId ?? null,
         input.title,
         input.eventType ?? null,
-        input.value ?? null,
+        // A booking value is for people who see money; anyone else's is left for them to fill in.
+        seesMoney(ctx) ? (input.value ?? null) : null,
         input.city ?? null,
         input.venue ?? null,
         input.notes ?? null,

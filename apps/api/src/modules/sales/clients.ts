@@ -77,7 +77,7 @@ function duplicate(err: unknown): never {
 }
 
 export async function listClients(db: Db, ctx: MemberContext, q?: string, archived = false): Promise<ClientSummary[]> {
-  if (!can(ctx, "clients.view")) throw forbidden("Your role doesn't include clients");
+  if (!can(ctx, "clients.view")) throw forbidden("Clients aren't on your screens. Ask the owner to add them for you");
   const params: unknown[] = [ctx.workspaceId];
   let filter = archived ? " AND c.archived_at IS NOT NULL" : " AND c.archived_at IS NULL";
   if (q) {
@@ -106,7 +106,7 @@ async function listContacts(db: Queryable, clientId: string): Promise<ClientCont
 }
 
 export async function getClient(db: Db, ctx: MemberContext, clientId: string): Promise<Client> {
-  if (!can(ctx, "clients.view")) throw forbidden("Your role doesn't include clients");
+  if (!can(ctx, "clients.view")) throw forbidden("Clients aren't on your screens. Ask the owner to add them for you");
   const { rows } = await db.query<ClientRow>(`${SELECT} WHERE c.workspace_id = $1 AND c.id = $2 AND c.deleted_at IS NULL`, [ctx.workspaceId, clientId]);
   const row = rows[0];
   if (!row) throw notFound("This client");
@@ -143,7 +143,8 @@ export async function getClient(db: Db, ctx: MemberContext, clientId: string): P
     custom: row.custom,
     noMessages: row.no_messages,
     // The page link lets anyone see the client's bills, so only those who share it and see money see it.
-    portalToken: can(ctx, "clients.manage") && can(ctx, "finance.view") ? row.portal_token : null,
+    // The client page shows their invoices and quotes.
+    portalToken: can(ctx, "clients.manage") && can(ctx, "finance.view") && can(ctx, "quotes.view") ? row.portal_token : null,
   };
 }
 

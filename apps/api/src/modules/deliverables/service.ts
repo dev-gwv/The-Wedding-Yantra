@@ -11,7 +11,7 @@ const requireManage = (ctx: MemberContext) => {
   if (!manages(ctx)) throw forbidden("Only the owner or a manager can plan deliverables");
 };
 const requireView = (ctx: MemberContext) => {
-  if (eventScope(ctx) === "none") throw forbidden("Your role doesn't include events");
+  if (eventScope(ctx) === "none") throw forbidden("Events aren't on your screens. Ask the owner to add them for you");
 };
 
 interface Row {

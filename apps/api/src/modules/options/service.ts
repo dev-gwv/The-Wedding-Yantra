@@ -79,7 +79,7 @@ export async function listOptions(db: Queryable, workspaceId: string, list?: Opt
 export async function addOption(db: Db, ctx: MemberContext, input: { list: OptionList; label: string }): Promise<CustomOption> {
   // Departments decide who sees which screens, so only the owner adds, renames or hides them.
   if (input.list === "department" ? !can(ctx, "members.hr") : !can(ctx, "workspace.update") && !ADD_RIGHT[input.list].some((p) => can(ctx, p))) {
-    throw forbidden(input.list === "department" ? "Only the owner adds departments" : "Your role can't add to this list");
+    throw forbidden(input.list === "department" ? "Only the owner adds departments" : "You can't add to this list. Ask the owner if you need to");
   }
   return withTransaction(db, async (tx) => {
     // The same name in other capitals is the same option: bring it back instead of adding another.

@@ -112,9 +112,12 @@ const toBroadcast = (r: BroadcastRow): Broadcast => ({
 
 export async function listBroadcasts(db: Queryable, ctx: MemberContext): Promise<Broadcast[]> {
   requireManage(ctx);
-  const { rows } = await db.query<BroadcastRow>(`${SELECT} WHERE b.workspace_id = $1 AND b.deleted_at IS NULL ORDER BY b.created_at DESC LIMIT 100`, [
-    ctx.workspaceId,
-  ]);
+  // Messages to lists made from leads are for people who see every lead.
+  const hidden = can(ctx, "leads.view_all") ? [] : [...FROM_LEADS];
+  const { rows } = await db.query<BroadcastRow>(
+    `${SELECT} WHERE b.workspace_id = $1 AND b.deleted_at IS NULL AND NOT (b.audience = ANY($2::text[])) ORDER BY b.created_at DESC LIMIT 100`,
+    [ctx.workspaceId, hidden],
+  );
   return rows.map(toBroadcast);
 }
 
@@ -231,6 +234,11 @@ export async function markRecipient(
 
 export async function deleteBroadcast(db: Db, ctx: MemberContext, id: string): Promise<void> {
   requireManage(ctx);
-  const result = await db.query(`UPDATE broadcasts SET deleted_at = now() WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [id, ctx.workspaceId]);
-  if (!result.rowCount) throw notFound("This message");
+  const { rows } = await db.query<{ audience: BroadcastAudience }>(`SELECT audience FROM broadcasts WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`, [
+    id,
+    ctx.workspaceId,
+  ]);
+  if (!rows[0]) throw notFound("This message");
+  requireAudience(ctx, rows[0].audience);
+  await db.query(`UPDATE broadcasts SET deleted_at = now() WHERE id = $1`, [id]);
 }

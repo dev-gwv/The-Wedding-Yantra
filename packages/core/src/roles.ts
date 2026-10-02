@@ -112,7 +112,9 @@ export interface Access {
 
 /** Whether this person may do something. */
 export function can(who: Access, permission: Permission): boolean {
-  return who.permissions.includes(permission);
+  // An older API (during a deploy) sends no permissions: fall back to the role's usual ones.
+  const permissions = (who.permissions as readonly Permission[] | undefined) ?? ROLE_GRANTS[who.role] ?? [];
+  return permissions.includes(permission);
 }
 
 /** Whether a role, with no department, may do something. Only for role defaults. */
@@ -163,12 +165,14 @@ export function eventScope(who: Access): "all" | "own" | "none" {
 }
 
 /**
- * Which quotes someone sees: people who see only their own leads see only the quotes they
- * made or that are on their own leads; everyone else with quotes sees them all.
+ * Which quotes someone sees and changes: people who see every lead see every quote; people
+ * who make quotes without that (staff) see only the quotes they made or that are on their
+ * own leads; people who only look (View only) see them all.
  */
 export function quoteScope(who: Access): "all" | "own" | "none" {
   if (!can(who, "quotes.view")) return "none";
-  return leadScope(who) === "own" ? "own" : "all";
+  if (can(who, "leads.view_all")) return "all";
+  return can(who, "quotes.manage") ? "own" : "all";
 }
 
 /**

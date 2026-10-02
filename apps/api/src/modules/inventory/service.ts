@@ -6,14 +6,14 @@ import type { MemberContext } from "../auth/guard.js";
 
 /** Everyone who sees all events sees the stock; owners and managers plan it; the crew loads it. */
 const requireView = (ctx: MemberContext) => {
-  if (eventScope(ctx) !== "all") throw forbidden("Your role doesn't include inventory");
+  if (eventScope(ctx) !== "all") throw forbidden("Stock isn't on your screens. Ask the owner to add Events & calendar for you");
 };
 const requireManage = (ctx: MemberContext) => {
   if (!can(ctx, "events.manage")) throw forbidden("Only the owner or a manager can change the stock");
 };
 const requireCrew = (ctx: MemberContext) => {
   requireView(ctx);
-  if (!can(ctx, "tasks.work")) throw forbidden("Your role doesn't include loading stock");
+  if (!can(ctx, "tasks.work")) throw forbidden("Loading stock needs the Events & calendar screen. Ask the owner if you need it");
 };
 
 /** Bookings that hold stock on their days: not returned, on an event that's still on. */

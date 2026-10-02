@@ -118,6 +118,7 @@ const toMember = (r: MemberRow, ctx: MemberContext): Member => {
     accessSource: access.source,
     departmentAreas: access.departmentAreas,
     extraAreas: access.extraAreas,
+    savedExtraAreas: cleanAreas(r.extra_areas),
   };
 };
 
@@ -449,9 +450,19 @@ export async function applyDepartments(db: Db, ctx: MemberContext, memberIds: st
   requireOwner(ctx);
   let applied = 0;
   await withTransaction(db, async (tx) => {
-    for (const id of memberIds) {
-      const target = await loadTargetAccess(tx, ctx.workspaceId, id).catch(() => null);
-      if (!target || !target.department || target.department_on) continue;
+    const { rows: targets } = await tx.query<TargetAccessRow>(
+      `SELECT m.id, m.user_id, u.name, m.role, d.department, coalesce(d.department_on, false) AS department_on,
+              da.areas AS department_areas, m.extra_areas, dp.label AS department_label
+         FROM memberships m JOIN users u ON u.id = m.user_id
+         LEFT JOIN member_details d ON d.membership_id = m.id
+         LEFT JOIN department_access da ON da.workspace_id = m.workspace_id AND da.department = d.department
+         ${optionJoin("dp", "department", "m.workspace_id", "d.department")}
+        WHERE m.id = ANY($1::uuid[]) AND m.workspace_id = $2 AND m.removed_at IS NULL`,
+      [memberIds, ctx.workspaceId],
+    );
+    for (const target of targets) {
+      const id = target.id;
+      if (!target.department || target.department_on) continue;
       const before = accessFrom(target);
       await tx.query(`UPDATE member_details SET department_on = true WHERE membership_id = $1`, [id]);
       const after = accessFrom({ ...target, department_on: true });
@@ -503,7 +514,6 @@ export async function inviteMember(
     throw new AppError(403, "FORBIDDEN", "You can't give this role", { role: "You can't give this role" });
   }
   if (input.department && !can(ctx, "members.hr")) throw forbidden("Only the owner chooses a department");
-  if (input.department) await assertOption(db, ctx.workspaceId, "department", input.department, "department");
 
   return withTransaction(db, async (tx) => {
     const existing = await tx.query(
@@ -523,7 +533,10 @@ export async function inviteMember(
         RETURNING department`,
       [ctx.workspaceId, input.phone],
     );
-    const department = input.department !== undefined && can(ctx, "members.hr") ? input.department : (replaced.rows[0]?.department ?? null);
+    const kept = replaced.rows[0]?.department ?? null;
+    const department = input.department !== undefined && can(ctx, "members.hr") ? input.department : kept;
+    // Keeping the department a re-sent invite already had is fine even if it's hidden now.
+    if (department) await assertOption(tx, ctx.workspaceId, "department", department, "department", kept);
 
     // What they'll be able to do when they join, which can't be more than the person inviting them has.
     if (ctx.role !== "owner") {

@@ -141,7 +141,7 @@ const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "prices
 };
 
 /** How invoices look and are numbered: part of the Payments & invoices screen, not Business settings. */
-export const INVOICE_FIELDS = ["billPrefix", "billTerms", "invoiceDesign", "invoiceAccent", "upiId"] as const;
+export const INVOICE_FIELDS = ["billPrefix", "billTerms", "invoiceDesign", "invoiceAccent"] as const;
 
 export async function updateWorkspace(
   db: Db,
