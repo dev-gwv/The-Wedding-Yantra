@@ -1,6 +1,7 @@
 import { can, eventScope, leadScope, quoteNumber } from "@wedding-yantra/core";
 import type {
   CalendarEntry,
+  DateCheck,
   EventClash,
   EventFunction,
   EventStatus,
@@ -114,8 +115,8 @@ export async function listEvents(db: Queryable, ctx: MemberContext, filters: Eve
   return rows.map((r) => ({ ...toSummary(r), ...(hideValue && { value: null }) }));
 }
 
-/** Other events that already have a function on any of these dates. */
-export async function findClashes(
+/** Every function of another live event on any of these dates. */
+async function functionsOn(
   db: Queryable,
   workspaceId: string,
   dates: string[],
@@ -133,9 +134,64 @@ export async function findClashes(
   return rows.map((r) => ({ date: r.date, eventId: r.event_id, eventTitle: r.title, functionName: r.name }));
 }
 
+/** How many events the business can take in a day (its teams). */
+async function eventsPerDay(db: Queryable, workspaceId: string): Promise<number> {
+  const { rows } = await db.query<{ events_per_day: number }>(`SELECT events_per_day FROM workspaces WHERE id = $1`, [workspaceId]);
+  return rows[0]?.events_per_day ?? 1;
+}
+
+/** How many different events are on each date. An event with two functions in a day counts once. */
+function bookedByDate(hits: EventClash[]): Map<string, number> {
+  const events = new Map<string, Set<string>>();
+  for (const h of hits) events.set(h.date, (events.get(h.date) ?? new Set()).add(h.eventId));
+  return new Map([...events].map(([date, ids]) => [date, ids.size]));
+}
+
+/**
+ * Other events on any of these dates, but only on days already booked to capacity: a
+ * business with three teams isn't warned about a second wedding on the same day.
+ */
+export async function findClashes(
+  db: Queryable,
+  workspaceId: string,
+  dates: string[],
+  excludeEventId?: string | null,
+): Promise<EventClash[]> {
+  const hits = await functionsOn(db, workspaceId, dates, excludeEventId);
+  if (hits.length === 0) return [];
+  const capacity = await eventsPerDay(db, workspaceId);
+  const booked = bookedByDate(hits);
+  return hits.filter((h) => (booked.get(h.date) ?? 0) >= capacity);
+}
+
 export async function clashesFor(db: Db, ctx: MemberContext, dates: string[], excludeEventId?: string) {
   requireViewAll(ctx);
   return findClashes(db, ctx.workspaceId, dates, excludeEventId);
+}
+
+/**
+ * How full each of these days is, for the lead and quote forms as well as events. Anyone
+ * who sells or works events may ask; only people who see every event are told which ones.
+ */
+export async function dateCheck(db: Db, ctx: MemberContext, dates: string[], excludeEventId?: string): Promise<DateCheck[]> {
+  const scope = eventScope(ctx);
+  if (scope === "none" && !can(ctx, "leads.work") && !can(ctx, "quotes.view")) {
+    throw forbidden("Events aren't on your screens. Ask the owner to add them for you");
+  }
+  const days = [...new Set(dates)];
+  const hits = await functionsOn(db, ctx.workspaceId, days, excludeEventId);
+  const capacity = await eventsPerDay(db, ctx.workspaceId);
+  const booked = bookedByDate(hits);
+  return days.map((date) => {
+    const count = booked.get(date) ?? 0;
+    return {
+      date,
+      booked: count,
+      capacity,
+      full: count >= capacity,
+      events: scope === "all" ? hits.filter((h) => h.date === date) : [],
+    };
+  });
 }
 
 export async function getEvent(db: Queryable, ctx: MemberContext, eventId: string): Promise<WeddingEvent> {

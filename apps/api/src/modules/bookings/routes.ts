@@ -3,6 +3,7 @@ import {
   acceptQuoteInput,
   catalogueItemInput,
   clashQuery,
+  dateCheckQuery,
   declineQuoteInput,
   eventInput,
   eventListQuery,
@@ -151,6 +152,12 @@ export function bookingRoutes(app: FastifyInstance, deps: { db: Db }) {
     const ctx = await member(request, request.params.workspaceId);
     const { dates, excludeEventId } = parse(clashQuery, request.query);
     return ok(await events.clashesFor(db, ctx, dates, excludeEventId));
+  });
+  // How full these days are, against how many events the business takes in a day.
+  app.get<Ws>("/workspaces/:workspaceId/date-check", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    const { dates, excludeEventId } = parse(dateCheckQuery, request.query);
+    return ok(await events.dateCheck(db, ctx, dates, excludeEventId));
   });
   app.get<Ws & { Querystring: { month?: string } }>("/workspaces/:workspaceId/calendar", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
