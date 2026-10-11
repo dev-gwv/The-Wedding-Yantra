@@ -4,6 +4,7 @@ import {
   clientInput,
   createLeadInput,
   leadListQuery,
+  leadRoutingInput,
   partnerInput,
   phoneMatchQuery,
   saveStagesInput,
@@ -19,6 +20,7 @@ import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as clients from "./clients.js";
+import * as leadRouting from "./lead-routing.js";
 import * as leads from "./leads.js";
 import * as partners from "./partners.js";
 import * as phoneMatch from "./phone-match.js";
@@ -75,6 +77,17 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
     const ctx = await member(request, request.params.workspaceId);
     const { phone } = parse(phoneMatchQuery, request.query);
     return ok(await phoneMatch.phoneMatch(db, ctx, phone));
+  });
+
+  // ---- Who gets Facebook and Instagram leads (owner only) -----------------------
+  app.get<Ws>("/workspaces/:workspaceId/lead-routing", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await leadRouting.getLeadRouting(db, ctx));
+  });
+
+  app.put<Ws>("/workspaces/:workspaceId/lead-routing", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await leadRouting.setLeadRouting(db, ctx, parse(leadRoutingInput, request.body)));
   });
 
   // ---- Sales stages ---------------------------------------------------------

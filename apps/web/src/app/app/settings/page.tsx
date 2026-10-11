@@ -14,6 +14,7 @@ import {
   Handshake,
   History,
   ListPlus,
+  Megaphone,
   MessageCircle,
   QrCode,
   UserRound,
@@ -60,6 +61,13 @@ export default function SettingsPage() {
       title: "Sales and enquiries",
       items: [
         { href: "/app/settings/enquiry-form", icon: QrCode, label: "Enquiry form", about: "A link and QR code anyone can fill; each enquiry becomes a lead", show: sells },
+        {
+          href: "/app/settings/facebook-leads",
+          icon: Megaphone,
+          label: "Facebook & Instagram leads",
+          about: "Leads from your lead ads arrive here by themselves, given to your salespeople",
+          show: can(workspace, "members.hr"),
+        },
         { href: "/app/settings/stages", icon: GitBranch, label: "Sales stages", about: "The steps every lead moves through, from first enquiry to booked", show: sells },
         { href: "/app/settings/replies", icon: MessageCircle, label: "WhatsApp replies", about: "Ready-made messages you send from a lead in one tap", show: sells },
         { href: "/app/partners", icon: Handshake, label: "Partner QR codes", about: "Each partner's own QR code; their enquiries are credited to them", show: can(workspace, "leads.view_all") },

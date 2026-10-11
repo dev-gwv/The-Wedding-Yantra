@@ -44,9 +44,45 @@ const scheduler = setInterval(() => {
 }, 60 * 1000);
 scheduler.unref();
 
+// Facebook and Instagram leads: waiting ones are brought in every 15 seconds (and straight away
+// when a webhook arrives); the catch-up, the daily check and retries every minute. Started once
+// the database is migrated (below), separately from the scheduler so neither holds up the other.
+let leadTimers: NodeJS.Timeout[] = [];
+function startLeadWorker(): void {
+  let draining = false;
+  let ticking = false;
+  const drain = setInterval(() => {
+    if (draining) return;
+    draining = true;
+    app.leadWorker
+      .drain()
+      .catch((err) => app.log.warn({ message: (err as Error).message }, "lead worker drain failed"))
+      .finally(() => {
+        draining = false;
+      });
+  }, 15 * 1000);
+  const tick = setInterval(() => {
+    if (ticking) return;
+    ticking = true;
+    app.leadWorker
+      .tick()
+      .catch((err) => app.log.warn({ message: (err as Error).message }, "lead worker tick failed"))
+      .finally(() => {
+        ticking = false;
+      });
+  }, 60 * 1000);
+  drain.unref();
+  tick.unref();
+  leadTimers = [drain, tick];
+  // Anything that arrived while the server was down.
+  app.leadWorker.nudge();
+}
+
 app.addHook("onClose", async () => {
   clearInterval(housekeeping);
   clearInterval(scheduler);
+  for (const timer of leadTimers) clearInterval(timer);
+  await app.leadWorker.stop();
   await pool.end();
 });
 
@@ -80,6 +116,7 @@ process.once("SIGINT", () => void shutdown("SIGINT"));
 try {
   await waitForDatabase();
   await runMigrations(pool, app.log);
+  startLeadWorker();
   await app.listen({ port: config.port, host: config.host });
 } catch (err) {
   app.log.fatal({ err }, "failed to start");

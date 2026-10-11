@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { MouseEvent } from "react";
 import { cn } from "@/lib/cn";
 import { FollowUpBadge } from "./follow-up-badge";
+import { isAdSource, SourceBadge } from "./source-badge";
 
 /** Keeps a tap on Call or WhatsApp from also opening the lead. */
 const keepCardShut = (e: MouseEvent) => e.stopPropagation();
@@ -18,6 +19,7 @@ export function LeadCard({ lead, showStage = false, className }: { lead: LeadSum
     .join(" · ");
   const digits = lead.phone?.replace(/\D/g, "") ?? "";
   const first = lead.name.split(" ")[0];
+  const fromAd = isAdSource(lead.source);
   return (
     // The name's link covers the whole card; the buttons sit above it, so links never nest.
     <div
@@ -51,13 +53,14 @@ export function LeadCard({ lead, showStage = false, className }: { lead: LeadSum
           )}
         </p>
       )}
-      {(showStage || lead.followUpState !== "none" || digits) && (
+      {(showStage || lead.followUpState !== "none" || fromAd || digits) && (
         <div className="mt-3 flex items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {showStage && (
               <span className="rounded-full bg-cream px-2.5 py-1 text-xs font-semibold text-ink">{lead.stageName}</span>
             )}
             <FollowUpBadge at={lead.nextFollowUpAt} state={lead.followUpState} />
+            <SourceBadge source={lead.source} />
           </div>
           {digits && (
             <div className="relative z-10 -my-1 flex shrink-0 gap-2">

@@ -3,6 +3,7 @@
  * Anything that crosses the network boundary belongs here. Request bodies are Zod
  * schemas so every client validates exactly like the server does.
  */
+export * from "./ad-leads.js";
 export * from "./auth.js";
 export * from "./bookings.js";
 export * from "./billing.js";

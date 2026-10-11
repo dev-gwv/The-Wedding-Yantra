@@ -22,6 +22,9 @@ export function billingGuard(app: FastifyInstance, deps: { db: Db; config: Confi
     const workspaceId = (request.params as { workspaceId?: string } | undefined)?.workspaceId;
     const url = request.routeOptions.url ?? "";
     if (!workspaceId || !UUID.test(workspaceId) || url.includes("/billing") || !request.auth) return;
+    // A business whose plan ran out can always disconnect Facebook, or stop a Page's leads.
+    if (request.method === "DELETE" && url.endsWith("/workspaces/:workspaceId/meta")) return;
+    if (request.method === "PATCH" && url.endsWith("/workspaces/:workspaceId/meta/pages/:id") && (request.body as { on?: unknown } | null)?.on === false) return;
     // Outsiders get the route's own "not found", not a hint about the business's plan.
     const member = await deps.db.query(`SELECT 1 FROM memberships WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NULL`, [
       workspaceId,

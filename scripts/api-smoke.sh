@@ -4,8 +4,10 @@
 #      sign-in -> create business -> Home -> lead -> quote -> client accepts -> booked
 #      -> bill -> payment -> bill photo -> expense -> monthly report -> checklist and tasks
 #      -> scores, activity log and daily summary flow work over real HTTP
+#      -> Facebook lead ads with the pretend Facebook (META_FAKE): webhook check, connect,
+#      a signed webhook post, and the lead arriving in Leads by itself
 #   2. second start applies nothing (migrations are idempotent) and data is intact
-# Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq.
+# Used by CI and by the deploy workflow's verify job. Requires: node, curl, jq, openssl.
 set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
@@ -14,10 +16,18 @@ BASE="http://127.0.0.1:$PORT"
 LOG="$(mktemp)"
 PID=""
 PHONE="+919812345678"
+# Facebook lead ads run against the pretend Facebook. One sealing key for both starts, so
+# tokens saved by the first still open in the second.
+META_APP_SECRET="smoke-app-secret"
+META_VERIFY_TOKEN="smoke-verify-token"
+META_TOKEN_KEY="$(openssl rand -base64 32)"
 trap 'if [ -n "$PID" ]; then kill "$PID" 2>/dev/null || true; fi' EXIT
 
 start_api() {
-  PORT="$PORT" AUTH_OTP_DEV_ECHO=true LOG_LEVEL=info node apps/api/dist/index.js >"$LOG" 2>&1 &
+  PORT="$PORT" AUTH_OTP_DEV_ECHO=true LOG_LEVEL=info \
+    META_FAKE=true META_APP_ID=smoke-app META_APP_SECRET="$META_APP_SECRET" META_VERIFY_TOKEN="$META_VERIFY_TOKEN" \
+    META_TOKEN_KEY="$META_TOKEN_KEY" WEB_APP_URL=http://localhost:3000 \
+    node apps/api/dist/index.js >"$LOG" 2>&1 &
   PID=$!
   for _ in $(seq 1 30); do
     if curl -fsS "$BASE/api/health" >/dev/null 2>&1; then return 0; fi
@@ -61,7 +71,7 @@ for m in 0001_create_bookings 0002_workspaces_and_team 0003_seed_business_types 
   0008_tasks_and_team 0009_team_review 0010_time_off \
   0011_billing 0012_client_portal 0013_deliverables 0014_vendors_payouts 0015_inventory 0016_task_repeats \
   0017_custom_fields 0018_broadcasts 0019_logo_and_setup \
-  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master 0034_services_and_packages 0035_partner_qr 0036_departments 0037_access 0038_events_per_day 0039_follow_up_alerts; do
+  0020_lists_and_invoices 0021_expenses_deep 0022_invoice_settings 0023_payment_plans 0024_bill_deliverables 0025_delegation 0026_alerts 0027_points 0028_client_master 0029_client_relationship 0030_client_wedding_date 0031_vendor_master 0032_employee_master 0033_venue_master 0034_services_and_packages 0035_partner_qr 0036_departments 0037_access 0038_events_per_day 0039_follow_up_alerts 0040_meta_lead_ads; do
   grep -q "applied migration $m.sql" "$LOG" || die "migration $m was not applied"
 done
 echo "  ok: migrations applied"
@@ -241,6 +251,45 @@ expect "and set aside for the event, on its days" '.success and .data.status == 
   "$(api POST "/api/v1/workspaces/$WS_ID/inventory-bookings" "{\"itemId\":\"$(echo "$ITEM" | jq -r '.data.id')\",\"eventId\":\"$EVENT_ID\",\"quantity\":4,\"fromDate\":\"2099-12-01\",\"toDate\":\"2099-12-02\"}" "$TOKEN")"
 expect "what's free on those days is worked out" '.success and .data[0].available == 6' \
   "$(api GET "/api/v1/workspaces/$WS_ID/inventory?from=2099-12-01&to=2099-12-02" "" "$TOKEN")"
+
+echo "== Facebook lead ads (pretend Facebook)"
+[ "$(curl -fsS "$BASE/api/v1/integrations/meta/webhook?hub.mode=subscribe&hub.verify_token=$META_VERIFY_TOKEN&hub.challenge=8675309")" = "8675309" ] \
+  || die "Meta's webhook check did not get its challenge back"
+echo "  ok: Meta's webhook check gets its challenge back"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/integrations/meta/webhook?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=1")" = "403" ] \
+  || die "a wrong verify token was accepted"
+echo "  ok: a wrong verify token is refused"
+CONNECT="$(api POST "/api/v1/workspaces/$WS_ID/meta/connect" '{}' "$TOKEN")"
+expect "Continue with Facebook gives a login link with a state" '.success and (.data.url | test("state="))' "$CONNECT"
+STATE="$(echo "$CONNECT" | jq -r '.data.url | capture("state=(?<s>[^&]+)").s')"
+COMPLETE="$(api POST "/api/v1/workspaces/$WS_ID/meta/complete" "{\"code\":\"fake:one-page\",\"state\":\"$STATE\"}" "$TOKEN")"
+expect "coming back from Facebook connects it and switches the one Page on" \
+  '.success and .data.added == 1 and .data.pages[0].active == true and .data.pages[0].status == "ok" and (tostring | contains("fake-page-token") | not)' "$COMPLETE"
+SEED="$(api POST /api/v1/integrations/meta/dev/leads "{\"workspaceId\":\"$WS_ID\",\"name\":\"Smoke Facebook Lead\",\"phone\":\"9811177777\"}" "$TOKEN")"
+expect "someone fills the lead form on the pretend Facebook" '.success and (.data.leads | length) == 1' "$SEED"
+PAGE_ID="$(echo "$SEED" | jq -r '.data.pageId')"
+FORM_ID="$(echo "$SEED" | jq -r '.data.formId')"
+LEADGEN_ID="$(echo "$SEED" | jq -r '.data.leads[0].leadgenId')"
+NOW="$(date +%s)"
+HOOK_BODY="{\"object\":\"page\",\"entry\":[{\"id\":\"$PAGE_ID\",\"time\":$NOW,\"changes\":[{\"field\":\"leadgen\",\"value\":{\"leadgen_id\":\"$LEADGEN_ID\",\"page_id\":\"$PAGE_ID\",\"form_id\":\"$FORM_ID\",\"created_time\":$NOW}}]}]}"
+HOOK_SIG="sha256=$(printf '%s' "$HOOK_BODY" | openssl dgst -sha256 -hmac "$META_APP_SECRET" | sed 's/^.*= //')"
+hook() { curl -sS -X POST "$BASE/api/v1/integrations/meta/webhook" -H "Content-Type: application/json" -H "X-Hub-Signature-256: $1" --data-binary "$HOOK_BODY"; }
+expect "a webhook with a wrong signature is refused" '.success == false and .error.code == "BAD_SIGNATURE"' "$(hook "sha256=0000")"
+expect "Meta's signed webhook is taken" '.success and .data.received == 1' "$(hook "$HOOK_SIG")"
+for _ in $(seq 1 20); do
+  FB_LEADS="$(api GET "/api/v1/workspaces/$WS_ID/leads?source=facebook_ad" "" "$TOKEN")"
+  if echo "$FB_LEADS" | jq -e '.success and (.data.leads | length) == 1' >/dev/null; then break; fi
+  sleep 0.5
+done
+expect "the Facebook lead arrives in Leads by itself, as a Facebook ad, for the owner" \
+  '.success and (.data.leads | length) == 1 and .data.leads[0].name == "Smoke Facebook Lead" and .data.leads[0].source == "facebook_ad" and .data.leads[0].assignedTo != null' "$FB_LEADS"
+expect "and the owner gets the New enquiry alert" '.success and ([.data.items[] | select(.kind == "lead.new")] | length) >= 1' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/notifications" "" "$TOKEN")"
+expect "Meta sending it again changes nothing" '.success and .data.received == 0' "$(hook "$HOOK_SIG")"
+expect "the recent list shows it brought in" '.success and .data[0].status == "added" and .data[0].receivedVia == "webhook"' \
+  "$(api GET "/api/v1/workspaces/$WS_ID/meta/recent" "" "$TOKEN")"
+if grep -q "$META_VERIFY_TOKEN" "$LOG" || ! grep -q 'hub.verify_token=\[redacted\]' "$LOG"; then die "the webhook verify token reached the log"; fi
+echo "  ok: the verify token never reaches the log"
 stop_api
 
 echo "== second start (same database)"

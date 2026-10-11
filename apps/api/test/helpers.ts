@@ -7,6 +7,7 @@ import { buildApp } from "../src/app.js";
 import { localFileStore } from "../src/lib/storage.js";
 import type { Files } from "../src/modules/files/service.js";
 import type { PaymentGateway } from "../src/modules/billing/gateway.js";
+import type { MetaGraph } from "../src/modules/meta/graph.js";
 import type { PushSend } from "../src/modules/notifications/push.js";
 import { loadConfig } from "../src/config.js";
 import { createPool, type Db } from "../src/db.js";
@@ -23,10 +24,11 @@ export interface TestContext {
 
 /**
  * A fresh, fully migrated database and an app instance. Wipes TEST_DATABASE_URL.
- * `env` adds settings (e.g. billing); `gateway` stands in for the payment provider.
+ * `env` adds settings (e.g. billing); `gateway` stands in for the payment provider, `metaGraph`
+ * for Facebook (see meta-helpers.ts).
  */
 export async function setup(
-  options: { env?: Record<string, string>; gateway?: PaymentGateway | null; pushSend?: PushSend | null } = {},
+  options: { env?: Record<string, string>; gateway?: PaymentGateway | null; pushSend?: PushSend | null; metaGraph?: MetaGraph | null } = {},
 ): Promise<TestContext> {
   if (!TEST_DATABASE_URL) throw new Error("Set TEST_DATABASE_URL to a throwaway Postgres database");
   const db = createPool(TEST_DATABASE_URL);
@@ -45,7 +47,16 @@ export async function setup(
   // Uploads go to a throwaway folder that is removed afterwards.
   const uploads = await mkdtemp(join(tmpdir(), "wy-uploads-"));
   const files: Files = { store: localFileStore(uploads), secret: randomBytes(32) };
-  const app = await buildApp({ config, db, logger: false, otpSender: { send: async () => undefined }, files, gateway: options.gateway, pushSend: options.pushSend ?? null });
+  const app = await buildApp({
+    config,
+    db,
+    logger: false,
+    otpSender: { send: async () => undefined },
+    files,
+    gateway: options.gateway,
+    pushSend: options.pushSend ?? null,
+    metaGraph: options.metaGraph,
+  });
   await app.ready();
   return {
     app,

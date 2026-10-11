@@ -11,10 +11,16 @@ import type { MemberContext } from "../auth/guard.js";
  * read from the database itself, so new columns are included without changing this file,
  * except anything secret: share links, portal links, tokens, hashes and file storage keys.
  */
-const SECTIONS: { key: string; table: string }[] = [
+const SECTIONS: { key: string; table: string; where?: string }[] = [
   { key: "pipelineStages", table: "pipeline_stages" },
   { key: "leads", table: "leads" },
   { key: "leadActivities", table: "lead_activities" },
+  // Facebook and Instagram lead forms as they arrived; a deleted lead's are left out.
+  {
+    key: "incomingLeads",
+    table: "incoming_leads",
+    where: "NOT EXISTS (SELECT 1 FROM leads d WHERE d.id = incoming_leads.lead_id AND d.deleted_at IS NOT NULL)",
+  },
   { key: "clients", table: "clients" },
   { key: "clientContacts", table: "client_contacts" },
   { key: "events", table: "events" },
@@ -63,12 +69,14 @@ async function exportableColumns(db: Db, tables: string[]): Promise<Map<string, 
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 /** This workspace's live rows of one table (deleted ones are left out), oldest first. */
-async function tableRows(db: Db, table: string, columns: string[], workspaceId: string): Promise<Row[]> {
+async function tableRows(db: Db, table: string, columns: string[], workspaceId: string, extraWhere?: string): Promise<Row[]> {
   // Only tables that really belong to a business are read.
   if (!columns.includes("workspace_id")) return [];
   const where = [`workspace_id = $1`];
   if (columns.includes("deleted_at")) where.push("deleted_at IS NULL");
-  const order = columns.includes("created_at") ? " ORDER BY created_at, 1" : columns.includes("position") ? " ORDER BY position" : "";
+  if (extraWhere) where.push(`(${extraWhere})`);
+  const first = ["created_at", "received_at"].find((c) => columns.includes(c));
+  const order = first ? ` ORDER BY ${first}, 1` : columns.includes("position") ? " ORDER BY position" : "";
   const { rows } = await db.query<Row>(
     `SELECT ${columns.map(ident).join(", ")} FROM ${ident(table)} WHERE ${where.join(" AND ")}${order}`,
     [workspaceId],
@@ -129,7 +137,7 @@ export async function exportWorkspace(db: Db, ctx: MemberContext): Promise<Works
     members: members.rows,
   };
   for (const section of SECTIONS) {
-    data[section.key] = await tableRows(db, section.table, columns.get(section.table) ?? [], ctx.workspaceId);
+    data[section.key] = await tableRows(db, section.table, columns.get(section.table) ?? [], ctx.workspaceId, section.where);
   }
 
   const name = typeof workspace.name === "string" ? workspace.name : "business";

@@ -9,6 +9,11 @@ import * as auth from "./service.js";
 
 export function authRoutes(app: FastifyInstance, deps: { db: Db; config: Config; otpSender: OtpSender }) {
   const { db, config, otpSender } = deps;
+  if (config.reviewLogin && config.nodeEnv === "production") {
+    app.log.warn(
+      `AUTH_REVIEW_PHONE is on: one number signs in with a fixed code until ${config.reviewLogin.until.toISOString()}. Remove the AUTH_REVIEW_* settings once Meta's review is done.`,
+    );
+  }
 
   app.post("/auth/otp/request", async (request) => {
     const { phone } = parse(otpRequestInput, request.body);
@@ -21,13 +26,17 @@ export function authRoutes(app: FastifyInstance, deps: { db: Db; config: Config;
         maxPerPhoneDay: config.otpMaxPerPhoneDay,
         maxGlobalDay: config.otpMaxGlobalDay,
         production: config.nodeEnv === "production",
+        review: config.reviewLogin,
+        log: request.log,
       }),
     );
   });
 
   app.post("/auth/otp/verify", async (request) => {
     const input = parse(otpVerifyInput, request.body);
-    return ok(await auth.verifyOtp(db, { ...input, userAgent: request.headers["user-agent"] ?? null }));
+    return ok(
+      await auth.verifyOtp(db, { ...input, userAgent: request.headers["user-agent"] ?? null, review: config.reviewLogin, log: request.log }),
+    );
   });
 
   app.get("/auth/me", async (request) => {

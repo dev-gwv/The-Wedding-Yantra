@@ -3,6 +3,7 @@ import { optionalText } from "./common.js";
 import type { CustomValues } from "@wedding-yantra/core";
 import { personName, phone } from "./auth.js";
 import { customValuesInput } from "./custom.js";
+import type { AdEnquiry } from "./ad-leads.js";
 
 // ---------------------------------------------------------------------------
 // Fixed lists
@@ -18,6 +19,8 @@ export const LEAD_SOURCES = [
   "wedding_portal",
   "website",
   "ads",
+  "facebook_ad",
+  "instagram_ad",
   "partner",
   "other",
 ] as const;
@@ -33,6 +36,8 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   wedding_portal: "Wedding portal",
   website: "Website",
   ads: "Ads",
+  facebook_ad: "Facebook ad",
+  instagram_ad: "Instagram ad",
   partner: "Partner QR",
   other: "Other",
 };
@@ -156,6 +161,11 @@ export interface Lead extends LeadSummary {
   /** The booking made from this lead, once a quote is accepted */
   eventId: string | null;
   activities: LeadActivity[];
+  /**
+   * The Facebook and Instagram lead forms behind this enquiry, newest first: the one that
+   * made it and any sent again. Missing from an older API: treat as [].
+   */
+  adEnquiries?: AdEnquiry[];
 }
 
 export interface LeadList {
@@ -239,6 +249,7 @@ export const leadListQuery = z.object({
   followUp: z.enum(["due", "overdue", "today", "upcoming"]).optional(),
   mine: z.enum(["true", "false"]).optional(),
   partnerId: z.uuid().optional(),
+  source: z.enum(LEAD_SOURCES).optional(),
 });
 export type LeadListQuery = z.input<typeof leadListQuery>;
 

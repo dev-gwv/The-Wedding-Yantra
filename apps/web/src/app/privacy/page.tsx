@@ -96,6 +96,66 @@ const SECTIONS: LegalSection[] = [
     ),
   },
   {
+    id: "meta-leads",
+    title: "Facebook and Instagram lead ads",
+    body: (
+      <>
+        <p>
+          A business owner can connect their Facebook Page so that enquiries from their Facebook and Instagram lead ads come straight into
+          Wedding Yantra. Only the owner can connect or disconnect it.
+        </p>
+        <p>
+          <strong>What we receive from Meta:</strong>
+        </p>
+        <ul>
+          <li>the name and ID of each Page the owner connects, and the name of the Facebook account used to connect it;</li>
+          <li>
+            the answers people give on that business&apos;s lead forms, such as name, phone number, email, city, event date and any other
+            question on the form, and when the form was filled;
+          </li>
+          <li>whether it came from Facebook or Instagram, and the names of the form, campaign, ad set and ad, when Meta shares them;</li>
+          <li>access keys (tokens) that let us read the Page&apos;s new leads.</li>
+        </ul>
+        <p>
+          <strong>Why:</strong> only to add each enquiry to that business&apos;s Leads, give it to one of its salespeople, alert them, and show
+          where it came from. We also check the connection regularly so leads are not missed.
+        </p>
+        <p>
+          <strong>How we protect it:</strong> access keys are stored encrypted and are never shown in the app or given to anyone. Each lead is
+          seen only by the business whose ad it came from.
+        </p>
+        <p>
+          <strong>How long we keep it:</strong> access keys are deleted as soon as the business disconnects Facebook, or as soon as the person
+          who connected a Page removes Wedding Yantra in their Facebook settings. The name of the Facebook account used to connect is kept until
+          the business disconnects Facebook, that person asks Facebook to delete their data, or the business closes its account. The names of
+          the Page, form and ad stay with the leads they brought in. Leads that arrived stay in the business&apos;s Leads as its own records
+          until the business deletes them or closes its account. Records of leads we could not bring in are deleted after [90] days.
+        </p>
+        <p>
+          We do not sell this data, use it for advertising, or share it with any other business. We use it only as Meta&apos;s Platform Terms
+          and Developer Policies allow.
+        </p>
+        <p>
+          <strong>How to delete it:</strong>
+        </p>
+        <ul>
+          <li>
+            the owner can tap <em>Disconnect</em> in <em>Settings</em>, <em>Facebook &amp; Instagram leads</em>. This stops new leads and
+            deletes the access keys at once;
+          </li>
+          <li>
+            anyone who connected a Page can remove Wedding Yantra in Facebook&apos;s settings (Settings and privacy, Settings, Business
+            integrations) and ask for their data to be deleted. Facebook then gives a link to a page at [Web app address]/meta-deletion that
+            shows where the request stands;
+          </li>
+          <li>a business can delete any lead in the app, which also removes the answers from its form;</li>
+          <li>or write to {COMPANY.email}.</li>
+        </ul>
+        <p>If you filled a lead form for a business, please contact that business first: the enquiry is their record.</p>
+      </>
+    ),
+  },
+  {
     id: "keep",
     title: "How long we keep it",
     body: (

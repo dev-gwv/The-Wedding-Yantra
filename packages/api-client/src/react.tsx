@@ -10,6 +10,10 @@ import {
 } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type {
+  LeadRoutingInput,
+  MetaCompleteInput,
+  MetaConnectInput,
+  MetaTestLeadInput,
   DepartmentAccessInput,
   MemberAccessInput,
   NotificationPrefs,
@@ -133,6 +137,11 @@ export const queryKeys = {
   client: (id: string, clientId: string) => ["workspace", id, "sales", "client", clientId] as const,
   templates: (id: string) => ["workspace", id, "templates"] as const,
   leadForm: (id: string) => ["workspace", id, "lead-form"] as const,
+  /** Facebook and Instagram lead ads: the connection, Pages, forms and recent leads. */
+  meta: (id: string) => ["workspace", id, "meta"] as const,
+  metaRecent: (id: string) => ["workspace", id, "meta", "recent"] as const,
+  leadRouting: (id: string) => ["workspace", id, "lead-routing"] as const,
+  metaDeletion: (code: string) => ["public-meta-deletion", code] as const,
   publicForm: (slug: string, ref: string, p = "") => ["public-form", slug, ref, p] as const,
   partners: (id: string, archived = false) => ["workspace", id, "partners", archived] as const,
   partner: (id: string, partnerId: string) => ["workspace", id, "partners", "one", partnerId] as const,
@@ -542,6 +551,110 @@ export function useSetLeadFormEnabled(workspaceId: string) {
     mutationFn: (enabled: boolean) => api.leadForm.setEnabled(workspaceId, enabled),
     onSuccess: (data) => qc.setQueryData(queryKeys.leadForm(workspaceId), data),
   });
+}
+
+// ---- Facebook and Instagram lead ads ---------------------------------------
+
+export function useMetaStatus(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.meta(workspaceId), queryFn: () => api.meta.status(workspaceId), enabled: enabled && !!workspaceId });
+}
+
+/** Resolves to the Facebook login link; send the whole page there. */
+export function useMetaConnect(workspaceId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (input: MetaConnectInput = {}) => api.meta.connect(workspaceId, input) });
+}
+
+/** Finishes "Continue with Facebook" with what Facebook sent back. */
+export function useMetaComplete(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MetaCompleteInput) => api.meta.complete(workspaceId, input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.meta(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.leadRouting(workspaceId) });
+    },
+  });
+}
+
+/** Switch a Page's leads on or off. `takeOver` moves a Page another business has on (asked first). */
+export function useUpdateMetaPage(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, on, takeOver }: { id: string; on: boolean; takeOver?: boolean }) =>
+      api.meta.updatePage(workspaceId, id, takeOver ? { on, takeOver } : { on }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.meta(workspaceId) }),
+  });
+}
+
+/** "Check again": may bring in leads that were missed, so Leads refresh too. */
+export function useCheckMetaPage(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.meta.checkPage(workspaceId, id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.meta(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.sales(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.home(workspaceId) });
+    },
+  });
+}
+
+/** `pageId` is the Page's id here (`MetaPage.id`); `formId` is Meta's form id. */
+export function useSendMetaTestLead(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pageId, ...input }: MetaTestLeadInput & { pageId: string }) => api.meta.testLead(workspaceId, pageId, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.metaRecent(workspaceId) }),
+  });
+}
+
+/** The last leads that came in. Poll with `refetchInterval` while a test lead is on its way. */
+export function useMetaRecent(workspaceId: string, options: { enabled?: boolean; refetchInterval?: number | false } = {}) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.metaRecent(workspaceId),
+    queryFn: () => api.meta.recent(workspaceId),
+    enabled: (options.enabled ?? true) && !!workspaceId,
+    refetchInterval: options.refetchInterval ?? false,
+  });
+}
+
+export function useDisconnectMeta(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.meta.disconnect(workspaceId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.meta(workspaceId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.leadRouting(workspaceId) });
+    },
+  });
+}
+
+export function useLeadRouting(workspaceId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.leadRouting(workspaceId), queryFn: () => api.leadRouting.get(workspaceId), enabled: enabled && !!workspaceId });
+}
+
+export function useSetLeadRouting(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: LeadRoutingInput) => api.leadRouting.set(workspaceId, input),
+    onSuccess: (data) => qc.setQueryData(queryKeys.leadRouting(workspaceId), data),
+  });
+}
+
+/** Public: where a Facebook data deletion request stands. */
+export function useMetaDeletionStatus(code: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.metaDeletion(code), queryFn: () => api.meta.deletionStatus(code), enabled: !!code, retry: false });
 }
 
 /** `ref` is the code from a client's "recommend us" link. */

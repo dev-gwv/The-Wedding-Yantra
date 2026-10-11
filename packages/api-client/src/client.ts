@@ -1,4 +1,17 @@
 import type {
+  IncomingLeadItem,
+  LeadRouting,
+  LeadRoutingInput,
+  MetaCheckResult,
+  MetaCompleteInput,
+  MetaCompleteResult,
+  MetaConnectInput,
+  MetaDeletionStatus,
+  MetaPage,
+  MetaStatus,
+  MetaTestLeadInput,
+  MetaTestLeadResult,
+  UpdateMetaPageInput,
   DateCheck,
   PhoneMatch,
   SearchResults,
@@ -372,6 +385,31 @@ export function createApiClient(options: ApiClientOptions) {
       publicGet: (slug: string, ref?: string, p?: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}${qs({ ref, p })}`),
       submit: (slug: string, input: SubmitLeadFormInput) =>
         request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
+    },
+    /** Facebook and Instagram lead ads. The owner only, except `deletionStatus`. */
+    meta: {
+      status: (workspaceId: string) => request<MetaStatus>("GET", `${ws(workspaceId)}/meta`),
+      /** The Facebook login link to send the whole page to */
+      connect: (workspaceId: string, input: MetaConnectInput = {}) => request<{ url: string }>("POST", `${ws(workspaceId)}/meta/connect`, input),
+      /** With the `code` and `state` Facebook sent back to /connect/meta */
+      complete: (workspaceId: string, input: MetaCompleteInput) => request<MetaCompleteResult>("POST", `${ws(workspaceId)}/meta/complete`, input),
+      /** Switch a Page's leads on or off */
+      updatePage: (workspaceId: string, id: string, input: UpdateMetaPageInput) =>
+        request<MetaPage>("PATCH", `${ws(workspaceId)}/meta/pages/${encodeURIComponent(id)}`, input),
+      /** "Check again": the Page's health now, and any missed leads brought in */
+      checkPage: (workspaceId: string, id: string) => request<MetaCheckResult>("POST", `${ws(workspaceId)}/meta/pages/${encodeURIComponent(id)}/check`),
+      testLead: (workspaceId: string, pageId: string, input: MetaTestLeadInput) =>
+        request<MetaTestLeadResult>("POST", `${ws(workspaceId)}/meta/pages/${encodeURIComponent(pageId)}/test-lead`, input),
+      /** The last 20 leads that came in */
+      recent: (workspaceId: string) => request<IncomingLeadItem[]>("GET", `${ws(workspaceId)}/meta/recent`),
+      disconnect: (workspaceId: string) => request<{ disconnected: true }>("DELETE", `${ws(workspaceId)}/meta`),
+      /** Public: where a Facebook data deletion request stands */
+      deletionStatus: (code: string) => request<MetaDeletionStatus>("GET", `/integrations/meta/deletion/${encodeURIComponent(code)}`),
+    },
+    /** Who gets the leads that arrive by themselves. The owner only. */
+    leadRouting: {
+      get: (workspaceId: string) => request<LeadRouting>("GET", `${ws(workspaceId)}/lead-routing`),
+      set: (workspaceId: string, input: LeadRoutingInput) => request<LeadRouting>("PUT", `${ws(workspaceId)}/lead-routing`, input),
     },
     catalogue: {
       list: (workspaceId: string, all = false) =>

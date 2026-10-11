@@ -21,6 +21,7 @@ import {
   Sun,
   TriangleAlert,
   Undo2,
+  Unplug,
   Upload,
   type LucideIcon,
   FileCheck2,
@@ -59,6 +60,7 @@ const KIND_ICON: Record<NotificationKind, { icon: LucideIcon; tone: string }> = 
   "lead.follow_up": { icon: PhoneCall, tone: "bg-sun-100 text-brand-strong" },
   "quote.accepted": { icon: FileCheck2, tone: "bg-success-soft text-success" },
   "quote.declined": { icon: FileX2, tone: "bg-danger-soft text-danger" },
+  "lead.source_problem": { icon: Unplug, tone: "bg-danger-soft text-danger" },
   test: { icon: Bell, tone: "bg-cream text-ink-muted" },
 };
 

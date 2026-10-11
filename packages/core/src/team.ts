@@ -88,6 +88,20 @@ export function activityText(a: ActivityFacts): string {
       return `cancelled the invitation for ${a.subject ?? "someone"}`;
     case "sales.stages_updated":
       return "changed the sales stages";
+    case "meta.connected":
+      return `connected Facebook lead ads${a.detail ? ` as ${a.detail}` : ""}`;
+    case "meta.disconnected":
+      return "disconnected Facebook lead ads";
+    case "meta.page_on":
+      return `turned on leads from the Facebook Page ${subject || "a Page"}`;
+    case "meta.page_off":
+      return `turned off leads from the Facebook Page ${subject || "a Page"}`;
+    case "meta.page_taken_over":
+      return a.actorName
+        ? `moved the Facebook Page ${subject || "a Page"} to this business${a.other ? ` from ${a.other}` : ""}`
+        : `The Facebook Page ${subject || "a Page"} now sends its leads to another business`;
+    case "lead_routing.changed":
+      return `changed who gets Facebook leads${a.detail ? `: ${a.detail}` : ""}`;
     case "quote.accepted":
       return a.actorName
         ? `marked quote ${subject} as accepted${a.other ? ` for ${a.other}` : ""}`
@@ -199,7 +213,7 @@ export function activityText(a: ActivityFacts): string {
         ? `added the enquiry ${subject}`
         : `New enquiry from ${subject}${a.detail ? ` via the ${a.detail}` : ""}${a.other ? `, recommended by ${a.other}` : ""}`;
     case "lead.note":
-      return a.actorName ? `added a note on ${subject}` : `${subject} sent the enquiry form again`;
+      return a.actorName ? `added a note on ${subject}` : `${subject} sent the ${a.other ?? "enquiry form"} again`;
     case "lead.call":
       return `called ${subject}`;
     case "lead.whatsapp":

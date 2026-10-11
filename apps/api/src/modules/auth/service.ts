@@ -1,4 +1,7 @@
+import type { FastifyBaseLogger } from "fastify";
+import { maskPhone } from "@wedding-yantra/core";
 import type { AuthSession, Me, OtpRequestResult, User } from "@wedding-yantra/types";
+import type { ReviewLogin } from "../../config.js";
 import type { Db, Queryable } from "../../db.js";
 import { otpCode, randomToken, sha256 } from "../../lib/crypto.js";
 import { AppError } from "../../lib/http.js";
@@ -29,6 +32,14 @@ export const toUser = (row: UserRow): User => ({
 
 const hashCode = (phone: string, code: string) => sha256(`${phone}:${code}`);
 
+/**
+ * Meta's app reviewer signs in to one number of ours with a fixed code (AUTH_REVIEW_*), only
+ * until the date. Nothing is sent: the fixed code is saved as that number's code, so the usual
+ * expiry, wrong-try and per-number limits still apply.
+ */
+export const isReviewLogin = (review: ReviewLogin | null | undefined, phone: string, now = new Date()): review is ReviewLogin =>
+  !!review && review.phone === phone && now.getTime() < review.until.getTime();
+
 export async function requestOtp(
   db: Db,
   sender: OtpSender,
@@ -42,6 +53,8 @@ export async function requestOtp(
     /** Codes sent to everyone together per day, so a bot can't run up the SMS bill; 0 means no cap. */
     maxGlobalDay?: number;
     production?: boolean;
+    review?: ReviewLogin | null;
+    log?: Pick<FastifyBaseLogger, "warn">;
   },
 ): Promise<OtpRequestResult> {
   // "Today" is the calendar day in India, so "try again tomorrow" means what it says.
@@ -70,7 +83,8 @@ export async function requestOtp(
     throw new AppError(429, "TOO_MANY_REQUESTS", "Too many codes requested. Please wait 15 minutes and try again.");
   }
 
-  const code = otpCode();
+  const review = isReviewLogin(input.review, input.phone) ? input.review : null;
+  const code = review ? review.code : otpCode();
   // A new code replaces any earlier unused one for this number.
   await db.query(`UPDATE otp_codes SET consumed_at = now() WHERE phone = $1 AND consumed_at IS NULL`, [input.phone]);
   await db.query(
@@ -78,6 +92,10 @@ export async function requestOtp(
      VALUES ($1, $2, now() + make_interval(secs => $3), $4)`,
     [input.phone, hashCode(input.phone, code), OTP_TTL_SECONDS, input.ip],
   );
+  if (review) {
+    input.log?.warn({ phone: maskPhone(input.phone) }, "Meta reviewer sign-in: code asked for the review number, nothing sent");
+    return { sent: true, phone: input.phone, expiresInSeconds: OTP_TTL_SECONDS, channel: "none" };
+  }
   const channel = (await sender.send(input.phone, code)) ?? "none";
   // Never tell someone "we sent a code" when nothing went out: in production with no
   // WhatsApp or SMS provider (and test mode off), nobody could ever sign in.
@@ -96,7 +114,7 @@ export async function requestOtp(
 
 export async function verifyOtp(
   db: Db,
-  input: { phone: string; code: string; userAgent: string | null },
+  input: { phone: string; code: string; userAgent: string | null; review?: ReviewLogin | null; log?: Pick<FastifyBaseLogger, "warn"> },
 ): Promise<AuthSession> {
   const { rows } = await db.query<{ id: string; code_hash: string; attempts: number; expired: boolean }>(
     `SELECT id, code_hash, attempts, expires_at < now() AS expired
@@ -120,6 +138,9 @@ export async function verifyOtp(
     otp.id,
   ]);
   if (claimed.rowCount !== 1) throw wrongCode("This code was already used. Ask for a new one.");
+  if (isReviewLogin(input.review, input.phone)) {
+    input.log?.warn({ phone: maskPhone(input.phone) }, "Meta reviewer sign-in: signed in with the review code");
+  }
 
   const upsert = await db.query<UserRow & { inserted: boolean }>(
     `INSERT INTO users (phone) VALUES ($1)

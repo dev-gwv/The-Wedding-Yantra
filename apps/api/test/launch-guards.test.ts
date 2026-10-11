@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, parseTrustProxy } from "../src/config.js";
 import { setup, type TestContext } from "./helpers.js";
+import { fakeGraph, leadgenBody, META_ENV, signMeta } from "./meta-helpers.js";
 
 let t: TestContext;
 beforeAll(async () => {
@@ -12,7 +13,9 @@ beforeAll(async () => {
       RATE_LIMIT_AUTH_PER_MIN: "5",
       RATE_LIMIT_PUBLIC_PER_MIN: "4",
       RATE_LIMIT_PUBLIC_POST_PER_MIN: "2",
+      ...META_ENV,
     },
+    metaGraph: fakeGraph(),
   });
 });
 afterAll(async () => {
@@ -71,6 +74,39 @@ describe("per-IP rate limits", () => {
     // Other screens aren't limited, and neither is reading who's signed in.
     expect((await viaProxy("GET", "/business-types", "198.51.100.1")).statusCode).toBe(200);
     for (let i = 0; i < 8; i++) expect((await viaProxy("GET", "/auth/me", "203.0.113.5")).statusCode).toBe(401);
+  });
+});
+
+describe("Meta's calls", () => {
+  const webhook = (raw: string, headers: Record<string, string> = {}) =>
+    t.app.inject({
+      method: "POST",
+      url: "/api/v1/integrations/meta/webhook",
+      headers: { "content-type": "application/json", "x-hub-signature-256": signMeta(raw), "x-forwarded-for": "31.13.64.1", ...headers },
+      payload: raw,
+    });
+
+  it("are never rate limited: a burst of lead webhooks from one address all get through", async () => {
+    const raw = leadgenBody([{ pageId: "555000555", leadgenId: "777000777" }]);
+    for (let i = 0; i < 30; i++) expect((await webhook(raw)).statusCode).toBe(200);
+    for (let i = 0; i < 10; i++) {
+      const res = await t.app.inject({ method: "GET", url: "/api/v1/integrations/meta/webhook?hub.mode=subscribe&hub.verify_token=nope&hub.challenge=1", headers: { "x-forwarded-for": "31.13.64.1" } });
+      expect(res.statusCode).toBe(403);
+    }
+  });
+
+  it("take big batches as raw bytes without changing how other routes read JSON", async () => {
+    // Bigger than the usual 1 MB limit, within the webhook's 5 MB.
+    const many = leadgenBody(Array.from({ length: 12_000 }, (_, i) => ({ pageId: "555000555", leadgenId: `9${String(i).padStart(12, "0")}` })));
+    expect(many.length).toBeGreaterThan(1_100_000);
+    expect((await webhook(many)).statusCode).toBe(200);
+    expect((await webhook("{not json", { "x-hub-signature-256": signMeta("{not json") })).statusCode).toBe(400);
+
+    const json = await viaProxy("POST", "/auth/otp/request", "192.0.2.250", { phone: "12" });
+    expect(json.statusCode).toBe(400);
+    expect(json.json().error.code).toBe("VALIDATION_ERROR");
+    const broken = await t.app.inject({ method: "POST", url: "/api/v1/auth/otp/request", headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.251" }, payload: "{oops" });
+    expect(broken.statusCode).toBe(400);
   });
 });
 

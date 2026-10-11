@@ -1,6 +1,6 @@
 "use client";
 
-import { can, formatDate, formatFollowUp, formatMoney, formatPhone, timeAgo } from "@wedding-yantra/core";
+import { adPlatform, can, formatDate, formatFollowUp, formatMoney, formatPhone, timeAgo } from "@wedding-yantra/core";
 import {
   useAddLeadActivity,
   useDeleteLead,
@@ -25,6 +25,7 @@ import {
   ChevronRight,
   CircleCheck,
   FileText,
+  Megaphone,
   MessageCircle,
   NotebookPen,
   Pencil,
@@ -41,11 +42,13 @@ import { CustomFieldList } from "@/components/app/custom-fields";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { DateCheck } from "@/components/bookings/date-check";
 import { QuoteRow } from "@/components/bookings/quote-row";
+import { AdEnquiryCard } from "@/components/sales/ad-enquiry-card";
 import { CallOutcomeSheet } from "@/components/sales/call-outcome-sheet";
 import { FollowUpBadge } from "@/components/sales/follow-up-badge";
 import { FollowUpSheet } from "@/components/sales/follow-up-picker";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
 import { LostSheet } from "@/components/sales/lost-sheet";
+import { isAdSource, SourceBadge } from "@/components/sales/source-badge";
 import { WhatsAppSheet } from "@/components/sales/whatsapp-sheet";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, Notice, Pill } from "@/components/ui/misc";
@@ -115,6 +118,8 @@ function LeadView({ lead }: { lead: Lead }) {
   const event = [lead.eventType ? EVENT_LABELS[lead.eventType] : null, lead.eventDate ? formatDate(lead.eventDate) : null]
     .filter(Boolean)
     .join(" · ");
+  // Missing from an older API.
+  const adEnquiries = lead.adEnquiries ?? [];
 
   async function moveTo(stage: PipelineStage, lostReason?: LostReason) {
     if (stage.id === lead.stageId) return;
@@ -168,6 +173,7 @@ function LeadView({ lead }: { lead: Lead }) {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <FollowUpBadge at={lead.nextFollowUpAt} state={lead.followUpState} />
+          <SourceBadge source={lead.source} />
           {lead.stageKind === "won" && <Pill tone="success">Booked</Pill>}
           {lead.stageKind === "lost" && lead.lostReason && <Pill>Lost · {LOST_LABELS[lead.lostReason]}</Pill>}
           {lead.clientId && can(workspace, "clients.view") && (
@@ -240,8 +246,19 @@ function LeadView({ lead }: { lead: Lead }) {
 
       <QuotesAndEvent lead={lead} />
 
-      {/* Details */}
-      <Details lead={lead} />
+      {/* Details, and the lead forms behind it side by side on a wide screen */}
+      {adEnquiries.length > 0 ? (
+        <div className="grid items-start gap-6 xl:grid-cols-2">
+          <Details lead={lead} />
+          <div className="space-y-6">
+            {adEnquiries.map((e, i) => (
+              <AdEnquiryCard key={e.id} enquiry={e} answersOpen={i === 0} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <Details lead={lead} />
+      )}
 
       {/* Note + history */}
       <section>
@@ -359,10 +376,15 @@ function QuotesAndEvent({ lead }: { lead: Lead }) {
 function Details({ lead }: { lead: Lead }) {
   const { workspace } = useCurrentWorkspace();
   const referrer = lead.referredByClient;
+  // The ad that brought them in: the lead form that made the lead, not a later repeat.
+  const ads = isAdSource(lead.source) ? (lead.adEnquiries ?? []) : [];
+  const firstAd = ads.find((e) => !e.merged) ?? ads[0];
   const rows: [string, ReactNode][] = [
     [
       "Came from",
-      lead.partner ? (
+      firstAd?.campaignName ? (
+        `${SOURCE_LABELS[lead.source]} · ${firstAd.campaignName}`
+      ) : lead.partner ? (
         <span>
           {SOURCE_LABELS[lead.source]} ·{" "}
           {can(workspace, "leads.view_all") ? (
@@ -452,6 +474,13 @@ function NoteBox({ lead }: { lead: Lead }) {
   );
 }
 
+/** What the lead ads intake kept on an activity: the platform and the form's name. */
+function adFacts(m: Record<string, unknown>): { platform: "Facebook" | "Instagram"; form: string } {
+  const instagram = m.source === "instagram_ad" || adPlatform(typeof m.platform === "string" ? m.platform : null) === "instagram";
+  const form = typeof m.form === "string" && m.form.trim() ? ` (${m.form.trim()})` : "";
+  return { platform: instagram ? "Instagram" : "Facebook", form };
+}
+
 const ACTIVITY_ICONS = {
   created: Sparkles,
   note: NotebookPen,
@@ -467,9 +496,18 @@ function describe(a: LeadActivity): string {
   const m = a.meta as Record<string, string | null | undefined>;
   switch (a.kind) {
     case "created":
+      if (m.via === "meta") {
+        const ad = adFacts(a.meta);
+        if (a.meta.test === true) return `A ${ad.platform} test lead came in${ad.form}`;
+        return `Came in from ${ad.platform === "Instagram" ? "an Instagram" : "a Facebook"} ad${ad.form}`;
+      }
       if (m.via === "enquiry_form") return `Sent your enquiry form${m.referrer ? `, recommended by ${m.referrer}` : ""}`;
       return m.source === "enquiry_form" ? "Sent your enquiry form" : `${who} added this lead`;
     case "note":
+      if (m.via === "meta") {
+        const ad = adFacts(a.meta);
+        return `Sent the ${ad.platform} form again${ad.form}`;
+      }
       // Notes without a person came from the client's quote link.
       return a.actor?.name ?? (m.quoteId ? "Quote link" : who);
     case "call":
@@ -482,6 +520,8 @@ function describe(a: LeadActivity): string {
         ? `${who} marked it Booked`
         : `${who} moved it from ${m.from ?? "?"} to ${m.to ?? "?"}${m.reason ? ` (${LOST_LABELS[m.reason as LostReason] ?? m.reason})` : ""}`;
     case "follow_up_set":
+      // A lead that came in by itself gets its first follow-up from nobody in particular.
+      if (!a.actor) return m.at ? `Follow-up set for ${formatFollowUp(m.at)}` : "Follow-up cleared";
       return m.at ? `${who} set a follow-up for ${formatFollowUp(m.at)}` : `${who} cleared the follow-up`;
     case "assigned":
       return m.toName ? `${who} gave it to ${m.toName}` : `${who} unassigned it`;
@@ -489,7 +529,16 @@ function describe(a: LeadActivity): string {
 }
 
 function ActivityRow({ activity }: { activity: LeadActivity }) {
-  const Icon = activity.kind === "stage_changed" && activity.meta.kind === "won" ? CircleCheck : ACTIVITY_ICONS[activity.kind];
+  const Icon =
+    activity.kind === "stage_changed" && activity.meta.kind === "won"
+      ? CircleCheck
+      : (activity.kind === "created" || activity.kind === "note") && activity.meta.via === "meta"
+        ? Megaphone
+        : ACTIVITY_ICONS[activity.kind];
+  const heading = describe(activity);
+  // A lead form sent again says it all in the heading; its note only repeats it.
+  const repeat = activity.meta.via === "meta" && activity.body === heading;
+  const body = (activity.kind === "note" || activity.kind === "call") && activity.body && !repeat ? activity.body : null;
   return (
     <li className="flex gap-3 rounded-2xl px-1 py-2.5">
       <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-cream text-brand-strong">
@@ -497,10 +546,10 @@ function ActivityRow({ activity }: { activity: LeadActivity }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm">
-          <span className="font-semibold">{describe(activity)}</span>
+          <span className="font-semibold">{heading}</span>
           <span className="text-ink-muted"> · {timeAgo(activity.createdAt)}</span>
         </p>
-        {(activity.kind === "note" || activity.kind === "call") && activity.body && <p className="mt-1 whitespace-pre-line text-[15px]">{activity.body}</p>}
+        {body && <p className="mt-1 whitespace-pre-line text-[15px]">{body}</p>}
       </div>
     </li>
   );

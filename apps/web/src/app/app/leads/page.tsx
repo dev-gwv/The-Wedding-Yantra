@@ -1,15 +1,16 @@
 "use client";
 
-import { formatMoneyShort, leadScope } from "@wedding-yantra/core";
-import { useLeads } from "@wedding-yantra/api-client/react";
-import type { LeadList, LeadSummary } from "@wedding-yantra/types";
-import { BellRing, Inbox, Lock, Plus, Search, Share2 } from "lucide-react";
+import { can, formatMoneyShort, leadScope } from "@wedding-yantra/core";
+import { useLeads, useMetaStatus } from "@wedding-yantra/api-client/react";
+import { LEAD_SOURCES, SOURCE_LABELS, type LeadList, type LeadSummary, type PipelineStage } from "@wedding-yantra/types";
+import { BellRing, Inbox, Lock, Megaphone, Plus, Search, Share2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { LeadCard } from "@/components/sales/lead-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
+import { isAdSource } from "@/components/sales/source-badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
@@ -24,9 +25,10 @@ function LeadsScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
   const view: View = params.get("view") === "pipeline" ? "pipeline" : "follow-ups";
+  const source = LEAD_SOURCES.find((s) => s === params.get("source")) ?? null;
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search.trim());
-  const leads = useLeads(workspace.id, q ? { q } : {}, leadScope(workspace) !== "none");
+  const leads = useLeads(workspace.id, { ...(q ? { q } : {}), ...(source ? { source } : {}) }, leadScope(workspace) !== "none");
   const [adding, setAdding] = useState(false);
 
   const setParam = (key: string, value: string | null) => {
@@ -50,13 +52,16 @@ function LeadsScreen() {
   }
 
   const data = leads.data;
-  const isEmpty = data && data.leads.length === 0 && !q;
+  const filtered = !!q || !!source;
+  const isEmpty = data && data.leads.length === 0 && !filtered;
 
   return (
     <>
       <PageHeader
         title="Leads"
-        subtitle={data ? `${data.leads.length} ${data.leads.length === 1 ? "enquiry" : "enquiries"}` : undefined}
+        subtitle={
+          data ? `${data.leads.length} ${data.leads.length === 1 ? "enquiry" : "enquiries"}${source ? ` from ${SOURCE_LABELS[source]}` : ""}` : undefined
+        }
         action={
           <Button onClick={() => setAdding(true)}>
             <Plus className="size-4" strokeWidth={2.5} /> Add lead
@@ -87,17 +92,35 @@ function LeadsScreen() {
               </button>
             ))}
           </div>
-          <label className="relative sm:w-72">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
-            <span className="sr-only">Search leads</span>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or number"
-              className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-4 text-[15px] placeholder:text-ink-subtle focus:border-sun-300 focus:shadow-glow focus:outline-none"
-            />
-          </label>
+          <div className="flex min-w-0 gap-2 sm:flex-1 sm:justify-end">
+            <label className="relative min-w-0 flex-1 sm:max-w-72">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+              <span className="sr-only">Search leads</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or number"
+                className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-4 text-[15px] placeholder:text-ink-subtle focus:border-sun-300 focus:shadow-glow focus:outline-none"
+              />
+            </label>
+            <select
+              value={source ?? ""}
+              onChange={(e) => setParam("source", e.target.value || null)}
+              aria-label="Came from"
+              className={cn(
+                "h-11 w-36 shrink-0 rounded-xl border bg-surface px-3 text-sm font-semibold focus:border-sun-300 focus:shadow-glow focus:outline-none sm:w-40",
+                source ? "border-sun-300 text-brand-strong" : "border-line",
+              )}
+            >
+              <option value="">All sources</option>
+              {LEAD_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {SOURCE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -121,6 +144,7 @@ function LeadsScreen() {
                 <ButtonLink href="/app/settings/enquiry-form" variant="secondary">
                   <Share2 className="size-4" /> Share enquiry form
                 </ButtonLink>
+                <ConnectFacebookLink />
               </div>
             }
           >
@@ -130,12 +154,30 @@ function LeadsScreen() {
       )}
 
       {data && !isEmpty && data.leads.length === 0 && (
-        <p className="py-12 text-center text-ink-muted">No leads match &ldquo;{q}&rdquo;.</p>
+        <div className="py-12 text-center text-ink-muted">
+          <p>
+            {q ? (
+              <>
+                No leads{source && ` from ${SOURCE_LABELS[source]}`} match &ldquo;{q}&rdquo;.
+              </>
+            ) : (
+              source && `No leads from ${SOURCE_LABELS[source]} yet.`
+            )}
+          </p>
+          {source && (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setParam("source", null)}>
+                Show all sources
+              </Button>
+              {isAdSource(source) && <ConnectFacebookLink size="sm" />}
+            </div>
+          )}
+        </div>
       )}
 
       {data && data.leads.length > 0 && view === "follow-ups" && <FollowUps leads={data.leads} />}
       {data && data.leads.length > 0 && view === "pipeline" && (
-        <Pipeline data={data} stageParam={params.get("stage")} onStage={(id) => setParam("stage", id)} />
+        <Pipeline data={data} filtered={filtered} stageParam={params.get("stage")} onStage={(id) => setParam("stage", id)} />
       )}
 
       <LeadFormSheet
@@ -147,6 +189,24 @@ function LeadsScreen() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * For the owner: "Connect Facebook lead ads", so ad enquiries arrive by themselves. Not shown
+ * once a Page is sending leads, or while this business can't connect yet.
+ */
+function ConnectFacebookLink({ size }: { size?: "sm" }) {
+  const { workspace } = useCurrentWorkspace();
+  const owner = can(workspace, "members.hr");
+  const meta = useMetaStatus(workspace.id, owner);
+  if (!owner) return null;
+  const ready = meta.data ? meta.data.available && !meta.data.pages.some((p) => p.active) : meta.isError;
+  if (!ready) return null;
+  return (
+    <ButtonLink href="/app/settings/facebook-leads" variant="secondary" size={size}>
+      <Megaphone className="size-4" /> Connect Facebook lead ads
+    </ButtonLink>
   );
 }
 
@@ -197,9 +257,22 @@ function FollowUps({ leads }: { leads: LeadSummary[] }) {
   );
 }
 
-function Pipeline({ data, stageParam, onStage }: { data: LeadList; stageParam: string | null; onStage: (id: string) => void }) {
-  const stage = data.stages.find((s) => s.id === stageParam) ?? data.stages.find((s) => s.leadCount > 0) ?? data.stages[0];
+function Pipeline({
+  data,
+  filtered,
+  stageParam,
+  onStage,
+}: {
+  data: LeadList;
+  /** Searched or filtered: count only the leads shown, not every lead in the stage */
+  filtered: boolean;
+  stageParam: string | null;
+  onStage: (id: string) => void;
+}) {
   const inStage = (id: string) => data.leads.filter((l) => l.stageId === id);
+  const count = (s: PipelineStage) => (filtered ? inStage(s.id).length : s.leadCount);
+  const worth = (s: PipelineStage) => (filtered ? inStage(s.id).reduce((sum, l) => sum + (l.budget ?? 0), 0) : s.value);
+  const stage = data.stages.find((s) => s.id === stageParam) ?? data.stages.find((s) => count(s) > 0) ?? data.stages[0];
 
   return (
     <>
@@ -218,13 +291,13 @@ function Pipeline({ data, stageParam, onStage }: { data: LeadList; stageParam: s
               )}
             >
               {s.name}
-              <span className={cn("tabular", s.id === stage?.id ? "text-on-brand/85" : "text-ink-muted")}>{s.leadCount}</span>
+              <span className={cn("tabular", s.id === stage?.id ? "text-on-brand/85" : "text-ink-muted")}>{count(s)}</span>
             </button>
           ))}
         </div>
         {stage && (
           <div className="space-y-3">
-            {stage.value > 0 && <p className="text-sm text-ink-muted">Worth {formatMoneyShort(stage.value)} in budgets</p>}
+            {worth(stage) > 0 && <p className="text-sm text-ink-muted">Worth {formatMoneyShort(worth(stage))} in budgets</p>}
             {inStage(stage.id).map((lead) => (
               <LeadCard key={lead.id} lead={lead} />
             ))}
@@ -241,8 +314,8 @@ function Pipeline({ data, stageParam, onStage }: { data: LeadList; stageParam: s
               <header className="flex items-baseline justify-between px-2 pb-3 pt-1">
                 <h2 className="font-display text-base font-extrabold">{s.name}</h2>
                 <span className="text-sm font-semibold text-ink-muted tabular">
-                  {s.leadCount}
-                  {s.value > 0 && ` · ${formatMoneyShort(s.value)}`}
+                  {count(s)}
+                  {worth(s) > 0 && ` · ${formatMoneyShort(worth(s))}`}
                 </span>
               </header>
               <div className="space-y-2">

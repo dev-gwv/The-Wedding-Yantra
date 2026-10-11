@@ -41,6 +41,7 @@ export interface ScheduleResult {
 }
 
 export async function runSchedule(db: Queryable, now: Date = new Date()): Promise<ScheduleResult> {
+  await metaHousekeeping(db, now);
   const result: ScheduleResult = { dueSoon: await dueSoon(db, now), followUps: await followUps(db, now), morning: 0, reminders: 0, evening: 0, streak: 0 };
   const { rows } = await db.query<{ id: string; clock: string; today: string }>(
     `SELECT id, to_char($1::timestamptz AT TIME ZONE timezone, 'HH24:MI') AS clock, ($1::timestamptz AT TIME ZONE timezone)::date::text AS today
@@ -59,6 +60,20 @@ export async function runSchedule(db: Queryable, now: Date = new Date()): Promis
     }
   }
   return result;
+}
+
+let tidiedAt: number | null = null;
+
+/**
+ * Facebook lead ads leftovers, about once an hour: sign-in attempts that expired a day ago, and
+ * leads that were skipped or not brought in more than 90 days ago (Meta has deleted them by then).
+ * `force` runs it whatever the time.
+ */
+export async function metaHousekeeping(db: Queryable, now: Date, force = false): Promise<void> {
+  if (!force && tidiedAt !== null && Math.abs(now.getTime() - tidiedAt) < 60 * 60 * 1000) return;
+  tidiedAt = now.getTime();
+  await db.query(`DELETE FROM meta_oauth_states WHERE expires_at < $1::timestamptz - interval '1 day'`, [now]);
+  await db.query(`DELETE FROM incoming_leads WHERE status IN ('skipped', 'failed') AND received_at < $1::timestamptz - interval '90 days'`, [now]);
 }
 
 /** Takes today's run of a job for a business; false if it already ran. */

@@ -1,5 +1,5 @@
 import cors from "@fastify/cors";
-import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 import { fastifyTrustProxy, type Config } from "./config.js";
 import type { Db } from "./db.js";
 import { AppError, fail } from "./lib/http.js";
@@ -20,6 +20,10 @@ import { deliverableRoutes } from "./modules/deliverables/routes.js";
 import { exportRoutes } from "./modules/export/routes.js";
 import { growRoutes } from "./modules/grow/routes.js";
 import { inventoryRoutes } from "./modules/inventory/routes.js";
+import type { MetaGraph } from "./modules/meta/graph.js";
+import { metaGraphFor, metaRoutes } from "./modules/meta/routes.js";
+import { redactUrl } from "./modules/meta/webhook.js";
+import { createLeadWorker, type LeadWorker } from "./modules/meta/worker.js";
 import { vendorRoutes } from "./modules/vendors/routes.js";
 import { venueRoutes } from "./modules/venues/routes.js";
 import type { Files } from "./modules/files/service.js";
@@ -47,13 +51,29 @@ export interface AppDeps {
   gateway?: PaymentGateway | null;
   /** Sends a push to a phone; tests pass a fake, null turns push off */
   pushSend?: PushSend | null;
+  /** Facebook's Graph API; tests pass a fake, null turns lead ads off. Defaults to what the config asks for. */
+  metaGraph?: MetaGraph | null;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     /** Pushes waiting alerts to phones; the scheduler flushes it every minute. */
     pusher: Pusher;
+    /** Brings in Facebook and Instagram leads; index.ts runs it on its own timers. */
+    leadWorker: LeadWorker;
   }
+}
+
+/** A request in the log: never its body, and never Meta's webhook verify token. */
+function requestForLog(raw: unknown) {
+  const req = raw as FastifyRequest;
+  return {
+    method: req.method,
+    url: redactUrl(req.url ?? ""),
+    host: req.host,
+    remoteAddress: req.ip,
+    remotePort: req.socket?.remotePort,
+  };
 }
 
 /** Push signing keys are read (or made) on first use, after migrations have run. */
@@ -80,7 +100,7 @@ function lazyWebPush(db: Db, subject: string): { send: PushSend; publicKey: () =
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
   const app = Fastify({
-    logger: deps.logger === false ? false : { level: config.logLevel },
+    logger: deps.logger === false ? false : { level: config.logLevel, serializers: { req: requestForLog } },
     // Behind the reverse proxy on the VPS: believe only the hop(s) it adds to
     // X-Forwarded-For (TRUST_PROXY), so a caller can't pick their own IP address.
     trustProxy: fastifyTrustProxy(config.trustProxy),
@@ -137,6 +157,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.addHook("onClose", async () => pusher.stop());
 
+  // Facebook and Instagram lead ads: the queue worker, stopped before the database closes.
+  const metaGraph = deps.metaGraph !== undefined ? deps.metaGraph : metaGraphFor(config);
+  const leadWorker = createLeadWorker({ db, config, graph: metaGraph, log: app.log, onAlerts: () => pusher.nudge() });
+  app.decorate("leadWorker", leadWorker);
+  app.addHook("onClose", async () => leadWorker.stop());
+
   // Per-IP budgets, checked before anything touches the database.
   const { rateLimit } = config;
   if (rateLimit.enabled) {
@@ -181,6 +207,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       broadcastRoutes(v1, { db });
       notificationRoutes(v1, { db, pusher, publicKey: web.publicKey });
       billingRoutes(v1, { db, config, gateway });
+      metaRoutes(v1, { db, config, graph: metaGraph, worker: leadWorker });
       exportRoutes(v1, { db });
     },
     { prefix: "/api/v1" },

@@ -1,4 +1,4 @@
-import { can, formatDate, formatDateRange, ROLE_INFO, type Permission, type Role } from "@wedding-yantra/core";
+import { adPlatform, can, formatDate, formatDateRange, ROLE_INFO, type Permission, type Role } from "@wedding-yantra/core";
 import type { ActivityItem, ActivityPage } from "@wedding-yantra/types";
 import type { Queryable } from "../../db.js";
 import { AppError, forbidden } from "../../lib/http.js";
@@ -51,6 +51,10 @@ const HIDDEN_WITHOUT: [Permission, string[]][] = [
   ["clients.view", ["client"]],
   ["events.view", ["event", "venue", "deliverable"]],
 ];
+
+/** Which of Meta's apps a lead form was filled on, from what intake kept on the activity. */
+const adApp = (m: Record<string, unknown>): "Facebook" | "Instagram" =>
+  m.source === "instagram_ad" || adPlatform(str(m.platform)) === "instagram" ? "Instagram" : "Facebook";
 
 /** The department an employee was put in, from a details change: its key, or null when taken out. */
 const departmentTo = (m: Record<string, unknown>): { to: string | null } | null =>
@@ -304,16 +308,28 @@ export async function activityFeed(db: Queryable, ctx: MemberContext, q: { befor
         item.link = { kind: "team", id: null };
         break;
       }
-      case "lead":
+      case "lead": {
         item.subject = (id && leads.get(id)?.name) ?? null;
         item.link = id ? { kind: "lead", id } : null;
+        // A Facebook or Instagram lead form: "via the Instagram ad", "sent the Facebook form again".
+        const ad = m.via === "meta" ? adApp(m) : null;
         if (r.action === "lead.stage_changed") item.detail = str(m.to);
         else if (r.action === "lead.assigned") item.other = str(m.toName);
         else if (r.action === "lead.created") {
-          item.detail = m.source === "enquiry_form" || m.via === "enquiry_form" ? "enquiry form" : null;
+          item.detail = ad ? `${ad} ad` : m.source === "enquiry_form" || m.via === "enquiry_form" ? "enquiry form" : null;
           item.other = str(m.referrer);
         }
+        // Its note only repeats that line, so it isn't quoted.
+        else if (r.action === "lead.note" && ad && !r.actor_user_id) item.other = `${ad} form`;
         else if (r.body) item.detail = r.body.length > 140 ? `${r.body.slice(0, 139)}…` : r.body;
+        break;
+      }
+      case "meta":
+        item.subject = str(m.pageName);
+        if (r.action === "meta.connected") item.detail = str(m.fbUserName);
+        break;
+      case "lead_routing":
+        item.detail = str(m.summary);
         break;
     }
     return item;

@@ -375,3 +375,73 @@ The other providers, for later:
 The API won't start if a provider is chosen without its keys, so a typo can't silently stop
 sign-ins. When no provider gets a code through, the person is asked to try again in a
 minute, and the API log records why.
+
+## 13. Facebook & Instagram lead ads
+
+Each business connects its own Facebook Page. When someone fills one of its Instant Form
+(lead form) ads on Facebook or Instagram, the enquiry appears in Leads within seconds, given
+to the salesperson with the fewest open leads. Only the owner can connect. Nothing changes
+until `META_APP_ID` is set.
+
+**Keys in the VPS `.env`.** The API won't start if one of these is missing once
+`META_APP_ID` is set, so a typo can't quietly lose leads.
+
+| Key | Value |
+|---|---|
+| `WEB_APP_URL` | The web app's exact address, e.g. `https://app.weddingyantra.com` (https, no path) |
+| `META_APP_ID`, `META_APP_SECRET` | developers.facebook.com → your app → App settings → Basic |
+| `META_VERIFY_TOKEN` | `openssl rand -hex 24`, also pasted into Meta's Webhooks setup |
+| `META_TOKEN_KEY` | `openssl rand -base64 32`. Locks Facebook tokens in the database. **Keep a copy**: losing or changing it means every business connects again |
+| `META_LOGIN_CONFIG_ID` | Facebook Login for Business → Configurations → the configuration id |
+| `META_ENABLED_FOR` | Your own business id while Meta reviews the app; `all` after approval |
+| `META_GRAPH_VERSION`, `META_POLL_MINUTES` | Optional: `v26.0` and `30` by default |
+| `AUTH_REVIEW_PHONE`, `AUTH_REVIEW_CODE`, `AUTH_REVIEW_UNTIL` | Only during App Review: see step 9 |
+
+**Addresses to paste into Meta** (`<API_HOST>` is the API's hostname, `<web>` the web app's):
+
+| Where in Meta | Address |
+|---|---|
+| Facebook Login for Business → Valid OAuth redirect URI | `https://<web>/connect/meta` (exactly `WEB_APP_URL` + `/connect/meta`) |
+| Facebook Login for Business → Deauthorize callback URL | `https://<API_HOST>/api/v1/integrations/meta/deauthorize` |
+| Facebook Login for Business → Data deletion request URL | `https://<API_HOST>/api/v1/integrations/meta/data-deletion` |
+| Webhooks → Page → Callback URL | `https://<API_HOST>/api/v1/integrations/meta/webhook` |
+
+**Your setup on Meta's side**, in order (the first steps take the longest):
+1. **Business Verification** (2-14 working days): business.facebook.com → your portfolio →
+   Business info → Verify. The legal name and address must match your GST, Udyam or
+   incorporation papers.
+2. **Legal pages:** finish the Privacy and Terms pages (no "Draft"). Meta checks them.
+3. **Create the app** at developers.facebook.com: type Business, use case "Capture & manage ad
+   leads", linked to your portfolio. In Basic settings add the app domains, Privacy and Terms
+   URLs, a 1024 px icon, category Business and a contact address. In Advanced, turn on
+   **Require App Secret**.
+4. **Facebook Login for Business:** add the redirect, deauthorize and data deletion addresses
+   above (Strict mode on). Create a **Configuration** with a user access token, the
+   permissions `pages_show_list`, `pages_read_engagement`, `pages_manage_metadata`,
+   `pages_manage_ads`, `leads_retrieval` and `ads_management`, and the asset types **Pages**
+   and **Ad accounts**. Copy its id into `META_LOGIN_CONFIG_ID`.
+5. **Keys:** fill the table above in `.env`, then run
+   `docker compose -p wedding-yantra -f docker-compose.prod.yml up -d`.
+6. **Webhooks** (after the deploy): object **Page**, the callback address above, your
+   `META_VERIFY_TOKEN`, Verify and save, then subscribe to **leadgen**. If Cloudflare's proxy
+   is on, add a rule that skips it for `/api/v1/integrations/meta/*`.
+7. **Switch the app to Live** straight away. Until approval it still only works for people
+   with a role on the app, and Development mode sends no real lead webhooks.
+8. **Try it on your own Page:** make an Instant Form, connect it in Settings → Sales and
+   enquiries → Facebook & Instagram leads, and send a test lead. Then run a tiny real lead ad
+   (about ₹100) and fill it from your phone: campaign and ad names need a real ad.
+9. **App Review:** ask for Advanced Access to the permissions in step 4, each with a reason and
+   a screen recording (sign in → Settings → Facebook & Instagram leads → Continue with Facebook
+   → pick the Page → its forms → the lead arrives in Leads with its alert → change who gets
+   leads → Disconnect). Give the reviewer a sign-in: set `AUTH_REVIEW_PHONE` (a number you own
+   that belongs only to a sandbox business), `AUTH_REVIEW_CODE` (6 digits) and
+   `AUTH_REVIEW_UNTIL` (a date, e.g. `2026-12-31`). No code is sent to that number; the fixed
+   code works until the date, and each use is logged. Then complete Access Verification.
+10. **After approval:** set `META_ENABLED_FOR=all`, remove the `AUTH_REVIEW_*` lines, and run
+    `up -d` again.
+11. **Every year:** do Meta's **Data Use Checkup**. Missing it switches off every customer's
+    leads at once. Send Developer Alerts to an inbox you read.
+
+**Trying it without Meta:** `META_FAKE=true` (development only; the API refuses it in
+production) uses a pretend Facebook, so connecting, test leads and webhooks work on your own
+computer.

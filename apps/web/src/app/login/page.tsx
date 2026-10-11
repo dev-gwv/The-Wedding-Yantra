@@ -18,9 +18,20 @@ import { getToken, setToken } from "@/lib/session";
 
 type Step = "phone" | "code" | "name";
 
-/** Only follow `next` to pages inside this app. */
+/**
+ * Only follow `next` to pages inside this app. Browsers read "/\evil.com", and paths with tabs
+ * or new lines in them, as another site, so those are refused; what's left must stay on this origin.
+ */
 function safeNext(next: string | null): string | null {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  if ([...next].some((c) => c === "\\" || c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) return null;
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  try {
+    const url = new URL(next, origin);
+    return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : null;
+  } catch {
+    return null;
+  }
 }
 
 function LoginFlow() {
@@ -123,6 +134,7 @@ function LoginFlow() {
               with your mobile number.
             </p>
           </div>
+          {next === "/connect/meta" && <Notice>Sign in to finish connecting Facebook. You&apos;ll come straight back.</Notice>}
           <PhoneField
             label="Mobile number"
             value={phone}

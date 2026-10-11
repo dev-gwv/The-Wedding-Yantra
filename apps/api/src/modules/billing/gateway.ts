@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { validHmacHex } from "../../lib/crypto.js";
 
 /** Starts a subscription with the payment provider and says where the owner pays. */
 export interface PaymentGateway {
@@ -26,8 +26,5 @@ export function razorpayGateway(keys: { keyId: string; keySecret: string }, fetc
 
 /** Razorpay signs each webhook: HMAC-SHA256 of the raw body with the webhook secret, in hex. */
 export function validRazorpaySignature(rawBody: string, signature: string | undefined, secret: string): boolean {
-  if (!signature) return false;
-  const expected = Buffer.from(createHmac("sha256", secret).update(rawBody).digest("hex"));
-  const given = Buffer.from(signature);
-  return expected.length === given.length && timingSafeEqual(expected, given);
+  return validHmacHex(rawBody, signature, secret);
 }

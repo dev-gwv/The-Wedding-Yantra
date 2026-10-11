@@ -3,7 +3,8 @@
  * hours, and the morning and evening round-ups. Shared by the API, the web app and
  * (later) the phone app, so an alert reads the same everywhere.
  */
-import { formatClock } from "./dates.js";
+import { formatClock, formatDate } from "./dates.js";
+import type { MetaProblemKind } from "./meta.js";
 
 export const NOTIFICATION_KINDS = [
   "task.assigned",
@@ -24,6 +25,7 @@ export const NOTIFICATION_KINDS = [
   "lead.follow_up",
   "quote.accepted",
   "quote.declined",
+  "lead.source_problem",
   "test",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -52,7 +54,10 @@ export const NOTIFICATION_GROUPS = [
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number]["key"];
 export const NOTIFICATION_GROUP_KEYS = NOTIFICATION_GROUPS.map((g) => g.key) as NotificationGroup[];
 
-/** The group a kind belongs to; the test alert belongs to none and always arrives. */
+/**
+ * The group a kind belongs to. The test alert and Facebook lead problems belong to none, so
+ * they can't be switched off and always arrive.
+ */
 export function groupOf(kind: NotificationKind): NotificationGroup | null {
   return NOTIFICATION_GROUPS.find((g) => (g.kinds as readonly string[]).includes(kind))?.key ?? null;
 }
@@ -119,6 +124,8 @@ export interface SalesAlertFacts {
   again?: boolean;
   /** For a declined quote: why */
   reason?: string | null;
+  /** Several new enquiries in one alert (Facebook leads brought in late); `name` is then unused */
+  count?: number | null;
 }
 
 /** The title and line for an enquiry or quote alert. */
@@ -127,6 +134,7 @@ export function salesAlertText(kind: NotificationKind, f: SalesAlertFacts): { ti
   const detail = f.detail ? clip(f.detail) : "";
   switch (kind) {
     case "lead.new":
+      if (f.count && f.count > 1) return { title: `${f.count} new enquiries`, body: detail };
       return { title: f.again ? `Enquired again: ${name}` : `New enquiry: ${name}`, body: detail };
     case "lead.follow_up":
       return { title: `Follow-up due: ${name}`, body: detail || "Time to get back to them" };
@@ -140,6 +148,65 @@ export function salesAlertText(kind: NotificationKind, f: SalesAlertFacts): { ti
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+export interface LeadSourceAlertFacts {
+  /**
+   * A problem with a Page (see core meta.ts), or: leads brought in late (`recovered`), the
+   * Page connected to another business (`taken_over`), leads paused because the plan ended
+   * (`paused`), Wedding Yantra removed on Facebook (`removed`), or Facebook told again to
+   * send leads after it missed some (`resubscribed`).
+   */
+  what: MetaProblemKind | "recovered" | "taken_over" | "paused" | "removed" | "resubscribed";
+  /** The Facebook Page's name */
+  pageName?: string | null;
+  /** Leads that failed, or were brought in late */
+  count?: number | null;
+  /** YYYY-MM-DD: log in to Facebook again by this day */
+  by?: string | null;
+  /** Days without a lead */
+  days?: number | null;
+  /** Who connected Facebook */
+  who?: string | null;
+}
+
+/** The title and line for an alert about Facebook and Instagram leads (`lead.source_problem`). */
+export function leadSourceAlertText(f: LeadSourceAlertFacts): { title: string; body: string } {
+  const page = f.pageName?.trim() ? clip(f.pageName.trim(), 60) : "your Page";
+  const n = Math.max(1, f.count ?? 1);
+  switch (f.what) {
+    case "needs_reconnect":
+      return { title: "Facebook leads stopped: log in again", body: `Leads from ${page} can't come in until you reconnect Facebook.` };
+    case "lead_access":
+      return { title: `Facebook leads stopped: ${page}`, body: "Facebook is blocking Wedding Yantra from reading them. Open Facebook & Instagram leads for the steps." };
+    case "not_subscribed":
+      return { title: `Facebook isn't sending leads from ${page}`, body: "Open Facebook & Instagram leads and tap Check again." };
+    case "permission_missing":
+      return { title: "Facebook leads need more permissions", body: "Reconnect Facebook and keep every option switched on." };
+    case "reconnect_soon":
+      return {
+        title: f.by ? `Log in to Facebook again by ${formatDate(f.by, { year: false })}` : "Log in to Facebook again soon",
+        body: "Facebook asks for this every 90 days. Leads keep coming meanwhile.",
+      };
+    case "connector_left":
+      return { title: `${first(f.who)} connected Facebook and has left`, body: "Reconnect with your own Facebook to keep leads coming." };
+    case "quiet":
+      return { title: `No Facebook leads for ${plural(f.days ?? 3, "day")}`, body: `Nothing from ${page}. Check your ads are still running.` };
+    case "failed_leads":
+      return { title: `Couldn't bring in ${plural(n, "Facebook lead")}`, body: `From ${page}. Open Facebook & Instagram leads and tap Try again.` };
+    case "meta_outage":
+      return { title: "Facebook is having a problem", body: "Leads will arrive by themselves once it's fixed." };
+    case "recovered":
+      return { title: `${plural(n, "Facebook lead")} brought in late`, body: `From ${page}. Facebook didn't send ${n === 1 ? "it" : "them"} straight away; ${n === 1 ? "it's" : "they're"} in Leads now.` };
+    case "taken_over":
+      return { title: `${page} now sends leads to another business`, body: "Someone with full control of the Page connected it to another Wedding Yantra account." };
+    case "paused":
+      return { title: "Facebook leads paused", body: "Your plan has ended. Renew it to get leads again." };
+    case "removed":
+      return { title: "Facebook was disconnected", body: "Wedding Yantra was removed on Facebook. Reconnect to get leads again." };
+    case "resubscribed":
+      return { title: `Facebook was slow to send leads from ${page}`, body: "We've fixed the connection. Any late leads are in Leads now." };
+  }
+}
 
 /** Where an open task stands, for a reminder. */
 export type ReminderState = "due_tomorrow" | "due_today" | "late" | "pending";

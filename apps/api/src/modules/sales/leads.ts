@@ -1,5 +1,7 @@
-import { can, firstName, leadScope } from "@wedding-yantra/core";
+import { adPlatform, can, firstName, leadScope, readLeadAnswers } from "@wedding-yantra/core";
 import type {
+  AdAnswer,
+  AdEnquiry,
   FollowUpState,
   Lead,
   LeadActivity,
@@ -101,6 +103,7 @@ export interface ListFilters {
   followUp?: "due" | "overdue" | "today" | "upcoming";
   mine?: boolean;
   partnerId?: string;
+  source?: string;
 }
 
 export async function listLeads(db: Db, ctx: MemberContext, filters: ListFilters): Promise<LeadList> {
@@ -114,6 +117,7 @@ export async function listLeads(db: Db, ctx: MemberContext, filters: ListFilters
   if (filters.stageId) where.push(`l.stage_id = ${add(filters.stageId)}`);
   if (filters.mine) where.push(`l.assigned_to = ${add(ctx.userId)}`);
   if (filters.partnerId) where.push(`l.partner_id = ${add(filters.partnerId)}`);
+  if (filters.source) where.push(`l.source = ${add(filters.source)}`);
   if (filters.q) {
     const byName = `l.name ILIKE ${add(`%${filters.q.replace(/[%_\\]/g, "\\$&")}%`)}`;
     const digits = filters.q.replace(/\D/g, "");
@@ -197,6 +201,86 @@ async function loadVisible(db: Queryable, ctx: MemberContext, leadId: string): P
   return rows[0];
 }
 
+const text = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : null);
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * A lead form's questions and answers, word for word. Kept either as read
+ * ([{key, label, value, usedFor}]) or as Meta sent them ([{name, values}]); the second are
+ * read again the same way, with the form's own labels.
+ */
+export function toAdAnswers(answers: unknown, questions: unknown): AdAnswer[] {
+  if (!Array.isArray(answers)) return [];
+  const items = answers.filter(isRecord);
+  if (items.some((a) => Array.isArray(a.values))) {
+    const labels = Array.isArray(questions)
+      ? questions.filter(isRecord).flatMap((q) => (text(q.key) && text(q.label) ? [{ key: text(q.key)!, label: text(q.label)! }] : []))
+      : null;
+    return readLeadAnswers({
+      fields: items.map((a) => ({
+        key: text(a.name) ?? text(a.key) ?? "",
+        label: text(a.label),
+        values: Array.isArray(a.values) ? a.values.map((v) => text(v) ?? "") : [],
+      })),
+      questions: labels,
+      today: new Date().toISOString().slice(0, 10),
+    }).answers;
+  }
+  return items.map((a) => ({
+    key: text(a.key) ?? "",
+    label: text(a.label) ?? text(a.key) ?? "",
+    value: text(a.value) ?? "",
+    usedFor: text(a.usedFor),
+  }));
+}
+
+/** The Facebook and Instagram lead forms behind a lead, newest first: the one that made it and any sent again. */
+async function loadAdEnquiries(db: Queryable, workspaceId: string, leadId: string): Promise<AdEnquiry[]> {
+  const { rows } = await db.query<{
+    id: string;
+    channel: string;
+    platform: string | null;
+    page_name: string | null;
+    form_name: string | null;
+    campaign_name: string | null;
+    adset_name: string | null;
+    ad_name: string | null;
+    is_test: boolean;
+    is_organic: boolean;
+    received_at: Date;
+    submitted_at: Date | null;
+    answers: unknown;
+    questions: unknown;
+    status: string;
+  }>(
+    `SELECT i.id, i.channel, i.platform, p.name AS page_name, coalesce(nullif(i.form_name, ''), f.name) AS form_name,
+            i.campaign_name, i.adset_name, i.ad_name, i.is_test, i.is_organic, i.received_at, i.submitted_at,
+            i.answers, f.questions, i.status
+       FROM incoming_leads i
+       LEFT JOIN meta_pages p ON p.id = i.meta_page_id AND p.workspace_id = i.workspace_id
+       LEFT JOIN meta_forms f ON f.meta_page_id = i.meta_page_id AND f.form_id = i.form_id AND f.workspace_id = i.workspace_id
+      WHERE i.workspace_id = $1 AND i.lead_id = $2 AND i.status IN ('added', 'merged')
+      ORDER BY i.received_at DESC, i.id
+      LIMIT 50`,
+    [workspaceId, leadId],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    platform: adPlatform(r.platform) ?? (r.channel === "meta" ? "facebook" : null),
+    pageName: r.page_name,
+    formName: r.form_name,
+    campaignName: r.campaign_name,
+    adsetName: r.adset_name,
+    adName: r.ad_name,
+    isTest: r.is_test,
+    isOrganic: r.is_organic,
+    receivedAt: r.received_at.toISOString(),
+    submittedAt: r.submitted_at?.toISOString() ?? null,
+    answers: toAdAnswers(r.answers, r.questions),
+    merged: r.status === "merged",
+  }));
+}
+
 export async function getLead(db: Queryable, ctx: MemberContext, leadId: string): Promise<Lead> {
   const r = await loadVisible(db, ctx, leadId);
   const activities = await db.query<{
@@ -229,6 +313,7 @@ export async function getLead(db: Queryable, ctx: MemberContext, leadId: string)
     lostReason: r.lost_reason,
     createdBy: r.created_by ? { id: r.created_by, name: r.created_by_name } : null,
     eventId: r.event_id,
+    adEnquiries: await loadAdEnquiries(db, ctx.workspaceId, leadId),
     activities: activities.rows.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -518,8 +603,19 @@ export async function updateLead(db: Db, ctx: MemberContext, leadId: string, inp
 
 export async function deleteLead(db: Db, ctx: MemberContext, leadId: string): Promise<void> {
   if (!can(ctx, "leads.delete")) throw forbidden("Only the owner or a manager can delete leads");
-  await loadVisible(db, ctx, leadId);
-  await db.query(`UPDATE leads SET deleted_at = now() WHERE id = $1 AND workspace_id = $2`, [leadId, ctx.workspaceId]);
+  await withTransaction(db, async (tx) => {
+    await loadVisible(tx, ctx, leadId);
+    await tx.query(`UPDATE leads SET deleted_at = now() WHERE id = $1 AND workspace_id = $2`, [leadId, ctx.workspaceId]);
+    // The lead forms behind it go too: their answers, names and ads. What stays only stops the
+    // same form being brought in again.
+    await tx.query(
+      `UPDATE incoming_leads
+          SET answers = '[]'::jsonb, name = NULL, form_name = NULL, campaign_id = NULL, campaign_name = NULL,
+              adset_id = NULL, adset_name = NULL, ad_id = NULL, ad_name = NULL, last_error = NULL
+        WHERE workspace_id = $1 AND lead_id = $2`,
+      [ctx.workspaceId, leadId],
+    );
+  });
 }
 
 export async function addActivity(

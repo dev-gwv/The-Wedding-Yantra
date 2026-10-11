@@ -366,6 +366,17 @@ describe("activity sentences", () => {
     expect(activityText({ ...base, actorName: null, action: "lead.created", subject: "Neha", detail: "enquiry form" })).toBe(
       "New enquiry from Neha via the enquiry form",
     );
+    expect(activityText({ ...base, actorName: null, action: "lead.note", subject: "Neha" })).toBe("Neha sent the enquiry form again");
+  });
+  it("names Facebook and Instagram lead forms", () => {
+    expect(activityText({ ...base, actorName: null, action: "lead.created", subject: "Priya", detail: "Instagram ad" })).toBe(
+      "New enquiry from Priya via the Instagram ad",
+    );
+    expect(activityText({ ...base, actorName: null, action: "lead.note", subject: "Priya", other: "Facebook form" })).toBe(
+      "Priya sent the Facebook form again",
+    );
+    expect(activityText({ ...base, action: "meta.page_on", subject: "Shubh Vivah" })).toBe("turned on leads from the Facebook Page Shubh Vivah");
+    expect(activityText({ ...base, action: "meta.connected", detail: "Riya Kapoor" })).toBe("connected Facebook lead ads as Riya Kapoor");
   });
   it("says what changed about someone's screens", () => {
     expect(activityText({ ...base, action: "member.screens_changed", subject: "Arfin", detail: "put in Sales; added Quotes & prices" })).toBe(
