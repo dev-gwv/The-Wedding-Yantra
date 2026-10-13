@@ -88,6 +88,8 @@ export function GuideVideoPlayer({
                 onError={i === video.sources.length - 1 ? () => setFailed(true) : undefined}
               />
             ))}
+            {/* What's said is in the picture too, so the track starts off */}
+            {video.captions && <track kind="captions" src={video.captions} srcLang="en" label="English" />}
           </video>
         )}
       </div>

@@ -16,7 +16,9 @@ and the top of the Facebook guide. See "Switch it on" at the end.
   sentences.
 - **Captions:** on, large, at the bottom.
 - **Screen footage:** use our built-in tutorial (`apps/web/public/videos/connect-facebook.mp4`)
-  as background footage. Each scene below says which part. The times are from that video.
+  as background footage. Each scene below says which part. The times are from that video. It has
+  its own voice-over (and captions in the picture), so mute it in the tool, or make a silent copy
+  first: `ffmpeg -i connect-facebook.mp4 -an -c:v copy footage.mp4`.
 - **Music:** soft and low, or none.
 - **Export:** MP4. Upload it to YouTube as **Unlisted**, or keep the MP4 link from the tool.
 
@@ -28,45 +30,45 @@ and the top of the Facebook guide. See "Switch it on" at the end.
   Yantra, all by itself."
 - **Caption:** Get your Facebook & Instagram leads in Wedding Yantra
 
-**Scene 2. Before you start** (screen: tutorial 0:05–0:20, about 20 s)
+**Scene 2. Before you start** (screen: tutorial 0:06–0:23, about 20 s)
 - **Say:** "First, check three things on Facebook. One: you have a Facebook Page for your
   business. Not your personal profile, your business Page. Two: you are an admin of that Page,
   with full control. Three: you have a lead form, which Facebook calls an Instant Form. If you
   already run lead ads, you already have one."
 - **Caption:** You need: a business Page · full control · a lead form
 
-**Scene 3. Open Leads** (screen: tutorial 0:21–0:26, about 8 s)
+**Scene 3. Open Leads** (screen: tutorial 0:23–0:27, about 8 s)
 - **Say:** "Now open Wedding Yantra. Go to Leads, and tap 'Connect now'."
 - **Caption:** Open Leads → tap "Connect now"
 
-**Scene 4. Continue with Facebook** (screen: tutorial 0:26–0:32, about 8 s)
+**Scene 4. Continue with Facebook** (screen: tutorial 0:27–0:32, about 8 s)
 - **Say:** "Tap the big orange button, 'Continue with Facebook'. Don't worry. Nothing will be
   posted on your Page."
 - **Caption:** Tap "Continue with Facebook"
 
-**Scene 5. On Facebook** (screen: tutorial 0:32–0:45, about 15 s)
+**Scene 5. On Facebook** (screen: tutorial 0:32–0:43, about 15 s)
 - **Say:** "Facebook will open. Log in with the account that manages your Page, and tap
   'Continue'. Then tick your business Page. If you run Instagram ads, tick the Page your
   Instagram is linked to. Keep every switch on, and tap 'Save'."
 - **Caption:** Log in → tick your Page → keep every switch ON → Save
 
-**Scene 6. Switch on** (screen: tutorial 0:46–0:55, about 9 s)
+**Scene 6. Switch on** (screen: tutorial 0:43–0:54, about 9 s)
 - **Say:** "You'll come back to Wedding Yantra. Tick your Page and tap 'Switch on'. When you see
   'Receiving leads' in green, you're connected."
 - **Caption:** Tap "Switch on" → "Receiving leads"
 
-**Scene 7. Who gets the leads** (screen: tutorial 0:55–1:02, about 12 s)
+**Scene 7. Who gets the leads** (screen: tutorial 0:54–1:00, about 12 s)
 - **Say:** "Next, choose who gets the leads. Each new lead goes to the salesperson with the
   fewest open leads, so the work is shared fairly. They get an alert on their phone straight
   away."
 - **Caption:** Each lead goes to the salesperson with the fewest open leads
 
-**Scene 8. Test it** (screen: tutorial 1:02–1:10, about 10 s)
+**Scene 8. Test it** (screen: tutorial 1:00–1:11, about 10 s)
 - **Say:** "Now let's test it. Tap 'Send a test lead'. In a few seconds you'll see 'Test lead
   received'. That means everything works."
 - **Caption:** Tap "Send a test lead" → "Test lead received"
 
-**Scene 9. Done** (screen: tutorial 1:10–1:17, about 10 s)
+**Scene 9. Done** (screen: tutorial 1:11–1:18, about 10 s)
 - **Say:** "That's it! From now on, when someone fills your ad's form, the lead comes into
   Wedding Yantra in seconds. No more downloading leads from Facebook."
 - **Caption:** Done! New leads come in by themselves

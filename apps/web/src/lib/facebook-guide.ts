@@ -261,13 +261,22 @@ export type GuideVideo =
   /** A YouTube video, played in a privacy-friendly player */
   | { kind: "youtube"; href: string; embed: string; poster: string; duration: string | null }
   /** A video file (ours, or an export from an AI video tool); `sound` when we know it talks */
-  | { kind: "file"; href: string; sources: { src: string; type: string }[]; poster: string | null; duration: string | null; sound?: true }
+  | {
+      kind: "file";
+      href: string;
+      sources: { src: string; type: string }[];
+      poster: string | null;
+      duration: string | null;
+      sound?: true;
+      /** WebVTT captions of what's said */
+      captions?: string;
+    }
   /** Any other page with the video: opened in a new tab */
   | { kind: "link"; href: string; poster: null; duration: null };
 
 /**
  * The animated tutorial that ships with the app (made by scripts/guide-video/): the real
- * screens with big captions and a voice-over.
+ * screens with a voice-over, and captions of what's said.
  */
 export const BUILT_IN_VIDEO: GuideVideo = {
   kind: "file",
@@ -280,6 +289,7 @@ export const BUILT_IN_VIDEO: GuideVideo = {
   poster: "/videos/connect-facebook.jpg",
   duration: "1:25",
   sound: true,
+  captions: "/videos/connect-facebook.vtt",
 };
 
 /**
