@@ -2,16 +2,15 @@
 
 import { can } from "@wedding-yantra/core";
 import { Play, Volume2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { GuideVideoPlayer } from "@/components/guides/video-player";
 import { ButtonLink } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { useDeviceFlag } from "@/lib/device-flag";
-import { APP_GUIDE_PATH, FACEBOOK_SETTINGS_PATH, guideVideo, type GuideVideo } from "@/lib/facebook-guide";
-
-const CLOSED_KEY = "wy.fb-video-closed";
+import { APP_GUIDE_PATH, FACEBOOK_SETTINGS_PATH, guideVideo } from "@/lib/facebook-guide";
+import { EVENTS_VIDEO, EVENTS_VIDEO_TITLE, FACEBOOK_VIDEO_TITLE, type GuideVideo } from "@/lib/guide-videos";
 
 function Cover({ video, className }: { video: GuideVideo; className: string }) {
   return (
@@ -30,16 +29,34 @@ function Cover({ video, className }: { video: GuideVideo; className: string }) {
 }
 
 /**
- * Bottom-right of Leads, for everyone: "Watch: connect Facebook & Instagram leads". Tapping it
- * plays the tutorial; × puts it away on this device (the video stays in the guide).
+ * Bottom-right of a page: "Watch · 1:24 · With sound" and what the video shows. Tapping it plays
+ * the tutorial; × puts it away on this device.
  */
-export function GuideVideoBubble() {
-  const { workspace } = useCurrentWorkspace();
-  const owner = can(workspace, "members.hr");
-  const [closed, close] = useDeviceFlag(CLOSED_KEY);
+export function GuideVideoBubble({
+  video,
+  title,
+  label,
+  closedKey,
+  stepsHref,
+  description,
+  children,
+}: {
+  video: GuideVideo;
+  /** The player's name for screen readers, e.g. "How to add and run an event" */
+  title: string;
+  /** The card's line and the sheet's heading, e.g. "Add and run an event" */
+  label: string;
+  /** Remembers × on this device */
+  closedKey: string;
+  /** Where the written steps are, if the video can't play */
+  stepsHref: string;
+  description?: string;
+  /** Buttons under the video */
+  children?: ReactNode;
+}) {
+  const [closed, close] = useDeviceFlag(closedKey);
   const [open, setOpen] = useState(false);
   const player = useRef<HTMLVideoElement>(null);
-  const video = guideVideo();
   const sound = video.kind === "file" && video.sound;
 
   if (closed) return null;
@@ -57,7 +74,7 @@ export function GuideVideoBubble() {
 
   return (
     <>
-      {/* Room at the end of the list, so the last lead can scroll clear of the card. */}
+      {/* Room at the end of the list, so the last row can scroll clear of the card. */}
       <div aria-hidden className="h-24 sm:h-72 print:hidden" />
       <div className="fixed bottom-24 right-4 z-30 print:hidden lg:bottom-8 lg:right-8" role="complementary" aria-label="Tutorial video">
         <div className="relative">
@@ -79,7 +96,7 @@ export function GuideVideoBubble() {
                   </>
                 )}
               </span>
-              <span className="block text-sm font-bold leading-snug text-ink">Connect Facebook & Instagram leads</span>
+              <span className="block text-sm font-bold leading-snug text-ink">{label}</span>
             </span>
           </button>
           <button
@@ -96,21 +113,56 @@ export function GuideVideoBubble() {
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="Connect Facebook & Instagram leads"
-        description={`${sound ? "Turn your sound on. " : ""}Watch how it's done, then follow the steps.`}
+        title={label}
+        description={`${sound ? "Turn your sound on. " : ""}${description ?? "Watch how it's done, then follow the steps."}`}
         className="sm:max-w-2xl"
       >
         <div className="space-y-4">
-          <GuideVideoPlayer video={video} autoPlay videoRef={player} stepsHref={APP_GUIDE_PATH} />
-          <div className="flex flex-wrap gap-2">
-            <ButtonLink href={APP_GUIDE_PATH} variant="secondary">
-              Read the steps
-            </ButtonLink>
-            {owner && <ButtonLink href={FACEBOOK_SETTINGS_PATH}>Connect now</ButtonLink>}
-          </div>
-          {!owner && <p className="text-sm text-ink-muted">Only the business owner can connect Facebook. Show them this video.</p>}
+          <GuideVideoPlayer video={video} title={title} autoPlay videoRef={player} stepsHref={stepsHref} />
+          {children}
         </div>
       </Sheet>
     </>
+  );
+}
+
+/** On Leads, for everyone: how to connect Facebook & Instagram lead ads. */
+export function FacebookVideoBubble() {
+  const { workspace } = useCurrentWorkspace();
+  const owner = can(workspace, "members.hr");
+  return (
+    <GuideVideoBubble
+      video={guideVideo()}
+      title={FACEBOOK_VIDEO_TITLE}
+      label="Connect Facebook & Instagram leads"
+      closedKey="wy.fb-video-closed"
+      stepsHref={APP_GUIDE_PATH}
+    >
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href={APP_GUIDE_PATH} variant="secondary">
+          Read the steps
+        </ButtonLink>
+        {owner && <ButtonLink href={FACEBOOK_SETTINGS_PATH}>Connect now</ButtonLink>}
+      </div>
+      {!owner && <p className="text-sm text-ink-muted">Only the business owner can connect Facebook. Show them this video.</p>}
+    </GuideVideoBubble>
+  );
+}
+
+/** On Events, for people who can add events: how to add one and run it. */
+export function EventsVideoBubble() {
+  return (
+    <GuideVideoBubble
+      video={EVENTS_VIDEO}
+      title={EVENTS_VIDEO_TITLE}
+      label="Add and run an event"
+      closedKey="wy.events-video-closed"
+      stepsHref="/help#events"
+      description="Watch how it's done, then add your own."
+    >
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href="/app/events/new">Add an event</ButtonLink>
+      </div>
+    </GuideVideoBubble>
   );
 }

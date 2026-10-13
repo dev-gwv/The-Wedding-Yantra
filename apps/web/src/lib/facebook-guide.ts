@@ -1,4 +1,5 @@
 import { leadAccessSteps, META_TEST_TOOL_URL, metaTestToolSteps } from "@wedding-yantra/core";
+import { FACEBOOK_VIDEO, type GuideVideo } from "@/lib/guide-videos";
 
 /**
  * "Connect your Facebook & Instagram lead ads": the guide's words, kept as data so the public
@@ -256,42 +257,6 @@ export const GUIDE_FAQ: GuideQuestion[] = [
 export const guideShareText = (url: string) =>
   `Please help me connect our Facebook and Instagram lead ads to Wedding Yantra, so new leads come in by themselves. The steps are here: ${url}`;
 
-/** The tutorial video: one that ships with the app, unless the site sets its own. */
-export type GuideVideo =
-  /** A YouTube video, played in a privacy-friendly player */
-  | { kind: "youtube"; href: string; embed: string; poster: string; duration: string | null }
-  /** A video file (ours, or an export from an AI video tool); `sound` when we know it talks */
-  | {
-      kind: "file";
-      href: string;
-      sources: { src: string; type: string }[];
-      poster: string | null;
-      duration: string | null;
-      sound?: true;
-      /** WebVTT captions of what's said */
-      captions?: string;
-    }
-  /** Any other page with the video: opened in a new tab */
-  | { kind: "link"; href: string; poster: null; duration: null };
-
-/**
- * The animated tutorial that ships with the app (made by scripts/guide-video/): the real
- * screens with a voice-over, and captions of what's said.
- */
-export const BUILT_IN_VIDEO: GuideVideo = {
-  kind: "file",
-  href: "/videos/connect-facebook.mp4",
-  // MP4 for phones and most browsers; WebM for browsers without H.264.
-  sources: [
-    { src: "/videos/connect-facebook.mp4", type: "video/mp4" },
-    { src: "/videos/connect-facebook.webm", type: "video/webm" },
-  ],
-  poster: "/videos/connect-facebook.jpg",
-  duration: "1:25",
-  sound: true,
-  captions: "/videos/connect-facebook.vtt",
-};
-
 /**
  * The video for the guide and the corner of Leads. NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL
  * replaces the built-in one: a YouTube link, or a direct .mp4/.webm link (an AI presenter
@@ -299,14 +264,14 @@ export const BUILT_IN_VIDEO: GuideVideo = {
  */
 export function guideVideo(raw: string | undefined = process.env.NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL): GuideVideo {
   const value = raw?.trim();
-  if (!value) return BUILT_IN_VIDEO;
+  if (!value) return FACEBOOK_VIDEO;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return BUILT_IN_VIDEO;
+    return FACEBOOK_VIDEO;
   }
-  if (url.protocol !== "https:") return BUILT_IN_VIDEO;
+  if (url.protocol !== "https:") return FACEBOOK_VIDEO;
   const host = url.hostname.replace(/^www\.|^m\./, "");
   let id: string | null = null;
   if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? null;

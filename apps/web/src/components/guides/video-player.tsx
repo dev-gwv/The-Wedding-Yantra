@@ -4,10 +4,8 @@ import { ExternalLink, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, type Ref } from "react";
 import { buttonClass } from "@/components/ui/button";
-import type { GuideVideo } from "@/lib/facebook-guide";
+import type { GuideVideo } from "@/lib/guide-videos";
 import { cn } from "@/lib/cn";
-
-const TITLE = "How to connect your Facebook & Instagram leads (video)";
 
 /**
  * The tutorial video, 16:9: YouTube in a privacy-friendly player, a video file in the
@@ -16,12 +14,15 @@ const TITLE = "How to connect your Facebook & Instagram leads (video)";
  */
 export function GuideVideoPlayer({
   video,
+  title,
   autoPlay = false,
   videoRef,
   stepsHref,
   className,
 }: {
   video: GuideVideo;
+  /** What it shows, e.g. "How to add and run an event" */
+  title: string;
   autoPlay?: boolean;
   /** The <video>, so a tap elsewhere can start it with sound (iPhones need play() in the tap) */
   videoRef?: Ref<HTMLVideoElement>;
@@ -45,7 +46,7 @@ export function GuideVideoPlayer({
         {video.kind === "youtube" ? (
           <iframe
             src={`${video.embed}${autoPlay ? "&autoplay=1" : ""}`}
-            title={TITLE}
+            title={`${title} (video)`}
             className="absolute inset-0 size-full"
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -72,7 +73,7 @@ export function GuideVideoPlayer({
             autoPlay={autoPlay}
             preload={autoPlay ? "auto" : "none"}
             poster={video.poster ?? undefined}
-            aria-label={TITLE}
+            aria-label={`${title} (video)`}
             // React passes a <source>'s error up to here too; only the video's own error counts,
             // so a browser without H.264 still goes on to try the WebM.
             onError={(e) => {

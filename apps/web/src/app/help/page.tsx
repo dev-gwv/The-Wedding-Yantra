@@ -1,9 +1,11 @@
 import { AREA_INFO, areaNeeds, AREAS, ROLE_INFO, ROLES, TRIAL_DAYS } from "@wedding-yantra/core";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GuideVideoPlayer } from "@/components/guides/video-player";
 import { SiteHeader } from "@/components/site/site-header";
 import { buttonClass } from "@/components/ui/button";
 import { GUIDE_PATH } from "@/lib/facebook-guide";
+import { EVENTS_VIDEO, EVENTS_VIDEO_TITLE, type GuideVideo } from "@/lib/guide-videos";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -16,6 +18,8 @@ interface Guide {
   steps: string[];
   /** A longer guide with pictures */
   more?: { href: string; label: string };
+  /** A tutorial video, shown under the heading */
+  video?: { video: GuideVideo; title: string };
 }
 
 const GUIDES: Guide[] = [
@@ -96,6 +100,7 @@ const GUIDES: Guide[] = [
   {
     id: "events",
     title: "Events, your team and checklists",
+    video: { video: EVENTS_VIDEO, title: EVENTS_VIDEO_TITLE },
     steps: [
       "Give a task from Tasks: who, by when and how urgent (low, normal, high, urgent). Under More options add a tag, steps, the hours it takes, your own task fields, or tick \"I'll check it before it's done\".",
       "Each task moves To do, Doing, Stuck (with what it's waiting on), and Done. A task you check is handed in with a note, link or photo; you approve it or send it back with what to change, and it counts how many times it went back.",
@@ -198,6 +203,15 @@ export default function HelpPage() {
           {GUIDES.map((g) => (
             <section key={g.id} id={g.id} className="scroll-mt-6 rounded-3xl border border-line p-6 shadow-soft">
               <h2 className="font-display text-2xl font-extrabold">{g.title}</h2>
+              {g.video && (
+                <div className="mt-4">
+                  <GuideVideoPlayer video={g.video.video} title={g.video.title} className="rounded-2xl" />
+                  <p className="mt-2 px-1 text-sm text-ink-muted">
+                    {g.video.title}
+                    {g.video.video.duration ? `, ${g.video.video.duration}` : ""}.
+                  </p>
+                </div>
+              )}
               <ol className="mt-4 space-y-3">
                 {g.steps.map((step, i) => (
                   <li key={step} className="flex gap-3 leading-relaxed">

@@ -12,9 +12,9 @@ new file the same way, replace that file, and re-make the video with
 
 ## ElevenLabs settings
 
-- **Voice:** one warm Indian English (or clear Hinglish) voice from the Voice Library.
+- **Voice:** "Nimmo – Clear Hinglish Customer Care", from the Voice Library (the one in use).
 - **Model:** Eleven Multilingual v2.
-- **Settings:** speed 0.9 · stability about 50% · similarity about 75% · style 0–10%.
+- **Settings:** speed 0.97 · stability 33% · similarity 66% · style 0 · speaker boost on.
 - **Output:** MP3, 44.1 kHz.
 - **Check one word first:** play "Wedding Yantra" once. If it sounds wrong, type it as
   "Wedding Yuntra" in ElevenLabs only. Don't change it anywhere else.
@@ -39,7 +39,7 @@ new file the same way, replace that file, and re-make the video with
 | `14-done` | Leads list with the new lead | That's it. New leads from your ads now come into Wedding Yantra by themselves, with an alert. | 6 s |
 | `15-help` | "Need help?" end card | Need help? Open Leads, and tap See how. Every step is there, with pictures. | 5 s |
 
-The whole voice-over is about 70 seconds; the finished video is 1 minute 25 seconds. The ids in the first column are the names `scripts/guide-video/` uses for each line, and the third column is also the video's captions, so keep it word for word what was voiced.
+The whole voice-over is about 70 seconds; the finished video is 1 minute 24 seconds. The ids in the first column are the names `scripts/guide-video/` uses for each line, and the third column is also the video's captions, so keep it word for word what was voiced.
 
 ## Make it
 

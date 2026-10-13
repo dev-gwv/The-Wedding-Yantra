@@ -1,0 +1,24 @@
+{
+  "source": null,
+  "estimated": true,
+  "lead": 0.15,
+  "lines": {
+    "01-title": {"clip":[0,4.81],"cues":[[0,"Let's see how to add an event in Wedding Yantra, and run it from start to finish."]]},
+    "02-events": {"clip":[6.11,9.8],"cues":[[0,"Open Events. Your upcoming events are here, month by month."]]},
+    "03-calendar": {"clip":[11.1,15.3],"cues":[[0,"Tap Calendar to see every booking by date."],[2.46,"Red dots mean a busy day."]]},
+    "04-quotes": {"clip":[16.6,20.25],"cues":[[0,"When a client accepts your quote, the event is made for you."]]},
+    "05-new": {"clip":[21.55,23.76],"cues":[[0,"To add one yourself, tap New event."]]},
+    "06-client": {"clip":[25.06,30.02],"cues":[[0,"First, choose the client."],[1.44,"If they're new, tap New and type their name and number."]]},
+    "07-details": {"clip":[31.32,36.5],"cues":[[0,"Give the event a name, and choose the type."],[2.5,"Add the booking value and the main venue."]]},
+    "08-functions": {"clip":[37.8,42.89],"cues":[[0,"Now add each function, like Mehendi, Sangeet and the wedding, with its date and time."]]},
+    "09-create": {"clip":[44.19,46.63],"cues":[[0,"Check everything, and tap Create event."]]},
+    "10-event": {"clip":[47.93,53],"cues":[[0,"This is your event."],[1.08,"Every function, with its date, time and venue, is in one place."]]},
+    "11-team": {"clip":[54.3,60.58],"cues":[[0,"Tap Choose the team."],[1.13,"Tick who works this event, add their role and the time to reach, and tap Save team."]]},
+    "12-their-day": {"clip":[61.88,65.81],"cues":[[0,"Your team sees this event, with their role and the time to reach."]]},
+    "13-checklist": {"clip":[67.11,72.18],"cues":[[0,"Add your checklist in one tap."],[1.73,"Each step gets its own date, counted from the event."]]},
+    "14-client": {"clip":[73.48,77.19],"cues":[[0,"Under For the client, add what you'll hand over, and by when."]]},
+    "15-money": {"clip":[78.49,83.62],"cues":[[0,"When the client pays, tap Money received."],[2.38,"You always see what's paid and what's due."]]},
+    "16-edit": {"clip":[84.92,89.76],"cues":[[0,"To change anything, tap Edit dates and details."],[2.74,"After the event, tap Mark done."]]},
+    "17-help": {"clip":[91.06,95.38],"cues":[[0,"Need help? Open More, then Help, and watch this video again, any time."]]}
+  }
+}

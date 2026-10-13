@@ -1,16 +1,15 @@
-// Records the "Connect Facebook & Instagram leads" tutorial video: the real Wedding Yantra
-// screens, driven step by step against the pretend Facebook (META_FAKE), with a ring on each
-// button before it's tapped. Each scene stays on screen as long as its line of the voice-over,
-// and the caption shows the words being said, a sentence at a time; `voice.mjs mix` then puts
-// the voice in. See README.md next to this file.
+// Records a tutorial video: the real Wedding Yantra screens, driven step by step, with a ring on
+// each button before it's tapped. Each scene stays on screen as long as its line of the
+// voice-over, and the caption shows the words being said, a sentence at a time; `voice.mjs mix`
+// then puts the voice in. The scenes for each video are in scenes/<video>.mjs. See README.md
+// next to this file.
 //
-//   node scripts/guide-video/record.mjs        (from a folder where `playwright` 1.63+ is installed)
+//   node scripts/guide-video/record.mjs <video>     (from a folder where `playwright` 1.63+ is installed)
 //
 // Settings (environment): BASE (web, default http://localhost:3000), API (default
-// http://localhost:4000/api/v1), META_APP_SECRET (the API's, to sign the pretend webhook),
-// OUT (folder for the raw recording, default ./guide-video-out), CHROMIUM (browser path).
+// http://localhost:4000/api/v1), OUT (folder for the raw recording, default ./guide-video-out),
+// CHROMIUM (browser path). Scenes may read their own (connect-facebook: META_APP_SECRET).
 
-import { createHmac } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -19,15 +18,20 @@ import path from "node:path";
 const require = createRequire(path.join(process.cwd(), "noop.js"));
 const { chromium } = require("playwright");
 
+const VIDEO = process.argv[2];
+if (!VIDEO) {
+  console.error("Usage: node scripts/guide-video/record.mjs <video>   (connect-facebook, events)");
+  process.exit(1);
+}
+const scenes = await import(new URL(`./scenes/${VIDEO}.mjs`, import.meta.url));
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const API = process.env.API ?? "http://localhost:4000/api/v1";
-const APP_SECRET = process.env.META_APP_SECRET ?? "walk-app-secret";
 const OUT = path.resolve(process.env.OUT ?? "guide-video-out");
 mkdirSync(OUT, { recursive: true });
 
-// Where each line is in the voice-over and when each of its sentences starts (`voice.mjs lines`),
+// Where each line is in the voice-over and when each of its sentences starts (`voice.mjs`),
 // so each scene lasts as long as its line and the caption keeps up with the voice.
-const { lines: LINES, lead: LEAD } = JSON.parse(readFileSync(new URL("../../assets/voiceover/connect-facebook/lines.json", import.meta.url), "utf8"));
+const { lines: LINES, lead: LEAD } = JSON.parse(readFileSync(new URL(`../../assets/voiceover/${VIDEO}/lines.json`, import.meta.url), "utf8"));
 
 async function api(method, p, body, token) {
   const res = await fetch(`${API}${p}`, {
@@ -46,28 +50,17 @@ async function signIn(phone, name) {
   return token;
 }
 
-// ---- A sample business: the owner, two salespeople and a couple of leads ----------------
-const tail = String(Date.now()).slice(-4);
-const owner = await signIn(`+91987697${tail}`, "Riya Kapoor");
-const ws = (await api("POST", "/workspaces", { name: "Shubh Vivah Weddings", businessTypeId: "wedding_planner", city: "Jaipur" }, owner)).id;
-await api("PATCH", `/workspaces/${ws}`, { phone: "9876500000", address: "C-Scheme, Jaipur", pricesConfirmed: true }, owner);
-for (const [i, name] of ["Kabir Mehta", "Neha Joshi"].entries()) {
-  const phone = `98669${tail}${i}`;
-  const inv = await api("POST", `/workspaces/${ws}/invitations`, { name, phone, role: "staff" }, owner);
-  const t = await signIn(`+91${phone}`, name);
-  await api("POST", `/invitations/${inv.token}/accept`, undefined, t);
-  const m = (await api("GET", `/workspaces/${ws}/team`, undefined, owner)).members.find((x) => x.name === name);
-  await api("PUT", `/workspaces/${ws}/members/${m.id}/access`, { department: "sales" }, owner);
-  await api("POST", `/workspaces/${ws}/leads`, { name: i ? "Kapoor family" : "Verma family", phone: `981110000${i}`, source: "instagram" }, t);
-}
+// ---- The sample business: each video seeds its own -------------------------------------
+const state = await scenes.setup({ api, signIn, tail: String(Date.now()).slice(-4) });
 
-// ---- What every page gets: captions, a title card, a ring, and no test-mode notice -------
+// ---- What every page gets: captions, a title card and a ring ------------------------------
 const overlay = () => {
   const css = `
     #wy-cap{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:center;gap:16px;
       max-width:1180px;width:max-content;padding:16px 26px;border-radius:22px;background:rgba(36,24,3,.93);color:#fff;
       font:700 28px/1.3 var(--font-jakarta),system-ui,sans-serif;box-shadow:0 12px 40px rgba(36,24,3,.35);transition:opacity .3s}
     #wy-cap span{text-wrap:balance}
+    dialog #wy-cap{top:20px;bottom:auto}
     #wy-cap b{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#FF6A00,#FFC02E);font-size:22px}
     #wy-title{position:fixed;inset:0;z-index:2147483646;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;
       background:linear-gradient(135deg,#FF6A00 0%,#FF8A1A 45%,#FFC02E 100%);color:#fff;text-align:center;padding:60px;
@@ -88,6 +81,18 @@ const overlay = () => {
     s.textContent = css;
     document.head.appendChild(s);
   };
+  // An open sheet is a modal <dialog>, drawn above everything else on the page: the caption and
+  // the ring go inside it while it's open, or they'd be hidden under it. There the caption sits
+  // at the top, clear of the sheet's buttons.
+  const host = () => document.querySelector("dialog[open]") ?? document.body;
+  const rehome = () => {
+    const h = host();
+    for (const id of ["wy-cap", "wy-ring"]) {
+      const el = document.getElementById(id);
+      if (el && el.parentNode !== h) h.appendChild(el);
+    }
+  };
+  new MutationObserver(rehome).observe(document, { subtree: true, attributes: true, attributeFilter: ["open"] });
   window.__wy = {
     timers: [],
     /** The line's sentences, each as it's said: [ms after the line starts, words]; `since` ms have passed. */
@@ -108,7 +113,7 @@ const overlay = () => {
       if (!el) {
         el = document.createElement("div");
         el.id = "wy-cap";
-        document.body.appendChild(el);
+        host().appendChild(el);
       }
       el.innerHTML = `${step ? `<b>${step}</b>` : ""}<span></span>`;
       el.querySelector("span").textContent = text;
@@ -141,192 +146,115 @@ const overlay = () => {
         tag.textContent = label;
         el.appendChild(tag);
       }
-      document.body.appendChild(el);
+      host().appendChild(el);
     },
   };
-  // The pretend Facebook says so on the settings page; customers never see that.
-  new MutationObserver(() => {
-    for (const el of document.querySelectorAll("div,p")) {
-      if (el.childElementCount === 0 && el.textContent?.startsWith("Test mode:")) el.style.display = "none";
-    }
-  }).observe(document, { childList: true, subtree: true });
 };
 
-const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+// Indian English, so date fields read dd/mm/yyyy as customers see them (the browser takes that
+// from its language, not the page's locale).
+const browser = await chromium.launch({
+  ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
+  args: ["--lang=en-IN"],
+  env: { ...process.env, LANG: "en_IN.UTF-8", LANGUAGE: "en_IN", LC_ALL: "en_IN.UTF-8" },
+});
 const context = await browser.newContext({
   viewport: { width: 1280, height: 720 },
   timezoneId: "Asia/Kolkata",
+  locale: "en-IN",
   recordVideo: { dir: OUT, size: { width: 1280, height: 720 } },
 });
 await context.addInitScript(
   ([token, workspace]) => {
     localStorage.setItem("wy.token", token);
     localStorage.setItem("wy.workspace", workspace);
-    localStorage.setItem("wy.fb-video-closed", "1"); // the video corner itself stays out of the video
+    // The tutorial corners themselves stay out of the videos.
+    localStorage.setItem("wy.fb-video-closed", "1");
+    localStorage.setItem("wy.events-video-closed", "1");
   },
-  [owner, ws],
+  [state.token, state.workspace],
 );
 await context.addInitScript(overlay);
+if (scenes.init) await context.addInitScript(scenes.init);
 const page = await context.newPage();
 const wait = (ms) => page.waitForTimeout(ms);
-const clear = () => page.evaluate(() => window.__wy.clear());
-/** Rings something on screen; "Tap here" only on what is about to be tapped. */
-async function ring(locator, label = null) {
-  await locator.scrollIntoViewIfNeeded();
-  await wait(400);
-  const b = await locator.boundingBox();
-  if (b) await page.evaluate(([x, y, w, h, l]) => window.__wy.ring(x, y, w, h, l), [b.x, b.y, b.width, b.height, label]);
-}
+const unring = () => page.evaluate(() => document.getElementById("wy-ring")?.remove());
 
 // The voice's clock: zero is when the title card appears. `mark` notes when a line's scene
 // appears (its line starts then); `hold` keeps the scene up until the line has been said, plus
 // a breath. Times go to scenes.json for `voice.mjs mix`.
 let zero = 0;
 const at = {};
-function mark(id) {
-  if (!LINES[id]) throw new Error(`No line ${id} in lines.json`);
-  at[id] = performance.now() - zero;
-}
-/** Shows the line's words in the caption (with the step number), a sentence at a time. */
-async function say(id, step) {
-  const since = performance.now() - zero - at[id];
-  await page.evaluate(([c, s, l, n]) => window.__wy.say(c, s, l, n), [LINES[id].cues, step ?? null, LEAD * 1000, since]);
-}
-async function hold(id, after = 1000, atLeast = 3000) {
-  const [from, to] = LINES[id].clip;
-  const left = zero + at[id] + Math.max(atLeast, (to - from) * 1000 + after) - performance.now();
-  if (left > 0) await wait(left);
-}
-async function tap(locator, id, holdMs = 1600) {
-  await ring(locator, "Tap here");
-  await wait(holdMs);
-  await hold(id, 300, 0); // and not before the line has said to tap it
-  await page.evaluate(() => document.getElementById("wy-ring")?.remove());
-  await locator.click();
-}
-async function showStep(stepId, id, step) {
-  await page.evaluate((i) => document.getElementById(i)?.scrollIntoView({ block: "center" }), `step-${stepId}`);
-  await wait(500);
-  mark(id);
-  await say(id, step);
-  await hold(id);
-}
+const kit = {
+  page,
+  BASE,
+  API,
+  OUT,
+  api,
+  wait,
+  unring,
+  clear: () => page.evaluate(() => window.__wy.clear()),
+  title: (main, sub, small) => page.evaluate(([m, s, l]) => window.__wy.title(m, s, l), [main, sub, small]),
+  /** The title card is up: the clock starts, its line starts, and the cover is taken (before the caption). */
+  async start(id) {
+    zero = performance.now();
+    kit.mark(id);
+    await page.screenshot({ path: path.join(OUT, "cover.jpg"), type: "jpeg", quality: 82 });
+  },
+  mark(id) {
+    if (!LINES[id]) throw new Error(`No line ${id} in lines.json`);
+    at[id] = performance.now() - zero;
+  },
+  /** Shows the line's words in the caption (with the step number), a sentence at a time. */
+  async say(id, step) {
+    const since = performance.now() - zero - at[id];
+    await page.evaluate(([c, s, l, n]) => window.__wy.say(c, s, l, n), [LINES[id].cues, step ?? null, LEAD * 1000, since]);
+  },
+  /** Waits until the line's sentence `k` is about to be said (its caption shows then). */
+  async cue(id, k) {
+    const [from, to] = LINES[id].clip;
+    const c = LINES[id].cues[k];
+    // A sentence that shares its caption has no time of its own: about halfway through.
+    const ms = c ? LEAD * 1000 + c[0] * 1000 : ((to - from) * 1000) / 2;
+    const left = zero + at[id] + ms - 400 - performance.now(); // a ring takes 400 ms to settle
+    if (left > 0) await wait(left);
+  },
+  async hold(id, after = 1000, atLeast = 3000) {
+    const [from, to] = LINES[id].clip;
+    const left = zero + at[id] + Math.max(atLeast, (to - from) * 1000 + after) - performance.now();
+    if (left > 0) await wait(left);
+  },
+  /** Rings something on screen; "Tap here" only on what is about to be tapped. */
+  async ring(locator, label = null) {
+    await locator.scrollIntoViewIfNeeded();
+    await wait(400);
+    const b = await locator.boundingBox();
+    if (b) await page.evaluate(([x, y, w, h, l]) => window.__wy.ring(x, y, w, h, l), [b.x, b.y, b.width, b.height, label]);
+  },
+  /** The line's one tap: rung, and tapped once the line has said to tap it. */
+  async tap(locator, id, holdMs = 1600) {
+    await kit.ring(locator, "Tap here");
+    await wait(holdMs);
+    await kit.hold(id, 300, 0);
+    await unring();
+    await locator.click();
+  },
+  /** A tap in the middle of a line: rung for a moment, then tapped. */
+  async press(locator, ms = 1100) {
+    await kit.ring(locator, "Tap here");
+    await wait(ms);
+    await unring();
+    await locator.click();
+  },
+  /** Types as a person would, into an empty field (some fill themselves in). */
+  async type(locator, text) {
+    await locator.click();
+    await locator.fill("");
+    await locator.pressSequentially(text, { delay: 45 });
+  },
+};
 
-// ---- 1. Title ---------------------------------------------------------------------------
-await page.goto(`${BASE}/guides/facebook-leads`);
-await page.getByRole("heading", { level: 1 }).waitFor();
-await page.evaluate(() => window.__wy.title("Get your Facebook & Instagram leads in Wedding Yantra", "Step by step · about 10 minutes, once", "Wedding Yantra · How to"));
-// Everything before the title card is the page loading: `voice.mjs mix` cuts there.
-zero = performance.now();
-mark("01-title");
-await page.screenshot({ path: path.join(OUT, "cover.jpg"), type: "jpeg", quality: 82 }); // before the caption
-await say("01-title");
-await hold("01-title");
-await clear();
-
-// ---- 2. Before you start (on Facebook) ---------------------------------------------------
-await showStep("page", "02-page", "1");
-await showStep("admin", "03-admin", "2");
-await showStep("form", "04-form", "3");
-
-// ---- 3. In Wedding Yantra: Leads → Connect now -------------------------------------------
-await page.goto(`${BASE}/app/leads`);
-const card = page.getByText("Get your Facebook & Instagram leads here by themselves");
-await card.waitFor({ timeout: 20000 });
-mark("05-leads");
-await say("05-leads", "4");
-await wait(1200);
-await tap(page.getByRole("link", { name: "Connect now" }), "05-leads", 2200);
-
-// ---- 4. Continue with Facebook, and what Facebook shows -------------------------------------
-const cont = page.getByRole("button", { name: "Continue with Facebook" }).first();
-await cont.waitFor({ timeout: 20000 });
-mark("06-continue");
-await say("06-continue", "5");
-await ring(cont, "Tap here");
-await hold("06-continue");
-await page.goto(`${BASE}/guides/facebook-leads`);
-await page.getByRole("heading", { level: 1 }).waitFor();
-await showStep("login", "07-login", "6");
-await showStep("choose", "08-choose", "7");
-
-// The pretend Facebook sends us straight back, as the real one does after "Save".
-await page.goto(`${BASE}/app/settings/facebook-leads`);
-await page.getByRole("button", { name: "Continue with Facebook" }).first().click();
-await page.waitForURL(/settings\/facebook-leads/, { timeout: 30000 });
-const switchOn = page.getByRole("button", { name: /Switch on/ });
-await switchOn.waitFor({ timeout: 30000 });
-mark("09-switch-on");
-await say("09-switch-on", "8");
-await wait(1200);
-await tap(switchOn, "09-switch-on", 2200);
-const receiving = page.getByText("Receiving leads").first();
-await receiving.waitFor({ timeout: 20000 });
-await ring(receiving);
-mark("10-receiving");
-await say("10-receiving", "8");
-await hold("10-receiving");
-await clear();
-
-// ---- 5. Who gets the leads -----------------------------------------------------------------
-const everyone = page.getByText("Everyone with the Leads screen").first();
-await everyone.scrollIntoViewIfNeeded();
-await page.evaluate(() => document.getElementById("who-gets")?.scrollIntoView({ block: "center" }));
-await wait(600);
-await ring(everyone);
-mark("11-who-gets");
-await say("11-who-gets", "9");
-await hold("11-who-gets");
-await clear();
-
-// ---- 6. Send a test lead ---------------------------------------------------------------------
-const test = page.getByRole("button", { name: /Send a test lead/ }).first();
-mark("12-test");
-await say("12-test", "10");
-await tap(test, "12-test", 2000);
-const received = page.getByText(/Test lead received/).first();
-await received.waitFor({ timeout: 30000 });
-await received.scrollIntoViewIfNeeded();
-await ring(received);
-mark("13-received");
-await say("13-received", "10");
-await hold("13-received");
-await clear();
-
-// ---- 7. A real-looking lead comes in by itself ----------------------------------------------
-const seeded = await api("POST", "/integrations/meta/dev/leads", { workspaceId: ws, platform: "ig" }, owner);
-const now = Math.floor(Date.now() / 1000);
-const raw = JSON.stringify({
-  object: "page",
-  entry: [{ id: seeded.pageId, time: now, changes: seeded.leads.map((l) => ({ field: "leadgen", value: { leadgen_id: l.leadgenId, page_id: seeded.pageId, form_id: seeded.formId, created_time: now } })) }],
-});
-await fetch(`${API}/integrations/meta/webhook`, {
-  method: "POST",
-  headers: { "content-type": "application/json", "x-hub-signature-256": `sha256=${createHmac("sha256", APP_SECRET).update(raw).digest("hex")}` },
-  body: raw,
-});
-// Open Leads as soon as the lead is in, rather than after a fixed wait (no dead air).
-for (let tries = 0; ; tries++) {
-  const { leads } = await api("GET", `/workspaces/${ws}/leads`, undefined, owner);
-  if (leads.some((l) => l.name === "Priya Sharma")) break;
-  if (tries > 120) throw new Error("The pretend Facebook lead never arrived");
-  await wait(250);
-}
-await page.goto(`${BASE}/app/leads`);
-const priya = page.getByText("Priya Sharma").first();
-await priya.waitFor({ timeout: 30000 });
-await wait(600);
-await ring(priya);
-mark("14-done");
-await say("14-done", "✓");
-await hold("14-done");
-await clear();
-
-// ---- 8. End card -------------------------------------------------------------------------------
-await page.evaluate(() => window.__wy.title("Need help?", "Open Leads and tap “See how” for every step, with pictures", "Wedding Yantra"));
-mark("15-help");
-await say("15-help");
-await hold("15-help", 1500);
+await scenes.run(kit, state);
 const end = performance.now() - zero; // closing the browser takes a while: the video ends here
 
 const missing = Object.keys(LINES).filter((id) => at[id] == null);
@@ -334,12 +262,12 @@ if (missing.length) throw new Error(`No scene for ${missing.join(", ")}`);
 const video = page.video();
 await context.close();
 await browser.close();
-const scenes = {
+const result = {
   video: await video.path(),
   cover: path.join(OUT, "cover.jpg"),
   // Seconds after the title card appeared, when each line's scene appeared.
   at: Object.fromEntries(Object.entries(at).map(([id, ms]) => [id, Math.round(ms) / 1000])),
   end: Math.round(end) / 1000,
 };
-writeFileSync(path.join(OUT, "scenes.json"), `${JSON.stringify(scenes, null, 2)}\n`);
-console.log(JSON.stringify(scenes));
+writeFileSync(path.join(OUT, "scenes.json"), `${JSON.stringify(result, null, 2)}\n`);
+console.log(JSON.stringify(result));

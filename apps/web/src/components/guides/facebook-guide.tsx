@@ -2,7 +2,8 @@ import { CircleCheck, ExternalLink, Info, Lightbulb, Search, TriangleAlert } fro
 import type { ReactNode } from "react";
 import { GuidePicture } from "@/components/guides/guide-pictures";
 import { GuideVideoPlayer } from "@/components/guides/video-player";
-import { GUIDE_DONE, GUIDE_FAQ, GUIDE_PARTS, type GuideStep, type GuideVideo } from "@/lib/facebook-guide";
+import { GUIDE_DONE, GUIDE_FAQ, GUIDE_PARTS, type GuideStep } from "@/lib/facebook-guide";
+import { FACEBOOK_VIDEO_TITLE, type GuideVideo } from "@/lib/guide-videos";
 import { cn } from "@/lib/cn";
 
 /*
@@ -13,7 +14,7 @@ import { cn } from "@/lib/cn";
 function VideoBlock({ video, stepsHref }: { video: GuideVideo; stepsHref: string }) {
   return (
     <section aria-label="Video">
-      <GuideVideoPlayer video={video} stepsHref={stepsHref} className="rounded-3xl" />
+      <GuideVideoPlayer video={video} title={FACEBOOK_VIDEO_TITLE} stepsHref={stepsHref} className="rounded-3xl" />
       {video.kind !== "link" && (
         <p className="mt-2 px-1 text-sm text-ink-muted">
           {video.kind === "file" && video.sound ? "Turn your sound on. " : ""}Watch it once, then follow the steps below.

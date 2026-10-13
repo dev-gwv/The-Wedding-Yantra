@@ -9,6 +9,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { EventCard } from "@/components/bookings/event-card";
+import { EventsVideoBubble } from "@/components/guides/video-bubble";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
@@ -76,6 +77,8 @@ function EventsScreen() {
         ))}
       </div>
       {view === "calendar" ? <CalendarView /> : <ListView past={view === "past"} />}
+      {/* The tutorial is about adding events, so it's for the people who can. */}
+      {can(workspace, "events.manage") && <EventsVideoBubble />}
     </>
   );
 }
