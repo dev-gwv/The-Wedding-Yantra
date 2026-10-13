@@ -3,7 +3,8 @@
 import { can, timeAgo } from "@wedding-yantra/core";
 import { useMetaStatus } from "@wedding-yantra/api-client/react";
 import type { MetaStatus } from "@wedding-yantra/types";
-import { CloudOff, Hourglass, Info, Lock, LogIn, Megaphone, Wrench } from "lucide-react";
+import { BookOpen, CloudOff, Hourglass, Info, Lock, LogIn, Megaphone, Wrench } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
@@ -21,6 +22,7 @@ import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
+import { APP_GUIDE_PATH } from "@/lib/facebook-guide";
 
 const PATH = "/app/settings/facebook-leads";
 
@@ -36,7 +38,20 @@ function Notes() {
           Only lead form (Instant Form) ads come in here. Click-to-WhatsApp, Messenger and website ads don&apos;t, so keep answering those as before.
         </span>
       </p>
+      <GuideLink />
     </div>
+  );
+}
+
+/** The step-by-step guide in Leads; `ready` points at what can be done before connecting. */
+function GuideLink({ ready }: { ready?: boolean }) {
+  return (
+    <Link
+      href={ready ? `${APP_GUIDE_PATH}#before` : APP_GUIDE_PATH}
+      className="inline-flex items-center gap-2 px-1 text-sm font-bold text-brand-strong hover:text-brand-deep"
+    >
+      <BookOpen className="size-4" /> {ready ? "Get ready now: what to do on Facebook first" : "Step-by-step guide, with pictures"}
+    </Link>
   );
 }
 
@@ -171,13 +186,13 @@ function FacebookLeads() {
     body =
       status.data.reason === "not_configured" ? (
         <Card>
-          <EmptyState icon={Wrench} title="Not set up on this server yet">
+          <EmptyState icon={Wrench} title="Not set up on this server yet" action={<GuideLink ready />}>
             Facebook lead ads need a one-time setup on the server before you can connect.
           </EmptyState>
         </Card>
       ) : (
         <Card>
-          <EmptyState icon={Hourglass} title="Coming soon: Meta is reviewing our app">
+          <EmptyState icon={Hourglass} title="Coming soon: Meta is reviewing our app" action={<GuideLink ready />}>
             Once Meta approves it, you can connect your Facebook Page here and its leads arrive in Leads by themselves.
           </EmptyState>
         </Card>

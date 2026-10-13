@@ -880,3 +880,18 @@ describe("department access", () => {
     expect(beyond(inDept("manager", "sales", ["team"]), ROLE_GRANTS.accountant)).toEqual(["finance.view", "clients.view"]);
   });
 });
+
+describe("Facebook guide steps", () => {
+  it("gives the Leads access steps on their own, naming the Page and the person", async () => {
+    const { leadAccessSteps, metaProblem } = await import("./meta.js");
+    const steps = leadAccessSteps({ pageName: "Shubh Vivah", who: "Riya" });
+    expect(steps[0]).toContain("business.facebook.com");
+    expect(steps.join(" ")).toContain("“Shubh Vivah”");
+    expect(steps.at(-1)).toContain("Riya");
+    expect(steps.join(" ")).not.toContain("Check again");
+    // The problem box is the same steps plus coming back to check.
+    expect(metaProblem("lead_access", { pageName: "Shubh Vivah", who: "Riya" }).steps.slice(0, steps.length)).toEqual(steps);
+    expect(leadAccessSteps()).toContain("Choose your Page.");
+    expect(leadAccessSteps().join(" ")).not.toContain("the Page your Page");
+  });
+});

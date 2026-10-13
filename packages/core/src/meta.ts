@@ -44,11 +44,11 @@ const page = (f: MetaProblemFacts) => (f.pageName?.trim() ? `“${f.pageName.tri
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** The Leads Access steps, done on business.facebook.com by an admin of the business there. */
-function leadAccessSteps(f: MetaProblemFacts): string[] {
+export function leadAccessSteps(f: MetaProblemFacts = {}): string[] {
   return [
     "On a computer, open business.facebook.com and go to Settings.",
     "Open Integrations, then Leads access.",
-    `Choose the Page ${page(f)}.`,
+    f.pageName?.trim() ? `Choose the Page ${page(f)}.` : "Choose your Page.",
     "Open CRMs, tap Assign CRMs, pick Wedding Yantra and tap Assign.",
     `Then open People and make sure ${f.who?.trim() || "the person who connected Facebook"} is listed. If not, add them.`,
   ];

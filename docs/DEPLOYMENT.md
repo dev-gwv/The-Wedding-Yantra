@@ -445,3 +445,8 @@ until `META_APP_ID` is set.
 **Trying it without Meta:** `META_FAKE=true` (development only; the API refuses it in
 production) uses a pretend Facebook, so connecting, test leads and webhooks work on your own
 computer.
+
+**The guide for your customers:** Leads → "See how" (and `/guides/facebook-leads`, which opens
+without signing in, so customers can send it to whoever runs their ads) walks them through every
+step in simple English. To add a video, set `NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL` in Vercel
+(Production and Preview) to a YouTube link and redeploy; without it, no video spot shows.

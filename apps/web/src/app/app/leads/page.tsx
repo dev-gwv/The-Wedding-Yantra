@@ -3,12 +3,13 @@
 import { can, formatMoneyShort, leadScope } from "@wedding-yantra/core";
 import { useLeads, useMetaStatus } from "@wedding-yantra/api-client/react";
 import { LEAD_SOURCES, SOURCE_LABELS, type LeadList, type LeadSummary, type PipelineStage } from "@wedding-yantra/types";
-import { BellRing, Inbox, Lock, Megaphone, Plus, Search, Share2 } from "lucide-react";
+import { BellRing, CircleHelp, Inbox, Lock, Megaphone, Plus, Search, Share2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { LeadCard } from "@/components/sales/lead-card";
+import { FacebookLeadsCard } from "@/components/sales/meta/facebook-leads-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
 import { isAdSource } from "@/components/sales/source-badge";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner, Splash } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/errors";
+import { APP_GUIDE_PATH } from "@/lib/facebook-guide";
 
 type View = "follow-ups" | "pipeline";
 
@@ -68,6 +70,8 @@ function LeadsScreen() {
           </Button>
         }
       />
+
+      <FacebookLeadsCard />
 
       {!isEmpty && (
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -204,9 +208,14 @@ function ConnectFacebookLink({ size }: { size?: "sm" }) {
   const ready = meta.data ? meta.data.available && !meta.data.pages.some((p) => p.active) : meta.isError;
   if (!ready) return null;
   return (
-    <ButtonLink href="/app/settings/facebook-leads" variant="secondary" size={size}>
-      <Megaphone className="size-4" /> Connect Facebook lead ads
-    </ButtonLink>
+    <>
+      <ButtonLink href="/app/settings/facebook-leads" variant="secondary" size={size}>
+        <Megaphone className="size-4" /> Connect Facebook lead ads
+      </ButtonLink>
+      <ButtonLink href={APP_GUIDE_PATH} variant="ghost" size={size}>
+        <CircleHelp className="size-4" /> How it works
+      </ButtonLink>
+    </>
   );
 }
 

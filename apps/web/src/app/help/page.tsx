@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/site-header";
 import { buttonClass } from "@/components/ui/button";
+import { GUIDE_PATH } from "@/lib/facebook-guide";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -13,6 +14,8 @@ interface Guide {
   id: string;
   title: string;
   steps: string[];
+  /** A longer guide with pictures */
+  more?: { href: string; label: string };
 }
 
 const GUIDES: Guide[] = [
@@ -37,6 +40,17 @@ const GUIDES: Guide[] = [
       "Share your enquiry form (More, Enquiry form) in your Instagram bio and on WhatsApp. Enquiries from it land in Leads by themselves.",
       "Move the enquiry through your stages. When it's booked or lost, say so, with the reason, so you learn what wins work.",
     ],
+  },
+  {
+    id: "facebook-leads",
+    title: "Facebook & Instagram leads",
+    steps: [
+      "You need a Facebook Page for your business, full control of it, and a lead form (Instant Form) on it.",
+      "The business owner opens Leads and taps “Connect now”, then “Continue with Facebook”, and ticks the Page.",
+      "Choose who gets the leads. Each new lead goes to whoever has the fewest open leads, with an alert.",
+      "Tap “Send a test lead” to check. From then on, leads from your ads come in by themselves.",
+    ],
+    more: { href: GUIDE_PATH, label: "Read the full guide, with pictures" },
   },
   {
     id: "quotes",
@@ -192,6 +206,11 @@ export default function HelpPage() {
                   </li>
                 ))}
               </ol>
+              {g.more && (
+                <Link href={g.more.href} className="mt-4 inline-flex font-bold text-brand-strong hover:text-brand-deep">
+                  {g.more.label} →
+                </Link>
+              )}
             </section>
           ))}
 

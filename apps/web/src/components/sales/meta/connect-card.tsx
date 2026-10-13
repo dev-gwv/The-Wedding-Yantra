@@ -1,8 +1,10 @@
 "use client";
 
-import { Check, Megaphone } from "lucide-react";
+import { BookOpen, Check, Megaphone } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, GradientTile } from "@/components/ui/misc";
+import { APP_GUIDE_PATH } from "@/lib/facebook-guide";
 import type { MetaActions } from "./use-meta-actions";
 
 const POINTS = [
@@ -33,6 +35,12 @@ export function ConnectCard({ actions }: { actions: MetaActions }) {
         Continue with Facebook
       </Button>
       <p className="mt-3 text-center text-sm text-ink-muted">You&apos;ll log in to Facebook and tick the Page your lead ads run from.</p>
+      <Link
+        href={APP_GUIDE_PATH}
+        className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-cream px-4 py-3 text-sm font-bold text-brand-strong hover:bg-sun-100"
+      >
+        <BookOpen className="size-4" /> First time? Step-by-step guide, with pictures
+      </Link>
     </Card>
   );
 }

@@ -97,7 +97,7 @@ export function RoutingPicker({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <Card className="p-5">
+    <Card id="who-gets" className="scroll-mt-6 p-5">
       <div className="flex items-start gap-3">
         <IconSquare icon={Users} />
         <div className="min-w-0">
