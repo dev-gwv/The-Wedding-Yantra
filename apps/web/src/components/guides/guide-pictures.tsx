@@ -180,7 +180,7 @@ function Picture({ kind }: { kind: GuidePictureKind }) {
             <p className="flex items-center gap-1.5 font-bold">
               <Megaphone className="size-3.5 text-brand-strong" /> Get your Facebook & Instagram leads here
             </p>
-            <p className="mt-0.5 text-[10px] text-ink-muted">5 easy steps, about 10 minutes</p>
+            <p className="mt-0.5 text-[10px] text-ink-muted">Easy steps, about 10 minutes</p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <WyButton light>See how</WyButton>
               <Tap>

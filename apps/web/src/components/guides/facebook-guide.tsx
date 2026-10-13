@@ -1,7 +1,7 @@
-import { CircleCheck, ExternalLink, Info, Lightbulb, PlayCircle, Search, TriangleAlert } from "lucide-react";
+import { CircleCheck, ExternalLink, Info, Lightbulb, Search, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { buttonClass } from "@/components/ui/button";
 import { GuidePicture } from "@/components/guides/guide-pictures";
+import { GuideVideoPlayer } from "@/components/guides/video-player";
 import { GUIDE_DONE, GUIDE_FAQ, GUIDE_PARTS, type GuideStep, type GuideVideo } from "@/lib/facebook-guide";
 import { cn } from "@/lib/cn";
 
@@ -10,28 +10,14 @@ import { cn } from "@/lib/cn";
  * wrong. No hooks, so the public page renders it on the server and Leads renders it in the app.
  */
 
-function VideoBlock({ video }: { video: GuideVideo }) {
-  if (video.embed) {
-    return (
-      <section aria-label="Video" className="overflow-hidden rounded-3xl border border-line bg-ink/5 shadow-soft">
-        <div className="relative aspect-video">
-          <iframe
-            src={video.embed}
-            title="How to connect your Facebook lead ads (video)"
-            className="absolute inset-0 size-full"
-            allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
-      </section>
-    );
-  }
+function VideoBlock({ video, stepsHref }: { video: GuideVideo; stepsHref: string }) {
   return (
-    <a href={video.href} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "secondary" })}>
-      <PlayCircle className="size-4" /> Watch the video
-    </a>
+    <section aria-label="Video">
+      <GuideVideoPlayer video={video} stepsHref={stepsHref} className="rounded-3xl" />
+      {video.kind !== "link" && (
+        <p className="mt-2 px-1 text-sm text-ink-muted">Watch it once, then follow the steps below.{video.duration ? ` About ${video.duration}.` : ""}</p>
+      )}
+    </section>
   );
 }
 
@@ -103,7 +89,7 @@ export function FacebookGuide({
         ))}
       </nav>
 
-      {video && <VideoBlock video={video} />}
+      {video && <VideoBlock video={video} stepsHref="#before" />}
       {share}
 
       {GUIDE_PARTS.map((part, partIndex) => (

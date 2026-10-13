@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useState } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { GuideVideoBubble } from "@/components/guides/video-bubble";
 import { LeadCard } from "@/components/sales/lead-card";
 import { FacebookLeadsCard } from "@/components/sales/meta/facebook-leads-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
@@ -183,6 +184,8 @@ function LeadsScreen() {
       {data && data.leads.length > 0 && view === "pipeline" && (
         <Pipeline data={data} filtered={filtered} stageParam={params.get("stage")} onStage={(id) => setParam("stage", id)} />
       )}
+
+      <GuideVideoBubble />
 
       <LeadFormSheet
         open={adding}

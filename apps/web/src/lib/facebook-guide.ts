@@ -256,27 +256,60 @@ export const GUIDE_FAQ: GuideQuestion[] = [
 export const guideShareText = (url: string) =>
   `Please help me connect our Facebook and Instagram lead ads to Wedding Yantra, so new leads come in by themselves. The steps are here: ${url}`;
 
-/** A video for the guide, when one is set for this site (NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL). */
-export interface GuideVideo {
-  href: string;
-  /** A privacy-friendly YouTube player address, when the link is a YouTube video */
-  embed: string | null;
-}
+/** The tutorial video: one that ships with the app, unless the site sets its own. */
+export type GuideVideo =
+  /** A YouTube video, played in a privacy-friendly player */
+  | { kind: "youtube"; href: string; embed: string; poster: string; duration: string | null }
+  /** A video file (ours, or an export from an AI video tool) */
+  | { kind: "file"; href: string; sources: { src: string; type: string }[]; poster: string | null; duration: string | null }
+  /** Any other page with the video: opened in a new tab */
+  | { kind: "link"; href: string; poster: null; duration: null };
 
-export function guideVideo(raw: string | undefined = process.env.NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL): GuideVideo | null {
+/**
+ * The animated tutorial that ships with the app (made by scripts/guide-video/record.mjs):
+ * the real screens with big captions, no voice.
+ */
+export const BUILT_IN_VIDEO: GuideVideo = {
+  kind: "file",
+  href: "/videos/connect-facebook.mp4",
+  // MP4 for phones and most browsers; WebM for browsers without H.264.
+  sources: [
+    { src: "/videos/connect-facebook.mp4", type: "video/mp4" },
+    { src: "/videos/connect-facebook.webm", type: "video/webm" },
+  ],
+  poster: "/videos/connect-facebook.jpg",
+  duration: "1:22",
+};
+
+/**
+ * The video for the guide and the corner of Leads. NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL
+ * replaces the built-in one: a YouTube link, or a direct .mp4/.webm link (an AI presenter
+ * video, for example). An https link to anything else opens in a new tab.
+ */
+export function guideVideo(raw: string | undefined = process.env.NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL): GuideVideo {
   const value = raw?.trim();
-  if (!value) return null;
+  if (!value) return BUILT_IN_VIDEO;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return null;
+    return BUILT_IN_VIDEO;
   }
-  if (url.protocol !== "https:") return null;
+  if (url.protocol !== "https:") return BUILT_IN_VIDEO;
   const host = url.hostname.replace(/^www\.|^m\./, "");
   let id: string | null = null;
   if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? null;
   else if (host === "youtube.com") id = url.searchParams.get("v") ?? url.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1] ?? null;
-  const safeId = id && /^[\w-]{6,20}$/.test(id) ? id : null;
-  return { href: url.toString(), embed: safeId ? `https://www.youtube-nocookie.com/embed/${safeId}` : null };
+  if (id && /^[\w-]{6,20}$/.test(id)) {
+    return {
+      kind: "youtube",
+      href: url.toString(),
+      embed: `https://www.youtube-nocookie.com/embed/${id}?rel=0`,
+      poster: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      duration: null,
+    };
+  }
+  const file = url.pathname.toLowerCase().match(/\.(mp4|webm)$/)?.[1];
+  if (file) return { kind: "file", href: url.toString(), sources: [{ src: url.toString(), type: `video/${file}` }], poster: null, duration: null };
+  return { kind: "link", href: url.toString(), poster: null, duration: null };
 }

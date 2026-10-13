@@ -448,5 +448,9 @@ computer.
 
 **The guide for your customers:** Leads → "See how" (and `/guides/facebook-leads`, which opens
 without signing in, so customers can send it to whoever runs their ads) walks them through every
-step in simple English. To add a video, set `NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL` in Vercel
-(Production and Preview) to a YouTube link and redeploy; without it, no video spot shows.
+step in simple English. A short tutorial video plays in the bottom-right corner of Leads and at
+the top of the guide: the built-in one (`apps/web/public/videos/connect-facebook.mp4`, made by
+`scripts/guide-video/record.mjs`), or your own. To use your own (for example an AI presenter
+video from `docs/video-scripts/connect-facebook-ai-presenter.md`), set
+`NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL` in Vercel (Production and Preview) to its YouTube or
+direct .mp4 link and redeploy.

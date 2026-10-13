@@ -52,7 +52,7 @@ export function FacebookLeadsCard() {
         <GradientTile icon={Megaphone} />
         <div className="min-w-0">
           <p className="font-display text-lg font-extrabold leading-snug">Get your Facebook & Instagram leads here by themselves</p>
-          <p className="mt-0.5 text-sm text-ink-muted">5 easy steps, about 10 minutes. Each lead goes to a salesperson, with an alert.</p>
+          <p className="mt-0.5 text-sm text-ink-muted">Easy steps, about 10 minutes, once. Each lead goes to a salesperson, with an alert.</p>
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
