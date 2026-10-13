@@ -260,14 +260,14 @@ export const guideShareText = (url: string) =>
 export type GuideVideo =
   /** A YouTube video, played in a privacy-friendly player */
   | { kind: "youtube"; href: string; embed: string; poster: string; duration: string | null }
-  /** A video file (ours, or an export from an AI video tool) */
-  | { kind: "file"; href: string; sources: { src: string; type: string }[]; poster: string | null; duration: string | null }
+  /** A video file (ours, or an export from an AI video tool); `sound` when we know it talks */
+  | { kind: "file"; href: string; sources: { src: string; type: string }[]; poster: string | null; duration: string | null; sound?: true }
   /** Any other page with the video: opened in a new tab */
   | { kind: "link"; href: string; poster: null; duration: null };
 
 /**
- * The animated tutorial that ships with the app (made by scripts/guide-video/record.mjs):
- * the real screens with big captions, no voice.
+ * The animated tutorial that ships with the app (made by scripts/guide-video/): the real
+ * screens with big captions and a voice-over.
  */
 export const BUILT_IN_VIDEO: GuideVideo = {
   kind: "file",
@@ -278,7 +278,8 @@ export const BUILT_IN_VIDEO: GuideVideo = {
     { src: "/videos/connect-facebook.webm", type: "video/webm" },
   ],
   poster: "/videos/connect-facebook.jpg",
-  duration: "1:22",
+  duration: "1:25",
+  sound: true,
 };
 
 /**

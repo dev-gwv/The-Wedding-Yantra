@@ -15,7 +15,10 @@ function VideoBlock({ video, stepsHref }: { video: GuideVideo; stepsHref: string
     <section aria-label="Video">
       <GuideVideoPlayer video={video} stepsHref={stepsHref} className="rounded-3xl" />
       {video.kind !== "link" && (
-        <p className="mt-2 px-1 text-sm text-ink-muted">Watch it once, then follow the steps below.{video.duration ? ` About ${video.duration}.` : ""}</p>
+        <p className="mt-2 px-1 text-sm text-ink-muted">
+          {video.kind === "file" && video.sound ? "Turn your sound on. " : ""}Watch it once, then follow the steps below.
+          {video.duration ? ` About ${video.duration}.` : ""}
+        </p>
       )}
     </section>
   );

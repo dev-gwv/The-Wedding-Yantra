@@ -2,7 +2,7 @@
 
 import { ExternalLink, PlayCircle } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { buttonClass } from "@/components/ui/button";
 import type { GuideVideo } from "@/lib/facebook-guide";
 import { cn } from "@/lib/cn";
@@ -17,11 +17,14 @@ const TITLE = "How to connect your Facebook & Instagram leads (video)";
 export function GuideVideoPlayer({
   video,
   autoPlay = false,
+  videoRef,
   stepsHref,
   className,
 }: {
   video: GuideVideo;
   autoPlay?: boolean;
+  /** The <video>, so a tap elsewhere can start it with sound (iPhones need play() in the tap) */
+  videoRef?: Ref<HTMLVideoElement>;
   /** Where the written steps are, offered if the video can't play */
   stepsHref?: string;
   className?: string;
@@ -62,6 +65,7 @@ export function GuideVideoPlayer({
           </div>
         ) : (
           <video
+            ref={videoRef}
             className="absolute inset-0 size-full bg-ink object-contain"
             controls
             playsInline

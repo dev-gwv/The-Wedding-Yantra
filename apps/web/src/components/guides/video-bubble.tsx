@@ -1,8 +1,9 @@
 "use client";
 
 import { can } from "@wedding-yantra/core";
-import { Play, X } from "lucide-react";
-import { useState } from "react";
+import { Play, Volume2, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { GuideVideoPlayer } from "@/components/guides/video-player";
 import { ButtonLink } from "@/components/ui/button";
@@ -37,13 +38,21 @@ export function GuideVideoBubble() {
   const owner = can(workspace, "members.hr");
   const [closed, close] = useDeviceFlag(CLOSED_KEY);
   const [open, setOpen] = useState(false);
+  const player = useRef<HTMLVideoElement>(null);
   const video = guideVideo();
+  const sound = video.kind === "file" && video.sound;
 
   if (closed) return null;
 
   function watch() {
-    if (video.kind === "link") window.open(video.href, "_blank", "noopener,noreferrer");
-    else setOpen(true);
+    if (video.kind === "link") {
+      window.open(video.href, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Open the sheet now and start the video inside this tap: iPhones only play with sound
+    // when play() comes straight from a tap. If it's still refused, its play button is there.
+    flushSync(() => setOpen(true));
+    player.current?.play().catch(() => {});
   }
 
   return (
@@ -59,8 +68,16 @@ export function GuideVideoBubble() {
           >
             <Cover video={video} className="h-12 w-20 rounded-xl sm:aspect-video sm:h-auto sm:w-full sm:rounded-b-none sm:rounded-t-2xl" />
             <span className="min-w-0 sm:px-4 sm:py-3">
-              <span className="block text-[11px] font-extrabold uppercase tracking-wider text-brand-strong">
+              <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-brand-strong">
                 Watch{video.duration ? ` · ${video.duration}` : ""}
+                {sound && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <Volume2 aria-hidden className="size-3.5" strokeWidth={2.5} />
+                    {/* The slim phone card has room for the speaker only */}
+                    <span className="max-sm:sr-only">With sound</span>
+                  </>
+                )}
               </span>
               <span className="block text-sm font-bold leading-snug text-ink">Connect Facebook & Instagram leads</span>
             </span>
@@ -80,11 +97,11 @@ export function GuideVideoBubble() {
         open={open}
         onClose={() => setOpen(false)}
         title="Connect Facebook & Instagram leads"
-        description="Watch how it's done, then follow the steps."
+        description={`${sound ? "Turn your sound on. " : ""}Watch how it's done, then follow the steps.`}
         className="sm:max-w-2xl"
       >
         <div className="space-y-4">
-          <GuideVideoPlayer video={video} autoPlay stepsHref={APP_GUIDE_PATH} />
+          <GuideVideoPlayer video={video} autoPlay videoRef={player} stepsHref={APP_GUIDE_PATH} />
           <div className="flex flex-wrap gap-2">
             <ButtonLink href={APP_GUIDE_PATH} variant="secondary">
               Read the steps

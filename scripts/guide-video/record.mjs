@@ -1,15 +1,16 @@
 // Records the "Connect Facebook & Instagram leads" tutorial video: the real Wedding Yantra
 // screens, driven step by step against the pretend Facebook (META_FAKE), with big captions
-// and a ring on each button before it's tapped. No voice. See README.md next to this file.
+// and a ring on each button before it's tapped. Each scene stays on screen as long as its
+// line of the voice-over; `voice.mjs mix` then puts the voice in. See README.md next to this file.
 //
-//   node scripts/guide-video/record.mjs        (from a folder where `playwright` is installed)
+//   node scripts/guide-video/record.mjs        (from a folder where `playwright` 1.63+ is installed)
 //
 // Settings (environment): BASE (web, default http://localhost:3000), API (default
 // http://localhost:4000/api/v1), META_APP_SECRET (the API's, to sign the pretend webhook),
 // OUT (folder for the raw recording, default ./guide-video-out), CHROMIUM (browser path).
 
 import { createHmac } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -22,6 +23,9 @@ const API = process.env.API ?? "http://localhost:4000/api/v1";
 const APP_SECRET = process.env.META_APP_SECRET ?? "walk-app-secret";
 const OUT = path.resolve(process.env.OUT ?? "guide-video-out");
 mkdirSync(OUT, { recursive: true });
+
+// Where each line is in the voice-over (`voice.mjs lines`), so each scene can last as long as it.
+const LINES = JSON.parse(readFileSync(new URL("../../assets/voiceover/connect-facebook/lines.json", import.meta.url), "utf8")).lines;
 
 async function api(method, p, body, token) {
   const res = await fetch(`${API}${p}`, {
@@ -147,7 +151,6 @@ await context.addInitScript(
 );
 await context.addInitScript(overlay);
 const page = await context.newPage();
-const recordingFrom = Date.now();
 const wait = (ms) => page.waitForTimeout(ms);
 const caption = (text, step) => page.evaluate(([t, s]) => window.__wy.caption(t, s), [text, step ?? null]);
 const clear = () => page.evaluate(() => window.__wy.clear());
@@ -158,54 +161,72 @@ async function ring(locator, label = null) {
   const b = await locator.boundingBox();
   if (b) await page.evaluate(([x, y, w, h, l]) => window.__wy.ring(x, y, w, h, l), [b.x, b.y, b.width, b.height, label]);
 }
-async function tap(locator, holdMs = 1600) {
+
+// The voice's clock: zero is when the title card appears. `mark` notes when a line's scene
+// appears (its line starts then); `hold` keeps the scene up until the line has been said, plus
+// a breath. Times go to scenes.json for `voice.mjs mix`.
+let zero = 0;
+const at = {};
+function mark(id) {
+  if (!LINES[id]) throw new Error(`No line ${id} in lines.json`);
+  at[id] = performance.now() - zero;
+}
+async function hold(id, after = 1000, atLeast = 3000) {
+  const [from, to] = LINES[id];
+  const left = zero + at[id] + Math.max(atLeast, (to - from) * 1000 + after) - performance.now();
+  if (left > 0) await wait(left);
+}
+async function tap(locator, id, holdMs = 1600) {
   await ring(locator, "Tap here");
   await wait(holdMs);
+  await hold(id, 300, 0); // and not before the line has said to tap it
   await page.evaluate(() => document.getElementById("wy-ring")?.remove());
   await locator.click();
 }
-async function showStep(id, text, step, ms = 5200) {
-  await page.evaluate((i) => document.getElementById(i)?.scrollIntoView({ block: "center" }), `step-${id}`);
+async function showStep(stepId, id, text, step) {
+  await page.evaluate((i) => document.getElementById(i)?.scrollIntoView({ block: "center" }), `step-${stepId}`);
   await wait(500);
   await caption(text, step);
-  await wait(ms);
+  mark(id);
+  await hold(id);
 }
 
 // ---- 1. Title ---------------------------------------------------------------------------
 await page.goto(`${BASE}/guides/facebook-leads`);
 await page.getByRole("heading", { level: 1 }).waitFor();
 await page.evaluate(() => window.__wy.title("Get your Facebook & Instagram leads in Wedding Yantra", "Step by step · about 10 minutes, once", "Wedding Yantra · How to"));
-await wait(300);
-// Everything before the title card is the page loading: cut when encoding.
-const trimStart = (Date.now() - recordingFrom) / 1000;
-const started = Date.now();
+// Everything before the title card is the page loading: `voice.mjs mix` cuts there.
+zero = performance.now();
+mark("01-title");
 await page.screenshot({ path: path.join(OUT, "cover.jpg"), type: "jpeg", quality: 82 });
-await wait(4200);
+await hold("01-title");
 await clear();
 
 // ---- 2. Before you start (on Facebook) ---------------------------------------------------
-await showStep("page", "Before you start: you need a Facebook Page for your business", "1");
-await showStep("admin", "You must be an admin of that Page, with “Full control”", "2");
-await showStep("form", "And a lead form (Instant Form) on Facebook for your ads", "3");
+await showStep("page", "02-page", "Before you start: you need a Facebook Page for your business", "1");
+await showStep("admin", "03-admin", "You must be an admin of that Page, with “Full control”", "2");
+await showStep("form", "04-form", "And a lead form (Instant Form) on Facebook for your ads", "3");
 
 // ---- 3. In Wedding Yantra: Leads → Connect now -------------------------------------------
 await page.goto(`${BASE}/app/leads`);
 const card = page.getByText("Get your Facebook & Instagram leads here by themselves");
 await card.waitFor({ timeout: 20000 });
 await caption("In Wedding Yantra, open Leads and tap “Connect now”", "4");
+mark("05-leads");
 await wait(1200);
-await tap(page.getByRole("link", { name: "Connect now" }), 2200);
+await tap(page.getByRole("link", { name: "Connect now" }), "05-leads", 2200);
 
 // ---- 4. Continue with Facebook, and what Facebook shows -------------------------------------
 const cont = page.getByRole("button", { name: "Continue with Facebook" }).first();
 await cont.waitFor({ timeout: 20000 });
 await caption("Tap “Continue with Facebook”", "5");
+mark("06-continue");
 await ring(cont, "Tap here");
-await wait(3000);
+await hold("06-continue");
 await page.goto(`${BASE}/guides/facebook-leads`);
 await page.getByRole("heading", { level: 1 }).waitFor();
-await showStep("login", "Facebook opens. Log in and tap “Continue as (your name)”", "6", 5600);
-await showStep("choose", "Tick your Page. Keep every switch ON. Tap “Save”", "7", 6000);
+await showStep("login", "07-login", "Facebook opens. Log in and tap “Continue as (your name)”", "6");
+await showStep("choose", "08-choose", "Tick your Page. Keep every switch ON. Tap “Save”", "7");
 
 // The pretend Facebook sends us straight back, as the real one does after "Save".
 await page.goto(`${BASE}/app/settings/facebook-leads`);
@@ -214,13 +235,15 @@ await page.waitForURL(/settings\/facebook-leads/, { timeout: 30000 });
 const switchOn = page.getByRole("button", { name: /Switch on/ });
 await switchOn.waitFor({ timeout: 30000 });
 await caption("Back in Wedding Yantra: tick your Page and tap “Switch on”", "8");
+mark("09-switch-on");
 await wait(1200);
-await tap(switchOn, 2200);
+await tap(switchOn, "09-switch-on", 2200);
 const receiving = page.getByText("Receiving leads").first();
 await receiving.waitFor({ timeout: 20000 });
 await ring(receiving);
 await caption("Your Page now says “Receiving leads”", "8");
-await wait(3400);
+mark("10-receiving");
+await hold("10-receiving");
 await clear();
 
 // ---- 5. Who gets the leads -----------------------------------------------------------------
@@ -230,19 +253,22 @@ await page.evaluate(() => document.getElementById("who-gets")?.scrollIntoView({ 
 await wait(600);
 await ring(everyone);
 await caption("Each new lead goes to the salesperson with the fewest open leads", "9");
-await wait(5600);
+mark("11-who-gets");
+await hold("11-who-gets");
 await clear();
 
 // ---- 6. Send a test lead ---------------------------------------------------------------------
 const test = page.getByRole("button", { name: /Send a test lead/ }).first();
 await caption("Tap “Send a test lead”", "10");
-await tap(test, 2000);
+mark("12-test");
+await tap(test, "12-test", 2000);
 const received = page.getByText(/Test lead received/).first();
 await received.waitFor({ timeout: 30000 });
 await received.scrollIntoViewIfNeeded();
 await ring(received);
 await caption("“Test lead received”: it works!", "10");
-await wait(3600);
+mark("13-received");
+await hold("13-received");
 await clear();
 
 // ---- 7. A real-looking lead comes in by itself ----------------------------------------------
@@ -257,22 +283,38 @@ await fetch(`${API}/integrations/meta/webhook`, {
   headers: { "content-type": "application/json", "x-hub-signature-256": `sha256=${createHmac("sha256", APP_SECRET).update(raw).digest("hex")}` },
   body: raw,
 });
-await wait(2500);
+// Open Leads as soon as the lead is in, rather than after a fixed wait (no dead air).
+for (let tries = 0; ; tries++) {
+  const { leads } = await api("GET", `/workspaces/${ws}/leads`, undefined, owner);
+  if (leads.some((l) => l.name === "Priya Sharma")) break;
+  if (tries > 120) throw new Error("The pretend Facebook lead never arrived");
+  await wait(250);
+}
 await page.goto(`${BASE}/app/leads`);
 const priya = page.getByText("Priya Sharma").first();
 await priya.waitFor({ timeout: 30000 });
 await wait(600);
 await ring(priya);
 await caption("Done! New leads from your ads now come in by themselves, with an alert", "✓");
-await wait(5600);
+mark("14-done");
+await hold("14-done");
 await clear();
 
 // ---- 8. End card -------------------------------------------------------------------------------
 await page.evaluate(() => window.__wy.title("Need help?", "Open Leads and tap “See how” for every step, with pictures", "Wedding Yantra"));
-await wait(4200);
+mark("15-help");
+await hold("15-help", 1500);
 
-const seconds = Math.round((Date.now() - started) / 1000);
+const missing = Object.keys(LINES).filter((id) => at[id] == null);
+if (missing.length) throw new Error(`No scene for ${missing.join(", ")}`);
 const video = page.video();
 await context.close();
 await browser.close();
-console.log(JSON.stringify({ video: await video.path(), cover: path.join(OUT, "cover.jpg"), trimStart, seconds }));
+const scenes = {
+  video: await video.path(),
+  cover: path.join(OUT, "cover.jpg"),
+  // Seconds after the title card appeared, when each line's scene appeared.
+  at: Object.fromEntries(Object.entries(at).map(([id, ms]) => [id, Math.round(ms) / 1000])),
+};
+writeFileSync(path.join(OUT, "scenes.json"), `${JSON.stringify(scenes, null, 2)}\n`);
+console.log(JSON.stringify(scenes));
