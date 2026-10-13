@@ -137,6 +137,9 @@ export async function run(k) {
   await k.say("08-functions", "4");
   async function fn(i, option, date, time) {
     const box = page.getByRole("combobox", { name: `Function ${i + 1}` });
+    // Mid-screen, so its list opens clear of the caption.
+    await box.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await wait(450);
     if (i === 0) await k.ring(box, "Tap here"); // a new row opens its list by itself
     // A few letters bring it to the top of the list, clear of the caption.
     await k.type(box, option.slice(0, 3));
@@ -239,6 +242,10 @@ export async function run(k) {
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("heading", { name: "Money", exact: true }).evaluate((el) => el.scrollIntoView({ block: "start" }));
   await wait(300);
+  // What's paid and what's due, long enough to read.
+  await k.ring(page.getByText("Received", { exact: true }).first());
+  await wait(2200);
+  await k.unring();
   await k.hold("15-money");
 
   // ---- 10. Edit, and Mark done after the event ---------------------------------------------------------------

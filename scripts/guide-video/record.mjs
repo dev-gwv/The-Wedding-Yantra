@@ -73,7 +73,8 @@ const overlay = () => {
     #wy-ring span{position:absolute;top:-34px;right:-6px;background:#FF6A00;color:#fff;font:800 15px var(--font-jakarta),system-ui;
       padding:5px 12px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
     @keyframes wyPulse{0%,100%{box-shadow:0 0 0 6px rgba(255,106,0,.25)}50%{box-shadow:0 0 0 16px rgba(255,106,0,.12)}}
-    html{scroll-behavior:smooth}`;
+    html{scroll-behavior:smooth}
+    body{padding-bottom:200px}`; // room for the last button on a page to scroll up clear of the caption
   const add = () => {
     if (document.getElementById("wy-style")) return;
     const s = document.createElement("style");
@@ -179,6 +180,22 @@ if (scenes.init) await context.addInitScript(scenes.init);
 const page = await context.newPage();
 const wait = (ms) => page.waitForTimeout(ms);
 const unring = () => page.evaluate(() => document.getElementById("wy-ring")?.remove());
+/**
+ * Moves something out from under the caption: the bottom band of the page, or the top of an
+ * open sheet (where the caption sits then). What's tapped must be seen being tapped.
+ */
+async function clearOfCaption(locator) {
+  const b = await locator.boundingBox();
+  if (!b) return;
+  const height = page.viewportSize().height;
+  const inSheet = await page.evaluate(() => !!document.querySelector("dialog[open]"));
+  if (!inSheet && b.y + b.height > height - 150) {
+    await page.evaluate((by) => window.scrollBy({ top: by }), b.y + b.height - (height - 170));
+  } else if (inSheet && b.y < 130) {
+    await locator.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  } else return;
+  await wait(450); // the scroll is smooth
+}
 
 // The voice's clock: zero is when the title card appears. `mark` notes when a line's scene
 // appears (its line starts then); `hold` keeps the scene up until the line has been said, plus
@@ -226,7 +243,9 @@ const kit = {
   },
   /** Rings something on screen; "Tap here" only on what is about to be tapped. */
   async ring(locator, label = null) {
+    await unring(); // a ring left on screen would float in place while the page scrolls
     await locator.scrollIntoViewIfNeeded();
+    await clearOfCaption(locator);
     await wait(400);
     const b = await locator.boundingBox();
     if (b) await page.evaluate(([x, y, w, h, l]) => window.__wy.ring(x, y, w, h, l), [b.x, b.y, b.width, b.height, label]);
