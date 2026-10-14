@@ -22,7 +22,7 @@ The same as the Facebook and Events videos, so they all sound like one person:
 | `01-title` | Orange title card | Let's see how My tasks keeps all your work in one place, so nothing is missed. | 4.5 s |
 | `02-open` | Menu: My tasks | Open My tasks from the menu. On a phone, tap More, then Tasks. | 3.5 s |
 | `03-list` | Tasks by date, Late in red | Every task for you is here, by date. Late tasks are at the top, in red. | 4 s |
-| `04-filters` | Doing, Stuck, To check | Tap Doing, Stuck or To check to see just those. To check is your work, waiting to be checked. | 5.5 s |
+| `04-filters` | Doing, Stuck, To check | Tap Doing, Stuck or To check, to see just those. The To check list is work you've handed in, waiting for a check. | 6.5 s |
 | `05-add` | "Add task" ringed | To add your own task, tap Add task. Owners and managers see Give a task. | 4 s |
 | `06-what` | "What needs doing", "Tomorrow" | Write what needs doing, and pick when it's due: today, tomorrow or in a week. | 4.5 s |
 | `07-priority` | Priority: High | Set the priority. Urgent and high tasks stand out on the list. | 3.5 s |
@@ -50,7 +50,7 @@ lines at the breaks, so keep exactly one break between lines and none inside a l
 Let's see how My tasks keeps all your work in one place, so nothing is missed. <break time="1.5s" />
 Open My tasks from the menu. On a phone, tap More, then Tasks. <break time="1.5s" />
 Every task for you is here, by date. Late tasks are at the top, in red. <break time="1.5s" />
-Tap Doing, Stuck or To check to see just those. To check is your work, waiting to be checked. <break time="1.5s" />
+Tap Doing, Stuck or To check, to see just those. The To check list is work you've handed in, waiting for a check. <break time="1.5s" />
 To add your own task, tap Add task. Owners and managers see Give a task. <break time="1.5s" />
 Write what needs doing, and pick when it's due: today, tomorrow or in a week. <break time="1.5s" />
 Set the priority. Urgent and high tasks stand out on the list. <break time="1.5s" />
@@ -66,7 +66,8 @@ Every morning at 8, you get your plan for the day, and reminders until each task
 Need help? Open More, then Help, and watch this video again, any time.
 ```
 
-If "Wedding Yantra" or "Neha" sounds wrong, change the spelling in ElevenLabs only.
+Play line 14 once. If "the @ sign" isn't read as "the at sign", type "the at sign" in ElevenLabs
+only; keep "@" here, so the caption shows it.
 
 ## Send the file
 
