@@ -40,6 +40,6 @@ function builtIn(name: string, duration: string, sound?: true): GuideVideo {
 export const FACEBOOK_VIDEO = builtIn("connect-facebook", "1:24", true);
 export const FACEBOOK_VIDEO_TITLE = "How to connect your Facebook & Instagram leads";
 
-/** "Add an event and run it": captions only until its voice-over is made. */
-export const EVENTS_VIDEO = builtIn("events", "1:50");
+/** "Add an event and run it", with the owner's voice-over. */
+export const EVENTS_VIDEO = builtIn("events", "1:48", true);
 export const EVENTS_VIDEO_TITLE = "How to add and run an event";

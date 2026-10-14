@@ -5,8 +5,9 @@ line per scene, in simple English. Make all 17 lines as **one file** in ElevenLa
 below). The video is made so every scene lasts as long as its line, so the voice and the screen
 always match.
 
-**Until the voice comes,** the video runs with captions only, timed as if spoken. With the
-voice, it is re-made with `scripts/guide-video/README.md`.
+**In use now:** the "Nimmo, Clear Hinglish Customer Care" voice (Eleven Multilingual v2), all 17
+lines in one file: `assets/voiceover/events/voiceover.mp3`. To change the voice, make a new file
+the same way, replace that file, and re-make the video with `scripts/guide-video/README.md`.
 
 ## ElevenLabs settings
 
@@ -39,7 +40,7 @@ The same as the Facebook video, so both sound like one person:
 | `16-edit` | "Edit dates and details" and "Mark done" ringed | To change anything, tap Edit dates and details. After the event, tap Mark done. | 4.5 s |
 | `17-help` | "Need help?" end card | Need help? Open More, then Help, and watch this video again, any time. | 4 s |
 
-The whole voice-over is about 70 seconds; the finished video is about 1 minute 50 seconds, because some
+The whole voice-over is about 80 seconds; the finished video is 1 minute 48 seconds, because some
 scenes show typing. The ids in the first column are the names `scripts/guide-video/` uses for each
 line, and the third column is also the video's captions, so keep it word for word what was
 voiced.

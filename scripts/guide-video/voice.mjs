@@ -74,6 +74,44 @@ const clock = (s) => {
   return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
 };
 const sentencesOf = (text) => text.split(/(?<=[.!?])\s+/);
+/** How long a line takes to say, as the Facebook voice says it (`estimate`, and choosing breaks). */
+const spoken = (words) => words.length / SPOKEN_CPS + (sentencesOf(words).length - 1) * SENTENCE_GAP;
+
+/**
+ * The breaks, in order, out of the long pauses: one fewer than the lines, chosen so each line is
+ * as near as can be to how long its words take (least Σ ((length − expected) ÷ expected)²). A long
+ * pause inside a line then can't be mistaken for a break.
+ */
+function chooseBreaks(cands, expected, first, last) {
+  const n = expected.length;
+  const m = cands.length;
+  if (n === 1) return [];
+  const miss = (i, from, to) => ((to - from - expected[i]) / expected[i]) ** 2;
+  // cost[i][k]: best for lines 0..i with break i at pause k; back[i][k]: break i − 1's pause.
+  const cost = expected.slice(1).map(() => new Array(m).fill(Infinity));
+  const back = expected.slice(1).map(() => new Array(m).fill(-1));
+  for (let i = 0; i < n - 1; i++) {
+    // Room for i breaks before this one and n − 2 − i after it.
+    for (let k = i; k <= m - (n - 1 - i); k++) {
+      if (i === 0) cost[0][k] = miss(0, first, cands[k].start);
+      else
+        for (let j = i - 1; j < k; j++) {
+          const c = cost[i - 1][j] + miss(i, cands[j].end, cands[k].start);
+          if (c < cost[i][k]) [cost[i][k], back[i][k]] = [c, j];
+        }
+    }
+  }
+  // The last line runs from the last break to the end of the speech.
+  let k = -1;
+  let best = Infinity;
+  for (let j = n - 2; j < m; j++) {
+    const c = cost[n - 2][j] + miss(n - 1, cands[j].end, last);
+    if (c < best) [best, k] = [c, j];
+  }
+  const picked = [];
+  for (let i = n - 2; i >= 0; k = back[i--][k]) picked.unshift(cands[k]);
+  return picked;
+}
 
 /** The lines in order, [id, words]: the first and third columns of the script's table. */
 function script(f) {
@@ -142,7 +180,7 @@ function writeLines(f, head, out) {
   console.log(`Wrote ${path.relative(REPO, f.lines)}`);
 }
 
-// ---- lines: the 1.5 s breaks between lines are the longest pauses ------------------------------
+// ---- lines: the 1.5 s breaks between lines, out of the long pauses ------------------------------
 function lines(f) {
   const rows = script(f);
   const count = rows.length;
@@ -154,21 +192,23 @@ function lines(f) {
 
   // Silence before the first word and after the last isn't a break. (The header's duration is
   // rounded, so "at the end" means within a tenth of a second of it, or no end printed at all.)
-  const first = pauses[0]?.start === 0 ? pauses.shift().end : 0;
+  const first = pauses.length && pauses[0].start < 0.1 ? pauses.shift().end : 0;
   const trailing = pauses.length && (ends.length < starts.length || total - pauses.at(-1).end < 0.1);
   const last = trailing ? pauses.pop().start : total;
-  const byLength = [...pauses].sort((a, b) => b.end - b.start - (a.end - a.start));
-  const breaks = byLength.slice(0, count - 1);
-  const shortestBreak = breaks.at(-1) ? breaks.at(-1).end - breaks.at(-1).start : 0;
-  const longestRest = byLength[count - 1] ? byLength[count - 1].end - byLength[count - 1].start : 0;
-  if (breaks.length !== count - 1 || shortestBreak < 1.2 || longestRest > 1.0) {
-    throw new Error(
-      `Expected ${count} lines with a 1.5 s break between each; found ${pauses.length} pauses ` +
-        `(shortest break ${round(shortestBreak)} s, longest other pause ${round(longestRest)} s). ` +
-        `Check the file has exactly one <break time="1.5s" /> between lines.`,
-    );
-  }
-  breaks.sort((a, b) => a.start - b.start);
+  const candidates = pauses.filter((p) => p.end - p.start >= 1.0);
+  const expected = rows.map(([, words]) => spoken(words));
+  const fail = (why) => {
+    throw new Error(`Expected ${count} lines with a 1.5 s break between each: ${why}. Check the file has exactly one <break time="1.5s" /> between lines.`);
+  };
+  if (candidates.length < count - 1) fail(`found only ${candidates.length} pauses of 1 s or more`);
+  const breaks = chooseBreaks(candidates, expected, first, last);
+  const short = breaks.find((b) => b.end - b.start < 1.2);
+  if (short) fail(`the break at ${round(short.start)} s is only ${round(short.end - short.start)} s`);
+  rows.forEach(([id], i) => {
+    const length = (i === count - 1 ? last : breaks[i].start) - (i === 0 ? first : breaks[i - 1].end);
+    if (length < expected[i] * 0.6 || length > expected[i] * 1.6) fail(`${id} is ${round(length)} s; its words take about ${round(expected[i])} s`);
+  });
+  for (const p of candidates) if (!breaks.includes(p)) console.log(`A ${round(p.end - p.start)} s pause at ${round(p.start)} s is inside a line, not a break.`);
 
   // The short pauses inside lines, where sentences can break.
   const fine = ffmpeg(["-i", f.voice, "-af", "silencedetect=n=-35dB:d=0.06", "-f", "null", "-"]);
@@ -189,7 +229,7 @@ function estimate(f) {
     script(f),
     (i, words) => {
       const from = t;
-      const to = from + words.length / SPOKEN_CPS + (sentencesOf(words).length - 1) * SENTENCE_GAP;
+      const to = from + spoken(words);
       t = to + BREAK;
       return [from, to];
     },

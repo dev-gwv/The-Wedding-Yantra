@@ -8,7 +8,8 @@ the captions for the player, and its cover, `<video>.jpg`.
 | Video | Where it shows | Script (the lines, also the captions) | Voice |
 |---|---|---|---|
 | `connect-facebook` | Bottom-right of Leads, and the top of the Facebook guide | `docs/video-scripts/connect-facebook-voiceover.md` | done |
-| `events` | Bottom-right of Events (for people who can add events), and Help → Events | `docs/video-scripts/events-voiceover.md` | not yet: captions only |
+| `events` | Bottom-right of Events (for people who can add events), and Help → Events | `docs/video-scripts/events-voiceover.md` | done |
+| `my-tasks` | (next: the video comes once the voice is made) | `docs/video-scripts/my-tasks-voiceover.md` | not yet |
 
 Their lengths (and whether they have sound) are in `apps/web/src/lib/guide-videos.ts`. Setting
 `NEXT_PUBLIC_FACEBOOK_GUIDE_VIDEO_URL` on Vercel (a YouTube link, or a direct `.mp4` link)
@@ -33,8 +34,9 @@ ffmpeg-static` gives one); point `FFMPEG` at it.
   ```
 
   It prints each line's start, end and length, and its captions, and stops if it can't find one
-  line per row of the script. A sentence too quick to read on its own shares a caption with its
-  neighbour.
+  line per row of the script. The breaks are the pauses of 1 s or more that best fit how long
+  each line's words take, so a long pause inside a line isn't taken for a break (it says so when
+  it sees one). A sentence too quick to read on its own shares a caption with its neighbour.
 - **Not made yet:** time the lines as the Facebook voice would say them, so the video can go out
   with captions only and look the same once the voice comes:
 
