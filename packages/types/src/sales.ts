@@ -253,6 +253,20 @@ export const leadListQuery = z.object({
 });
 export type LeadListQuery = z.input<typeof leadListQuery>;
 
+/** Leads as a spreadsheet: the same filters as the list, as Excel or CSV. */
+export const leadExportQuery = leadListQuery.omit({ followUp: true, mine: true }).extend({
+  format: z.enum(["xlsx", "csv"]).default("xlsx"),
+});
+export type LeadExportQuery = z.input<typeof leadExportQuery>;
+
+export interface LeadExportFile {
+  filename: string;
+  contentType: string;
+  /** The file, base64-encoded so every app saves it the same way */
+  data: string;
+  rows: number;
+}
+
 // ---------------------------------------------------------------------------
 // Sales stages
 // ---------------------------------------------------------------------------

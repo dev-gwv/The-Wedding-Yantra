@@ -140,6 +140,8 @@ import type {
   Lead,
   LeadFormSettings,
   LeadList,
+  LeadExportFile,
+  LeadExportQuery,
   LeadListQuery,
   PipelineStage,
   PublicLeadForm,
@@ -349,6 +351,8 @@ export function createApiClient(options: ApiClientOptions) {
     leads: {
       list: (workspaceId: string, query: LeadListQuery = {}) =>
         request<LeadList>("GET", `${ws(workspaceId)}/leads${qs(query)}`),
+      export: (workspaceId: string, query: LeadExportQuery = {}) =>
+        request<LeadExportFile>("GET", `${ws(workspaceId)}/leads/export${qs(query)}`),
       get: (workspaceId: string, id: string) => request<Lead>("GET", `${ws(workspaceId)}/leads/${encodeURIComponent(id)}`),
       create: (workspaceId: string, input: CreateLeadInput) => request<Lead>("POST", `${ws(workspaceId)}/leads`, input),
       update: (workspaceId: string, id: string, input: UpdateLeadInput) =>

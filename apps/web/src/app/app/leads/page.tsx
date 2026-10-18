@@ -11,6 +11,7 @@ import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { FacebookVideoBubble } from "@/components/guides/video-bubble";
 import { LeadCard } from "@/components/sales/lead-card";
+import { LeadExportButtons } from "@/components/sales/lead-export";
 import { FacebookLeadsCard } from "@/components/sales/meta/facebook-leads-card";
 import { LeadFormSheet } from "@/components/sales/lead-form-sheet";
 import { isAdSource } from "@/components/sales/source-badge";
@@ -132,6 +133,13 @@ function LeadsScreen() {
               ))}
             </select>
           </div>
+        </div>
+      )}
+
+      {data && !isEmpty && data.leads.length > 0 && (
+        <div className="-mt-3 mb-5 flex flex-wrap items-center justify-end gap-2 text-sm text-ink-muted">
+          <span>Download {source ? `leads from ${SOURCE_LABELS[source]}` : q ? "these leads" : "all leads"}</span>
+          <LeadExportButtons query={{ ...(q ? { q } : {}), ...(source ? { source } : {}) }} />
         </div>
       )}
 

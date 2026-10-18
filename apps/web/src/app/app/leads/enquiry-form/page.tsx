@@ -10,6 +10,7 @@ import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
 import { enquiryFormUrl, PartnerQrRow, QrPoster, useMakeVendorQr } from "@/components/partners/partner-qr";
+import { LeadExportButtons } from "@/components/sales/lead-export";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { QrDownloadButtons } from "@/components/ui/qr-download";
@@ -121,6 +122,14 @@ export default function EnquiryFormPage() {
                     </a>
                   </div>
                 </div>
+                {editable && (
+                  <div>
+                    <p className="text-sm font-semibold text-ink-muted">Leads from this QR code and link</p>
+                    <div className="mt-2">
+                      <LeadExportButtons query={{ source: "enquiry_form" }} />
+                    </div>
+                  </div>
+                )}
                 <p className="text-sm text-ink-muted">
                   The form asks for name, mobile, event, date, city and a note. Put the link in your Instagram bio, WhatsApp Business profile and Google listing.
                 </p>
@@ -161,9 +170,12 @@ function PartnerCodes({ slug, formOn }: { slug: string; formOn: boolean }) {
             </h2>
             <p className="text-sm text-ink-muted">Each has its own code. Enquiries through it are marked as theirs, so you see who sends you work.</p>
           </div>
-          <Button size="sm" onClick={() => setAdding(true)}>
-            <Plus className="size-4" /> Add partner
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {list.some((p) => p.enquiries > 0) && <LeadExportButtons query={{ source: "partner" }} />}
+            <Button size="sm" onClick={() => setAdding(true)}>
+              <Plus className="size-4" /> Add partner
+            </Button>
+          </div>
         </div>
         {!formOn && list.length > 0 && (
           <div className="mb-3">

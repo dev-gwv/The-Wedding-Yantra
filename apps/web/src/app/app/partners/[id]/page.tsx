@@ -13,6 +13,7 @@ import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
 import { LeadCard } from "@/components/sales/lead-card";
+import { LeadExportButtons } from "@/components/sales/lead-export";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card, Notice } from "@/components/ui/misc";
 import { QrDownloadButtons } from "@/components/ui/qr-download";
@@ -192,7 +193,10 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
       )}
 
       <section>
-        <h2 className="mb-3 font-display text-lg font-extrabold">Enquiries from {p.name}</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-extrabold">Enquiries from {p.name}</h2>
+          {p.leads.length > 0 && <LeadExportButtons query={{ partnerId: p.id }} />}
+        </div>
         {p.leads.length === 0 ? (
           <p className="text-ink-muted">None yet. They show here the moment someone enquires through this QR code.</p>
         ) : (

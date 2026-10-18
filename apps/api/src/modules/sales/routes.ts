@@ -3,6 +3,7 @@ import {
   addActivityInput,
   clientInput,
   createLeadInput,
+  leadExportQuery,
   leadListQuery,
   leadRoutingInput,
   partnerInput,
@@ -20,6 +21,7 @@ import type { Db } from "../../db.js";
 import { assertId, ok, parse } from "../../lib/http.js";
 import { requireMember } from "../auth/guard.js";
 import * as clients from "./clients.js";
+import * as leadExport from "./lead-export.js";
 import * as leadRouting from "./lead-routing.js";
 import * as leads from "./leads.js";
 import * as partners from "./partners.js";
@@ -40,6 +42,12 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
     const ctx = await member(request, request.params.workspaceId);
     const q = parse(leadListQuery, request.query);
     return ok(await leads.listLeads(db, ctx, { ...q, mine: q.mine === "true" }));
+  });
+
+  // A spreadsheet of the leads that match: one partner's QR code, a source, or all of them.
+  app.get<Ws>("/workspaces/:workspaceId/leads/export", async (request) => {
+    const ctx = await member(request, request.params.workspaceId);
+    return ok(await leadExport.exportLeads(db, ctx, parse(leadExportQuery, request.query)));
   });
 
   app.post<Ws>("/workspaces/:workspaceId/leads", async (request, reply) => {
