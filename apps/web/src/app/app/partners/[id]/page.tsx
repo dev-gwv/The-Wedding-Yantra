@@ -4,10 +4,12 @@ import { firstName, formatPhone, whatsappLink } from "@wedding-yantra/core";
 import { useLeadForm, usePartner, useSetPartnerSharing, useUpdatePartner } from "@wedding-yantra/api-client/react";
 import type { Partner } from "@wedding-yantra/types";
 import { Archive, ArchiveRestore, Copy, ExternalLink, Handshake, Link2, Link2Off, MessageCircle, Pencil, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { BackLink } from "@/components/app/back-link";
+import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
 import { LeadCard } from "@/components/sales/lead-card";
@@ -111,7 +113,10 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
           <h2 className="font-display text-lg font-extrabold">Their QR code</h2>
           {!formOn && (
             <div className="mt-3">
-              <Notice tone="warning">Your enquiry form is switched off, so this QR shows a &quot;not available&quot; page. Switch it on in More, Enquiry form.</Notice>
+              <Notice tone="warning">Your enquiry form is switched off, so this QR shows a &quot;not available&quot; page.{" "}
+                <Link href={ENQUIRY_FORM_PATH} className="font-bold underline">
+                  Switch it on
+                </Link></Notice>
             </div>
           )}
           <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-start">

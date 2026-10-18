@@ -39,6 +39,13 @@ function PartnerForm({ partner, onSaved }: { partner?: Partner; onSaved: (p: Par
   const [errors, setErrors] = useState<Record<string, string>>({});
   const set = (key: keyof typeof v) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [key]: e.target.value }));
 
+  // Picking a vendor fills in what's still blank: their name, number and what they do.
+  function pickVendor(id: string) {
+    setVendorId(id);
+    const x = vendors.data?.find((y) => y.id === id);
+    if (x) setV((cur) => ({ ...cur, name: cur.name || x.name, phone: cur.phone || local(x.phone), label: cur.label || (x.service ?? "") }));
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     const payload = { ...v, vendorId: vendorId || null };
@@ -64,7 +71,7 @@ function PartnerForm({ partner, onSaved }: { partner?: Partner; onSaved: (p: Par
       </datalist>
       <PhoneField label="Their mobile" value={v.phone} onChange={set("phone")} error={errors.phone} hint="To send them their page on WhatsApp" />
       {(vendors.data?.length ?? 0) > 0 && (
-        <SelectField label="Also one of your vendors?" value={vendorId} onChange={(e) => setVendorId(e.target.value)} error={errors.vendorId}>
+        <SelectField label="Also one of your vendors?" value={vendorId} onChange={(e) => pickVendor(e.target.value)} error={errors.vendorId}>
           <option value="">No</option>
           {vendors.data!.map((x) => (
             <option key={x.id} value={x.id}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { can, eventScope, formatPhone, ROLE_INFO } from "@wedding-yantra/core";
+import { can, eventScope, formatPhone, leadScope, ROLE_INFO } from "@wedding-yantra/core";
 import { useApi, useLogout } from "@wedding-yantra/api-client/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,6 +21,7 @@ import {
   MessageSquareText,
   Package,
   Plus,
+  QrCode,
   ReceiptText,
   Settings,
   Star,
@@ -34,6 +35,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BusinessIcon } from "@/components/app/business-icon";
 import { BusinessMark } from "@/components/app/business-mark";
+import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Avatar, Card, PageHeader } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
@@ -88,6 +90,7 @@ export default function MorePage() {
       <Card className="mb-6 divide-y divide-line overflow-hidden">
         {work && <Row href="/app/my-day" icon={Sun} label="My day" />}
         {work && <Row href="/app/tasks" icon={ListChecks} label="Tasks" />}
+        {leadScope(workspace) !== "none" && <Row href={ENQUIRY_FORM_PATH} icon={QrCode} label="Enquiry form & QR codes" />}
         {can(workspace, "clients.view") && <Row href="/app/clients" icon={UsersRound} label="Clients" />}
         {/* Without the money, Quotes isn't under Payments and invoices. */}
         {can(workspace, "quotes.view") && !can(workspace, "finance.view") && <Row href="/app/money/quotes" icon={FileText} label="Quotes" />}

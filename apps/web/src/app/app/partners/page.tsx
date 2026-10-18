@@ -1,14 +1,15 @@
 "use client";
 
-import { can, formatDate } from "@wedding-yantra/core";
-import { usePartners } from "@wedding-yantra/api-client/react";
-import { ChevronRight, Handshake, Lock, Plus, QrCode } from "lucide-react";
-import Link from "next/link";
+import { can } from "@wedding-yantra/core";
+import { useLeadForm, usePartners } from "@wedding-yantra/api-client/react";
+import { Lock, Plus, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
+import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
+import { PartnerQrRow } from "@/components/partners/partner-qr";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,13 +22,14 @@ export default function PartnersPage() {
   const allowed = can(workspace, "leads.view_all");
   const [archived, setArchived] = useState(false);
   const partners = usePartners(workspace.id, allowed, archived);
+  const form = useLeadForm(workspace.id, allowed);
   const [adding, setAdding] = useState(false);
   const router = useRouter();
 
   if (!allowed)
     return (
       <>
-        <BackLink href="/app/settings" label="Settings" />
+        <BackLink href="/app/leads" label="Leads" />
         <PageHeader title="Partner QR codes" />
         <Card>
           <EmptyState icon={Lock} title="Partner QR codes aren't on your screens">
@@ -42,7 +44,7 @@ export default function PartnersPage() {
 
   return (
     <>
-      <BackLink href="/app/settings" label="Settings" />
+      <BackLink href={ENQUIRY_FORM_PATH} label="Enquiry form & QR codes" />
       <PageHeader
         title="Partner QR codes"
         subtitle="Give each partner you collaborate with their own QR code. Every enquiry through it is credited to them, and they see their enquiries on their own page."
@@ -112,21 +114,7 @@ export default function PartnersPage() {
             )}
             <Card className="divide-y divide-line overflow-hidden">
               {all.map((p) => (
-                <Link key={p.id} href={`/app/partners/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cream text-brand-strong">
-                    <Handshake className="size-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold">{p.name}</p>
-                    <p className="truncate text-sm text-ink-muted">
-                      {[p.label, `${p.scans} scan${p.scans === 1 ? "" : "s"}`, `${p.enquiries} enquir${p.enquiries === 1 ? "y" : "ies"}`, p.booked ? `${p.booked} booked` : null]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                  {p.lastEnquiryAt && <span className="hidden shrink-0 text-xs text-ink-muted sm:block">Last {formatDate(p.lastEnquiryAt.slice(0, 10))}</span>}
-                  <ChevronRight className="size-4 shrink-0 text-ink-subtle" />
-                </Link>
+                <PartnerQrRow key={p.id} p={p} slug={form.data?.slug ?? null} />
               ))}
             </Card>
           </>

@@ -60,7 +60,7 @@ export default function SettingsPage() {
     {
       title: "Sales and enquiries",
       items: [
-        { href: "/app/settings/enquiry-form", icon: QrCode, label: "Enquiry form", about: "A link and QR code anyone can fill; each enquiry becomes a lead", show: sells },
+        { href: "/app/leads/enquiry-form", icon: QrCode, label: "Enquiry form & QR codes", about: "A link and QR code anyone can fill; each enquiry becomes a lead", show: sells },
         {
           href: "/app/settings/facebook-leads",
           icon: Megaphone,

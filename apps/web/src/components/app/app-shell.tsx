@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { moneySectionOf, moneySections } from "@/components/money/money-page";
+import { leadSectionOf, leadSections } from "./lead-sections";
 import { inMasterData, masterSectionOf, masterSections } from "./master-sections";
 import { taskSectionOf, taskSections } from "./task-sections";
 import { cn } from "@/lib/cn";
@@ -45,7 +46,8 @@ const TAB_COLUMNS = ["", "grid-cols-1", "grid-cols-2", "grid-cols-3", "grid-cols
 
 function isActive(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/departments", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/partners", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/more") return ["/app/more", "/app/masters", "/app/team", "/app/departments", "/app/settings", "/app/my-day", "/app/notifications", "/app/clients", "/app/expenses", "/app/tasks", "/app/time-off", "/app/scores", "/app/activity", "/app/summary", "/app/billing", "/app/grow", "/app/deliverables", "/app/vendors", "/app/venues", "/app/services", "/app/inventory", "/app/messages"].some((p) => pathname.startsWith(p));
+  if (href === "/app/leads") return leadSectionOf(pathname) !== null;
   if (href === "/app/money/quotes") return ["/app/money/quotes", "/app/quotes"].some((p) => pathname.startsWith(p));
   if (href === "/app/money") return ["/app/money", "/app/quotes", "/app/bills", "/app/reports"].some((p) => pathname.startsWith(p));
   return pathname.startsWith(href);
@@ -80,6 +82,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Tasks come right after Events: a group for those who give tasks, one link for everyone
   // else. They stay when Events isn't on someone's screens.
   const tasks = taskSections(workspace);
+  // Leads, with the enquiry form and partner QR codes that bring enquiries in.
+  const leads = leadSections(workspace);
   const tasksItem = !can(workspace, "tasks.work") ? null : tasks.length > 1 ? (
     <NavGroup
       label="Team Task Management"
@@ -124,6 +128,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active = isActive(pathname, href);
             const item = show && !show(workspace) ? null : href === "/app/money" ? (
               <NavGroup label={label} icon={Icon} href={href} sections={moneySections(workspace)} current={moneySectionOf(pathname)} active={active} />
+            ) : href === "/app/leads" && leads.length > 1 ? (
+              <NavGroup label={label} icon={Icon} href={href} sections={leads} current={leadSectionOf(pathname)} active={active} />
             ) : (
               <NavLink href={href} label={label} icon={Icon} active={active} />
             );

@@ -3,10 +3,11 @@
 import { can, formatMoneyShort, leadScope } from "@wedding-yantra/core";
 import { useLeads, useMetaStatus } from "@wedding-yantra/api-client/react";
 import { LEAD_SOURCES, SOURCE_LABELS, type LeadList, type LeadSummary, type PipelineStage } from "@wedding-yantra/types";
-import { BellRing, CircleHelp, Inbox, Lock, Megaphone, Plus, Search, Share2 } from "lucide-react";
+import { BellRing, CircleHelp, Inbox, Lock, Megaphone, Plus, QrCode, Search, Share2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useState } from "react";
+import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { FacebookVideoBubble } from "@/components/guides/video-bubble";
 import { LeadCard } from "@/components/sales/lead-card";
@@ -66,9 +67,14 @@ function LeadsScreen() {
           data ? `${data.leads.length} ${data.leads.length === 1 ? "enquiry" : "enquiries"}${source ? ` from ${SOURCE_LABELS[source]}` : ""}` : undefined
         }
         action={
-          <Button onClick={() => setAdding(true)}>
-            <Plus className="size-4" strokeWidth={2.5} /> Add lead
-          </Button>
+          <div className="flex gap-2">
+            <ButtonLink href={ENQUIRY_FORM_PATH} variant="secondary" aria-label="Enquiry form and QR codes">
+              <QrCode className="size-4" /> Form &amp; QR
+            </ButtonLink>
+            <Button onClick={() => setAdding(true)}>
+              <Plus className="size-4" strokeWidth={2.5} /> Add lead
+            </Button>
+          </div>
         }
       />
 
@@ -146,7 +152,7 @@ function LeadsScreen() {
                 <Button onClick={() => setAdding(true)}>
                   <Plus className="size-4" strokeWidth={2.5} /> Add lead
                 </Button>
-                <ButtonLink href="/app/settings/enquiry-form" variant="secondary">
+                <ButtonLink href={ENQUIRY_FORM_PATH} variant="secondary">
                   <Share2 className="size-4" /> Share enquiry form
                 </ButtonLink>
                 <ConnectFacebookLink />

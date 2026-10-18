@@ -539,9 +539,9 @@ export function useDeleteTemplate(workspaceId: string) {
   return useTemplateMutation(workspaceId, (id: string) => api.templates.remove(workspaceId, id));
 }
 
-export function useLeadForm(workspaceId: string) {
+export function useLeadForm(workspaceId: string, enabled = true) {
   const api = useApi();
-  return useQuery({ queryKey: queryKeys.leadForm(workspaceId), queryFn: () => api.leadForm.get(workspaceId) });
+  return useQuery({ queryKey: queryKeys.leadForm(workspaceId), queryFn: () => api.leadForm.get(workspaceId), enabled });
 }
 
 export function useSetLeadFormEnabled(workspaceId: string) {

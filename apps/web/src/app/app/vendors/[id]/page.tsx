@@ -1,15 +1,18 @@
 "use client";
 
 import { can, formatMoney, formatPhone, whatsappLink } from "@wedding-yantra/core";
-import { useUpdateVendor, useVendor } from "@wedding-yantra/api-client/react";
+import { useLeadForm, usePartners, useUpdateVendor, useVendor } from "@wedding-yantra/api-client/react";
 import type { Payout, Vendor } from "@wedding-yantra/types";
-import { Archive, ArchiveRestore, HandCoins, MessageCircle, Pencil, Phone, Star } from "lucide-react";
-import { useParams } from "next/navigation";
+import { Archive, ArchiveRestore, ChevronRight, HandCoins, MessageCircle, Pencil, Phone, QrCode, Star } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
+import { enquiryFormUrl, partnerCounts, partnerQrText, QrImage, useMakeVendorQr } from "@/components/partners/partner-qr";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Avatar, Card, Notice } from "@/components/ui/misc";
+import { QrDownloadButtons } from "@/components/ui/qr-download";
 import { Splash } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { PayoutRow } from "@/components/vendors/payouts";
@@ -98,6 +101,8 @@ export default function VendorPage() {
 
       <VendorDetails vendor={v} />
 
+      {can(workspace, "leads.view_all") && !v.archived && <VendorQrCard vendor={v} />}
+
       <section>
         <h2 className="mb-3 font-display text-lg font-extrabold">Payouts</h2>
         {v.payouts.length === 0 ? (
@@ -170,6 +175,52 @@ function VendorDetails({ vendor: v }: { vendor: Vendor }) {
         <Detail label="IFSC">{v.ifsc}</Detail>
         <Detail label="GST number">{v.gstin}</Detail>
       </dl>
+    </Card>
+  );
+}
+
+/** The vendor's own enquiry QR code: enquiries through it are marked as theirs. */
+function VendorQrCard({ vendor: v }: { vendor: Vendor }) {
+  const { workspace } = useCurrentWorkspace();
+  const router = useRouter();
+  const partners = usePartners(workspace.id);
+  const form = useLeadForm(workspace.id);
+  const { make, making } = useMakeVendorQr((p) => router.push(`/app/partners/${p.id}`));
+  if (!partners.data || !form.data) return null;
+  const p = partners.data.find((x) => x.vendorId === v.id);
+  const first = v.name.split(" ")[0];
+
+  if (!p)
+    return (
+      <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-cream text-brand-strong">
+          <QrCode className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg font-extrabold">Enquiry QR code</h2>
+          <p className="text-sm text-ink-muted">Give {v.name} their own QR code for their counter. Enquiries from it are marked as theirs.</p>
+        </div>
+        <Button loading={making === v.id} onClick={() => void make(v)}>
+          <QrCode className="size-4" /> Make their QR code
+        </Button>
+      </Card>
+    );
+
+  const url = enquiryFormUrl(form.data.slug, p.code);
+  const print = partnerQrText(workspace.name, p);
+  return (
+    <Card className="p-5">
+      <h2 className="font-display text-lg font-extrabold">Enquiry QR code</h2>
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+        <QrImage text={url} label={`QR code for ${v.name}`} className="size-32" />
+        <div className="min-w-0 flex-1 space-y-3">
+          <p className="text-sm text-ink-muted">{partnerCounts(p)} through {first}&apos;s QR code.</p>
+          <QrDownloadButtons text={url} filename={print.filename} title={print.title} subtitle={print.subtitle} size="sm" />
+          <Link href={`/app/partners/${p.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-brand-strong">
+            Their enquiries and page <ChevronRight className="size-4" />
+          </Link>
+        </div>
+      </div>
     </Card>
   );
 }
