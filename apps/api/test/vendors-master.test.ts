@@ -6,6 +6,7 @@ type Vendor = {
   id: string;
   name: string;
   category: string | null;
+  categories: string[];
   service: string | null;
   contactPerson: string | null;
   phone: string | null;
@@ -127,6 +128,44 @@ describe("the vendor master", () => {
     const other = await signIn(t.app, "8639999999", "Stranger");
     await createBusiness(t.app, other, "Elsewhere");
     expect((await call(t.app, "GET", `/workspaces/${ws}/vendors/${v.id}`, { token: other })).status).toBe(404);
+  });
+
+  it("lets a vendor do several things, main one first", async () => {
+    const { owner, ws } = await team("865");
+    const url = `/workspaces/${ws}/vendors`;
+    const made = await call<Vendor>(t.app, "POST", url, { token: owner, body: { name: "Shine Decor", categories: ["decor", "lights", "decor"] } });
+    expect(made.status).toBe(201);
+    expect(made.body.data).toMatchObject({ categories: ["decor", "lights"], category: "decor", service: "Tent and décor, Lights" });
+    const listed = (await call<Vendor[]>(t.app, "GET", url, { token: owner })).body.data.find((v) => v.id === made.body.data.id)!;
+    expect(listed).toMatchObject({ categories: ["decor", "lights"], service: "Tent and décor, Lights" });
+
+    // The older single category still works, as a list of one.
+    const one = await call<Vendor>(t.app, "POST", url, { token: owner, body: { name: "Only Flowers", category: "florist" } });
+    expect(one.body.data).toMatchObject({ categories: ["florist"], category: "florist", service: "Florist" });
+
+    const bad = await call(t.app, "POST", url, { token: owner, body: { name: "Mystery Co", categories: ["florist", "martian"] } });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.fields).toHaveProperty(["categories"]);
+
+    const id = made.body.data.id;
+    const edited = await call<Vendor>(t.app, "PATCH", `${url}/${id}`, { token: owner, body: { categories: ["lights"] } });
+    expect(edited.body.data).toMatchObject({ categories: ["lights"], category: "lights", service: "Lights" });
+    const stored = await t.db.query<{ category: string; categories: string[] }>(`SELECT category, categories FROM vendors WHERE id = $1`, [id]);
+    expect(stored.rows[0]).toEqual({ category: "lights", categories: ["lights"] });
+
+    // A category hidden from the list stays on vendors who have it, but can't be newly picked.
+    const options = await call<{ id: string; key: string }[]>(t.app, "GET", `/workspaces/${ws}/options?list=vendor_category`, { token: owner });
+    const lights = options.body.data.find((o) => o.key === "lights")!;
+    await call(t.app, "PATCH", `/workspaces/${ws}/options/${lights.id}`, { token: owner, body: { archived: true } });
+    const kept = await call<Vendor>(t.app, "PATCH", `${url}/${id}`, { token: owner, body: { categories: ["florist", "lights"] } });
+    expect(kept.status).toBe(200);
+    expect(kept.body.data).toMatchObject({ categories: ["florist", "lights"], category: "florist", service: "Florist, Lights" });
+    const notNew = await call(t.app, "PATCH", `${url}/${one.body.data.id}`, { token: owner, body: { categories: ["florist", "lights"] } });
+    expect(notNew.status).toBe(400);
+
+    // Ticking none clears both.
+    const none = await call<Vendor>(t.app, "PATCH", `${url}/${id}`, { token: owner, body: { categories: [] } });
+    expect(none.body.data).toMatchObject({ categories: [], category: null, service: null });
   });
 
   it("turns what vendors were described as into categories", async () => {

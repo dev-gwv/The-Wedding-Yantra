@@ -72,7 +72,7 @@ function Form({ deliverable: d, event, existing, onDone }: { deliverable?: Deliv
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const works = !d || d.canUpdate;
-  const suggestions = !d && event ? deliverableSuggestions(workspace.businessTypeId).filter((s) => !existing.includes(s.title)) : [];
+  const suggestions = !d && event ? deliverableSuggestions(workspace.businessTypeIds).filter((s) => !existing.includes(s.title)) : [];
 
   async function submit(e: FormEvent) {
     e.preventDefault();

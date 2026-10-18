@@ -2,18 +2,17 @@
 
 import { useBusinessTypes, useCreateWorkspace, useMe } from "@wedding-yantra/api-client/react";
 import { createWorkspaceInput } from "@wedding-yantra/types";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { BusinessIcon } from "@/components/app/business-icon";
 import { AuthScreen } from "@/components/app/auth-screen";
 import { RequireAuth } from "@/components/app/require-auth";
+import { TradePicker } from "@/components/app/trade-picker";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { Eyebrow, Notice } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { setWorkspaceId } from "@/lib/session";
 
@@ -24,17 +23,17 @@ function Onboarding() {
   const create = useCreateWorkspace();
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [typeId, setTypeId] = useState<string | null>(null);
+  const [typeIds, setTypeIds] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const hasBusiness = (me.data?.workspaces.length ?? 0) > 0;
-  const chosen = types.data?.find((t) => t.id === typeId);
+  const chosen = typeIds.map((id) => types.data?.find((t) => t.id === id)?.name).filter(Boolean).join(" · ");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const values = { name, city, businessTypeId: typeId ?? "" };
+    const values = { name, city, businessTypeIds: typeIds };
     const check = validate(createWorkspaceInput, values);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
@@ -63,7 +62,8 @@ function Onboarding() {
         <section className="mt-4">
           <h1 className="font-display text-3xl font-extrabold">What does your business do?</h1>
           <p className="mt-1 text-[15px] text-ink-muted">
-            We&apos;ll set up services, sales stages and checklists that fit. You can change everything later.
+            Tick all that apply, for example a wedding planner who also does photography. We&apos;ll set up services and checklists for each. You can
+            change it later.
           </p>
 
           {types.isPending && (
@@ -77,43 +77,13 @@ function Onboarding() {
             </div>
           )}
 
-          <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {types.data?.map((t) => {
-              const selected = t.id === typeId;
-              return (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setTypeId(t.id)}
-                    aria-pressed={selected}
-                    className={cn(
-                      "relative flex h-full w-full flex-col items-start gap-3 rounded-2xl border p-4 text-left transition",
-                      selected
-                        ? "border-brand bg-cream text-brand-deep"
-                        : "border-line bg-surface text-ink hover:border-sun-300 hover:bg-cream",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-10 place-items-center rounded-xl text-brand-strong",
-                        selected ? "bg-surface shadow-soft" : "bg-cream",
-                      )}
-                    >
-                      <BusinessIcon name={t.icon} className="size-5" />
-                    </span>
-                    <span className="text-sm font-bold leading-snug">{t.name}</span>
-                    {selected && (
-                      <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-gradient-primary text-on-brand">
-                        <Check className="size-3" strokeWidth={3} />
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          {types.data && (
+            <div className="mt-6">
+              <TradePicker types={types.data} value={typeIds} onChange={setTypeIds} />
+            </div>
+          )}
 
-          <Button size="lg" disabled={!typeId} onClick={() => setStep(2)} className="mt-6">
+          <Button size="lg" disabled={!typeIds.length} onClick={() => setStep(2)} className="mt-6">
             Continue
           </Button>
         </section>
@@ -130,7 +100,7 @@ function Onboarding() {
                 className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink"
               >
                 <ArrowLeft className="size-4" />
-                {chosen.name}
+                {chosen}
               </button>
             )}
           </div>
@@ -151,7 +121,7 @@ function Onboarding() {
             placeholder="Jaipur"
             autoComplete="address-level2"
           />
-          {(errors._ || errors.businessTypeId) && <Notice tone="danger">{errors._ ?? errors.businessTypeId}</Notice>}
+          {(errors._ || errors.businessTypeIds) && <Notice tone="danger">{errors._ ?? errors.businessTypeIds}</Notice>}
           <Button type="submit" size="lg" loading={create.isPending}>
             Create my business
           </Button>

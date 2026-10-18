@@ -115,4 +115,16 @@ export const CUSTOM_FIELD_SUGGESTIONS: Record<string, CustomFieldSuggestion[]> =
   fireworks: [{ entity: "event", label: "Permission taken", kind: "yes_no" }],
 };
 
-export const customFieldSuggestions = (businessTypeId: string): CustomFieldSuggestion[] => CUSTOM_FIELD_SUGGESTIONS[businessTypeId] ?? [];
+/** For one kind of work, or several (each suggestion once, by name). */
+export const customFieldSuggestions = (businessTypeIds: string | string[]): CustomFieldSuggestion[] => {
+  const seen = new Set<string>();
+  return [businessTypeIds]
+    .flat()
+    .flatMap((id) => CUSTOM_FIELD_SUGGESTIONS[id] ?? [])
+    .filter((s) => {
+      const key = `${s.entity}:${s.label.toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};

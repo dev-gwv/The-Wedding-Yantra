@@ -73,7 +73,8 @@ export interface PartnerPage {
 const blankToNull = <T>(v: T | "" | null | undefined) => (v === undefined ? undefined : v === "" ? null : v);
 
 const partnerFields = {
-  label: optionalText(60),
+  /** What they are: one kind, or several joined with ", " */
+  label: optionalText(120),
   vendorId: z.uuid().nullable().optional(),
   phone: z.union([z.literal(""), phone]).nullable().optional().transform(blankToNull),
   notes: optionalText(1000),

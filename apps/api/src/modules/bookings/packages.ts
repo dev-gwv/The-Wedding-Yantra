@@ -211,8 +211,8 @@ export async function installStarterPackages(db: Queryable, workspaceId: string,
 export async function addStarterPackages(db: Db, ctx: MemberContext): Promise<ServicePackage[]> {
   requireManage(ctx);
   return withTransaction(db, async (tx) => {
-    const ws = await tx.query<{ business_type_id: string }>(`SELECT business_type_id FROM workspaces WHERE id = $1`, [ctx.workspaceId]);
-    await installStarterPackages(tx, ctx.workspaceId, ws.rows[0]?.business_type_id);
+    const ws = await tx.query<{ business_type_ids: string[] }>(`SELECT business_type_ids FROM workspaces WHERE id = $1`, [ctx.workspaceId]);
+    for (const id of ws.rows[0]?.business_type_ids ?? []) await installStarterPackages(tx, ctx.workspaceId, id);
     return load(tx, ctx.workspaceId, "", []);
   });
 }

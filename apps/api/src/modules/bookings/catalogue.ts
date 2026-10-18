@@ -124,10 +124,13 @@ export async function installCatalogue(
   businessTypeId?: string,
 ): Promise<void> {
   const trade = tradeSeed(businessTypeId);
-  for (const [i, s] of services.entries()) {
+  // A second kind of work adds after what's there, and skips a service the business already has.
+  for (const s of services) {
     await db.query(
-      `INSERT INTO catalogue_items (workspace_id, name, category, unit, price, position) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [workspaceId, s.name, trade?.serviceCategoryOf[s.name] ?? (trade ? null : "main"), s.unit, s.price, i],
+      `INSERT INTO catalogue_items (workspace_id, name, category, unit, price, position)
+       SELECT $1, $2, $3, $4, $5, (SELECT coalesce(max(position), -1) + 1 FROM catalogue_items WHERE workspace_id = $1)
+        WHERE NOT EXISTS (SELECT 1 FROM catalogue_items WHERE workspace_id = $1 AND lower(name) = lower($2))`,
+      [workspaceId, s.name, trade?.serviceCategoryOf[s.name] ?? (trade ? null : "main"), s.unit, s.price],
     );
   }
 }

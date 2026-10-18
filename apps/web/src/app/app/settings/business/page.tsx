@@ -1,7 +1,7 @@
 "use client";
 
 import { can } from "@wedding-yantra/core";
-import { useUpdateWorkspace, useUploadFile, useWorkspace } from "@wedding-yantra/api-client/react";
+import { useBusinessTypes, useUpdateWorkspace, useUploadFile, useWorkspace } from "@wedding-yantra/api-client/react";
 import { updateWorkspaceInput, type Workspace } from "@wedding-yantra/types";
 import { ChevronRight, ImagePlus, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState, type FormEvent } from "react";
 import { BackLink } from "@/components/app/back-link";
 import { BusinessMark } from "@/components/app/business-mark";
+import { TradePicker } from "@/components/app/trade-picker";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { TextAreaField, TextField } from "@/components/ui/field";
@@ -40,7 +41,12 @@ function BusinessProfile() {
         </div>
       )}
       {details.isError && <Notice tone="danger">{errorMessage(details.error)}</Notice>}
-      {details.data && <ProfileForm key={details.data.id} workspace={details.data} />}
+      {details.data && (
+        <>
+          <TradesCard key={`trades-${details.data.businessTypeIds.join()}`} workspace={details.data} />
+          <ProfileForm key={details.data.id} workspace={details.data} />
+        </>
+      )}
     </>
   );
 }
@@ -276,3 +282,54 @@ function LogoCard({ workspace, editable }: { workspace: Workspace; editable: boo
   );
 }
 
+
+/** What the business does: several kinds of work, main first. A new one brings its starter lists. */
+function TradesCard({ workspace }: { workspace: Workspace }) {
+  const types = useBusinessTypes();
+  const update = useUpdateWorkspace(workspace.id);
+  const toast = useToast();
+  const [ids, setIds] = useState(workspace.businessTypeIds);
+  const editable = can(workspace, "workspace.update");
+  const changed = ids.join() !== workspace.businessTypeIds.join();
+  const added = ids.filter((id) => !workspace.businessTypeIds.includes(id));
+
+  function save() {
+    update.mutate(
+      { businessTypeIds: ids },
+      {
+        onSuccess: () =>
+          toast(added.length ? "Saved. Their services, checklist steps and categories were added to yours." : "Saved"),
+        onError: (err) => toast(errorMessage(err), "error"),
+      },
+    );
+  }
+
+  return (
+    <Card className="mb-6 p-5">
+      <h2 className="font-display text-lg font-extrabold">What your business does</h2>
+      <p className="mt-1 text-sm text-ink-muted">
+        Tick all that apply. Adding one adds its usual services, checklist steps and categories to yours; nothing you have is changed. The first one is your main one.
+      </p>
+      {types.isPending && (
+        <div className="flex justify-center py-8 text-brand">
+          <Spinner />
+        </div>
+      )}
+      {types.data && (
+        <fieldset disabled={!editable} className="mt-4">
+          <TradePicker types={types.data} value={ids} onChange={setIds} />
+        </fieldset>
+      )}
+      {changed && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button loading={update.isPending} disabled={!ids.length} onClick={save}>
+            Save
+          </Button>
+          <Button variant="ghost" onClick={() => setIds(workspace.businessTypeIds)}>
+            Undo
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}

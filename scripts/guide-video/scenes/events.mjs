@@ -9,7 +9,7 @@ const WEDDING = 52; // days out: the new event's wedding day
 /** A wedding planner with two on the team, a few clients, a saved venue and some events booked. */
 export async function setup({ api, signIn, tail }) {
   const owner = await signIn(`+91987696${tail}`, "Riya Kapoor");
-  const ws = (await api("POST", "/workspaces", { name: "Shubh Vivah Weddings", businessTypeId: "wedding_planner", city: "Jaipur" }, owner)).id;
+  const ws = (await api("POST", "/workspaces", { name: "Shubh Vivah Weddings", businessTypeIds: ["wedding_planner"], city: "Jaipur" }, owner)).id;
   const at = (p) => `/workspaces/${ws}${p}`;
   await api("PATCH", at(""), { phone: "9876500000", address: "C-Scheme, Jaipur", pricesConfirmed: true }, owner);
   for (const [i, name] of ["Kabir Mehta", "Neha Joshi"].entries()) {

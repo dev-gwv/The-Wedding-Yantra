@@ -45,7 +45,7 @@ export function DeliverablesEditor({
   error?: string;
 }) {
   const { workspace } = useCurrentWorkspace();
-  const suggestions = deliverableSuggestions(workspace.businessTypeId).filter((s) => !list.some((d) => d.title.toLowerCase() === s.title.toLowerCase()));
+  const suggestions = deliverableSuggestions(workspace.businessTypeIds).filter((s) => !list.some((d) => d.title.toLowerCase() === s.title.toLowerCase()));
   const set = (i: number, patch: Partial<EditableDeliverable>) => onChange(list.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   const add = (title = "", dueDate = "") => onChange([...list, { title, dueDate, deliverableId: null, status: null }]);
 

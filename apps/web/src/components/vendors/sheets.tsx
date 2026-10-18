@@ -2,6 +2,7 @@
 
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, formatMoney, upiLink, type PaymentMethod } from "@wedding-yantra/core";
 import {
+  useAddOption,
   useCreatePayout,
   useCreateVendor,
   useDeletePayout,
@@ -13,15 +14,16 @@ import {
   useVendors,
 } from "@wedding-yantra/api-client/react";
 import { payoutInput, payPayoutInput, updatePayoutInput, vendorInput, type Payout, type Vendor } from "@wedding-yantra/types";
-import { Smartphone, Star } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Check, Plus, Smartphone, Star, X } from "lucide-react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
-import { OptionSelect } from "@/components/app/option-picker";
+import { useOptionList } from "@/components/app/option-picker";
 import { Button, buttonClass } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 import { useBusinessDay } from "@/lib/today";
 
@@ -53,14 +55,14 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (v: Vendor) =
     gstin: vendor?.gstin ?? "",
     notes: vendor?.notes ?? "",
   });
-  const [category, setCategory] = useState<string | null>(vendor?.category ?? null);
+  const [categories, setCategories] = useState<string[]>(vendor?.categories ?? []);
   const [preferred, setPreferred] = useState(vendor?.preferred ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const payload = { ...values, category, preferred };
+    const payload = { ...values, categories, preferred };
     const check = validate(vendorInput, payload);
     if (check.errors) return setErrors(check.errors);
     setErrors({});
@@ -77,10 +79,8 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (v: Vendor) =
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
       <TextField label="Name" value={values.name} onChange={set("name")} error={errors.name} placeholder="Ramesh Flowers" autoFocus={!vendor} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <OptionSelect list="vendor_category" label="Category" value={category} onChange={setCategory} error={errors.category} />
-        <TextField label="Contact person" value={values.contactPerson} onChange={set("contactPerson")} error={errors.contactPerson} placeholder="Who you talk to" />
-      </div>
+      <CategoryChips value={categories} onChange={setCategories} error={errors.categories ?? errors.category} />
+      <TextField label="Contact person" value={values.contactPerson} onChange={set("contactPerson")} error={errors.contactPerson} placeholder="Who you talk to" />
       <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} />
       <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} />
       <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line px-4 py-3 has-[:checked]:border-sun-300 has-[:checked]:bg-cream">
@@ -120,6 +120,103 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (v: Vendor) =
         {vendor ? "Save" : "Add vendor"}
       </Button>
     </form>
+  );
+}
+
+/**
+ * What a vendor does, as chips: tick all that apply (a decorator who also does lights).
+ * The first ticked is the main one. A new category can be added right here.
+ */
+function CategoryChips({ value, onChange, error }: { value: string[]; onChange: (keys: string[]) => void; error?: string }) {
+  const { workspace } = useCurrentWorkspace();
+  const { active, options } = useOptionList("vendor_category");
+  const add = useAddOption(workspace.id);
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  // Hidden ones still show while this vendor has them.
+  const shown = [...active, ...options.filter((o) => o.archived && value.includes(o.key))];
+  const toggle = (key: string) => onChange(value.includes(key) ? value.filter((k) => k !== key) : [...value, key]);
+
+  async function save() {
+    const label = name.trim();
+    if (!label) return setAdding(false);
+    // The same name in other capitals ticks the one already there.
+    const existing = active.find((o) => o.label.toLowerCase() === label.toLowerCase());
+    try {
+      const option = existing ?? (await add.mutateAsync({ list: "vendor_category", label }));
+      if (!value.includes(option.key)) onChange([...value, option.key]);
+      setName("");
+      setAdding(false);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  }
+
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void save();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setAdding(false);
+    }
+  };
+
+  return (
+    <fieldset>
+      <legend className="mb-2 text-sm font-semibold">What they do (tick all that apply)</legend>
+      <div className="flex flex-wrap gap-2">
+        {shown.map((o) => {
+          const on = value.includes(o.key);
+          return (
+            <button
+              key={o.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(o.key)}
+              className={cn(
+                "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition",
+                on ? "border-brand bg-brand text-on-brand" : "border-line bg-surface hover:border-sun-300",
+              )}
+            >
+              {on && <Check className="size-4" />} {o.label}
+            </button>
+          );
+        })}
+        {adding ? (
+          <span className="inline-flex h-10 items-center gap-1 rounded-full border border-sun-300 bg-surface pl-4 pr-1 shadow-glow">
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={onKey}
+              maxLength={40}
+              placeholder="New category"
+              aria-label="New category"
+              className="w-36 bg-transparent text-sm font-semibold outline-none"
+            />
+            <button type="button" onClick={() => void save()} className="grid size-8 place-items-center rounded-full bg-gradient-primary text-on-brand" aria-label="Add it">
+              <Check className="size-4" strokeWidth={3} />
+            </button>
+            <button type="button" onClick={() => setAdding(false)} className="grid size-8 place-items-center rounded-full text-ink-muted hover:bg-cream" aria-label="Cancel">
+              <X className="size-4" />
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-10 items-center gap-1 rounded-full border border-dashed border-line-strong px-4 text-sm font-bold text-brand-strong hover:bg-cream"
+          >
+            <Plus className="size-4" strokeWidth={2.5} /> Add a category
+          </button>
+        )}
+      </div>
+      {value.length > 1 && <p className="mt-1.5 text-xs text-ink-muted">The first one you ticked is their main one.</p>}
+      {error && <p className="mt-1.5 text-sm text-danger">{error}</p>}
+    </fieldset>
   );
 }
 

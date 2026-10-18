@@ -11,9 +11,11 @@ import { GSTIN_PATTERN, UPI_ID_PATTERN } from "./workspaces.js";
 export interface VendorSummary {
   id: string;
   name: string;
-  /** A key from the business's "vendor_category" list */
+  /** The main one of their categories (the first), for anything that reads only one */
   category: string | null;
-  /** What they do, in words: the category's name */
+  /** Keys from the business's "vendor_category" list: all they do, main first */
+  categories: string[];
+  /** What they do, in words: the categories' names, joined with ", " */
   service: string | null;
   contactPerson: string | null;
   phone: string | null;
@@ -92,8 +94,14 @@ const optionalUpper = (pattern: RegExp, message: string) =>
 
 export const vendorInput = z.object({
   name: z.string().trim().min(2, "Enter their name").max(80),
-  /** What they do, typed in words (older screens); the category is the list choice */
+  /** What they do, typed in words (older screens); the categories are the list choices */
   service: optionalText(60),
+  /** All they do, main first. Sending only the older single category means just that one. */
+  categories: z
+    .array(z.string().trim().min(1).max(40))
+    .max(8, "Pick up to 8")
+    .optional()
+    .transform((v) => (v === undefined ? undefined : [...new Set(v)])),
   category: z
     .string()
     .trim()

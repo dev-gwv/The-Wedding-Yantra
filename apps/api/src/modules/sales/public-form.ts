@@ -7,6 +7,7 @@ import { enquiryLine } from "./alerts.js";
 import { intakeLead } from "./intake.js";
 import { findPartnerByCode } from "./partners.js";
 import { logoPath } from "../files/logo.js";
+import { TYPE_NAMES } from "../workspaces/type-names.js";
 
 const MAX_PER_IP_PER_HOUR = 10;
 
@@ -32,7 +33,7 @@ interface FormRow {
 
 async function loadForm(db: Db, slug: string): Promise<FormRow> {
   const { rows } = await db.query<FormRow>(
-    `SELECT f.workspace_id, w.name, w.city, bt.name AS business_type_name, bt.icon AS business_type_icon, w.logo_file_id,
+    `SELECT f.workspace_id, w.name, w.city, ${TYPE_NAMES} AS business_type_name, bt.icon AS business_type_icon, w.logo_file_id,
             f.fields, f.after_submit, f.whatsapp_phone, f.whatsapp_text, f.redirect_url,
             o.user_id AS owner_id, coalesce(nullif(w.phone, ''), o.phone) AS default_phone
        FROM lead_forms f

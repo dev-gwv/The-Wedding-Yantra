@@ -15,11 +15,14 @@ import { homeBilling } from "../billing/service.js";
 import type { Config } from "../../config.js";
 import { logoPath } from "../files/logo.js";
 import { installOptions } from "../options/service.js";
+import { installTrade, loadTrades } from "./trades.js";
+import { TYPE_NAMES } from "./type-names.js";
 
 interface WorkspaceRow {
   id: string;
   name: string;
   business_type_id: string;
+  business_type_ids: string[];
   business_type_name: string;
   business_type_icon: string;
   city: string;
@@ -44,6 +47,7 @@ const toWorkspace = (row: WorkspaceRow, access: PersonAccess): Workspace => ({
   id: row.id,
   name: row.name,
   businessTypeId: row.business_type_id,
+  businessTypeIds: row.business_type_ids,
   businessTypeName: row.business_type_name,
   businessTypeIcon: row.business_type_icon,
   city: row.city,
@@ -68,7 +72,7 @@ const toWorkspace = (row: WorkspaceRow, access: PersonAccess): Workspace => ({
 
 async function loadWorkspace(db: Queryable, workspaceId: string): Promise<WorkspaceRow> {
   const { rows } = await db.query<WorkspaceRow>(
-    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name,
+    `SELECT w.id, w.name, w.business_type_id, w.business_type_ids, ${TYPE_NAMES} AS business_type_name,
             bt.icon AS business_type_icon, w.city,
             w.phone, w.email, w.address, w.gstin, w.quote_terms, w.upi_id, w.bill_prefix, w.bill_terms, w.invoice_design, w.invoice_accent, w.review_url, w.events_per_day, w.logo_file_id, w.timezone, w.created_at
        FROM workspaces w
@@ -83,33 +87,33 @@ async function loadWorkspace(db: Queryable, workspaceId: string): Promise<Worksp
 export async function createWorkspace(
   db: Db,
   userId: string,
-  input: { name: string; businessTypeId: string; city: string },
+  input: { name: string; businessTypeId?: string; businessTypeIds?: string[]; city: string },
 ): Promise<Workspace> {
   return withTransaction(db, async (tx) => {
-    const type = await tx.query<{ starter_pack: StarterPack }>(
-      `SELECT starter_pack FROM business_types WHERE id = $1 AND active`,
-      [input.businessTypeId],
-    );
-    if (!type.rows[0]) {
-      throw new AppError(400, "VALIDATION_ERROR", "Pick what your business does", {
-        businessTypeId: "Pick what your business does",
-      });
-    }
+    // Several kinds of work, main first; older apps send one.
+    const ids = input.businessTypeIds?.length ? input.businessTypeIds : input.businessTypeId ? [input.businessTypeId] : [];
+    const trades = await loadTrades(tx, ids).catch((err: unknown) => {
+      // Older apps show the error on the single picker.
+      if (err instanceof AppError && !input.businessTypeIds) throw new AppError(400, "VALIDATION_ERROR", err.message, { businessTypeId: err.message });
+      throw err;
+    });
+    const main = trades[0]!;
     // The owner's own number is a sensible default for the business phone.
     const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO workspaces (name, business_type_id, city, phone, created_by)
-       SELECT $1, $2, $3, u.phone, u.id FROM users u WHERE u.id = $4
+      `INSERT INTO workspaces (name, business_type_id, business_type_ids, city, phone, created_by)
+       SELECT $1, $2, $3, $4, u.phone, u.id FROM users u WHERE u.id = $5
        RETURNING id`,
-      [input.name, input.businessTypeId, input.city, userId],
+      [input.name, main.id, ids, input.city, userId],
     );
     const workspaceId = rows[0]!.id;
     await tx.query(`INSERT INTO memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [
       workspaceId,
       userId,
     ]);
-    await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: type.rows[0].starter_pack, businessTypeId: input.businessTypeId });
-    await installChecklist(tx, workspaceId, type.rows[0].starter_pack);
-    await installOptions(tx, workspaceId, input.businessTypeId);
+    await installSalesDefaults(tx, { id: workspaceId, name: input.name, starterPack: main.pack, businessTypeId: main.id });
+    await installChecklist(tx, workspaceId, main.pack);
+    await installOptions(tx, workspaceId, main.id);
+    for (const trade of trades.slice(1)) await installTrade(tx, workspaceId, trade);
     await logActivity(tx, {
       workspaceId,
       actorUserId: userId,
@@ -126,7 +130,30 @@ export async function getWorkspace(db: Db, ctx: MemberContext): Promise<Workspac
   return toWorkspace(await loadWorkspace(db, ctx.workspaceId), ctx.access);
 }
 
-const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "pricesConfirmed">, string> = {
+/**
+ * The kinds of work, main first. One that's new brings its services, packages, checklist and
+ * list options; one taken away leaves everything already made.
+ */
+async function setTrades(db: Db, ctx: MemberContext, ids: string[]): Promise<void> {
+  await withTransaction(db, async (tx) => {
+    const trades = await loadTrades(tx, ids);
+    const before = await tx.query<{ business_type_ids: string[] }>(`SELECT business_type_ids FROM workspaces WHERE id = $1 FOR UPDATE`, [ctx.workspaceId]);
+    const had = before.rows[0]?.business_type_ids ?? [];
+    if (had.length === ids.length && had.every((id, i) => id === ids[i])) return;
+    for (const trade of trades) if (!had.includes(trade.id)) await installTrade(tx, ctx.workspaceId, trade);
+    await tx.query(`UPDATE workspaces SET business_type_id = $2, business_type_ids = $3 WHERE id = $1`, [ctx.workspaceId, ids[0], ids]);
+    await logActivity(tx, {
+      workspaceId: ctx.workspaceId,
+      actorUserId: ctx.userId,
+      action: "workspace.trades_changed",
+      entityType: "workspace",
+      entityId: ctx.workspaceId,
+      meta: { added: ids.filter((id) => !had.includes(id)), removed: had.filter((id) => !ids.includes(id)) },
+    });
+  });
+}
+
+const COLUMNS: Record<Exclude<keyof UpdateWorkspaceInput, "logoFileId" | "pricesConfirmed" | "businessTypeIds">, string> = {
   name: "name",
   city: "city",
   phone: "phone",
@@ -149,8 +176,9 @@ export const INVOICE_FIELDS = ["billPrefix", "billTerms", "invoiceDesign", "invo
 export async function updateWorkspace(
   db: Db,
   ctx: MemberContext,
-  input: Partial<Record<keyof typeof COLUMNS, string | number | null>> & { logoFileId?: string | null; pricesConfirmed?: true },
+  input: Partial<Record<keyof typeof COLUMNS, string | number | null>> & { logoFileId?: string | null; pricesConfirmed?: true; businessTypeIds?: string[] },
 ): Promise<Workspace> {
+  if (input.businessTypeIds) await setTrades(db, ctx, input.businessTypeIds);
   const sets: string[] = [];
   const values: unknown[] = [ctx.workspaceId];
   for (const [key, column] of Object.entries(COLUMNS) as [keyof typeof COLUMNS, string][]) {
@@ -180,7 +208,7 @@ export async function updateWorkspace(
       action: "workspace.updated",
       entityType: "workspace",
       entityId: ctx.workspaceId,
-      meta: { fields: Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined) },
+      meta: { fields: Object.keys(input).filter((k) => k !== "businessTypeIds" && input[k as keyof typeof input] !== undefined) },
     });
   }
   return getWorkspace(db, ctx);

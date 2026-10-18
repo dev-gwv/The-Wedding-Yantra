@@ -512,10 +512,13 @@ export async function deleteTask(db: Db, ctx: MemberContext, id: string): Promis
 /** A new business starts with its trade's checklist, spread over the days around each event. */
 export async function installChecklist(db: Queryable, workspaceId: string, pack: StarterPack): Promise<void> {
   const days = checklistDays(pack.checklist);
+  // A second kind of work adds its steps after the business's, skipping ones it has.
   for (const [i, item] of pack.checklist.entries()) {
     await db.query(
-      `INSERT INTO checklist_templates (workspace_id, title, when_kind, days, position) VALUES ($1, $2, $3, $4, $5)`,
-      [workspaceId, item.title, item.when, days[i], i],
+      `INSERT INTO checklist_templates (workspace_id, title, when_kind, days, position)
+       SELECT $1, $2, $3, $4, (SELECT coalesce(max(position), -1) + 1 FROM checklist_templates WHERE workspace_id = $1)
+        WHERE NOT EXISTS (SELECT 1 FROM checklist_templates WHERE workspace_id = $1 AND lower(title) = lower($2))`,
+      [workspaceId, item.title, item.when, days[i]],
     );
   }
 }

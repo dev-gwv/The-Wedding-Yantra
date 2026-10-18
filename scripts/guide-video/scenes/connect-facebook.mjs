@@ -8,7 +8,7 @@ const APP_SECRET = process.env.META_APP_SECRET ?? "walk-app-secret";
 /** A sample business: the owner, two salespeople and a couple of leads. */
 export async function setup({ api, signIn, tail }) {
   const owner = await signIn(`+91987697${tail}`, "Riya Kapoor");
-  const ws = (await api("POST", "/workspaces", { name: "Shubh Vivah Weddings", businessTypeId: "wedding_planner", city: "Jaipur" }, owner)).id;
+  const ws = (await api("POST", "/workspaces", { name: "Shubh Vivah Weddings", businessTypeIds: ["wedding_planner"], city: "Jaipur" }, owner)).id;
   await api("PATCH", `/workspaces/${ws}`, { phone: "9876500000", address: "C-Scheme, Jaipur", pricesConfirmed: true }, owner);
   for (const [i, name] of ["Kabir Mehta", "Neha Joshi"].entries()) {
     const phone = `98669${tail}${i}`;

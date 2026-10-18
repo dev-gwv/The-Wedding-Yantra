@@ -53,7 +53,7 @@ export default function VendorsPage() {
   const digits = q.replace(/\D/g, "");
   const shown = (vendors.data ?? []).filter(
     (v) =>
-      (!category || v.category === category) &&
+      (!category || v.categories.includes(category)) &&
       (!q ||
         v.name.toLowerCase().includes(q) ||
         (v.contactPerson ?? "").toLowerCase().includes(q) ||
@@ -61,8 +61,8 @@ export default function VendorsPage() {
         (v.service ?? "").toLowerCase().includes(q) ||
         (digits.length >= 3 && (v.phone ?? "").includes(digits))),
   );
-  // Only the categories in use, as filter chips.
-  const used = categories.active.filter((o) => (vendors.data ?? []).some((v) => v.category === o.key));
+  // Only the categories in use, as filter chips. A vendor who does several shows under each.
+  const used = categories.active.filter((o) => (vendors.data ?? []).some((v) => v.categories.includes(o.key)));
 
   return (
     <>

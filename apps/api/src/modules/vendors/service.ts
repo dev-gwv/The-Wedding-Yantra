@@ -5,7 +5,7 @@ import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { requireMoneyView } from "../money/access.js";
-import { assertOption, optionJoin } from "../options/service.js";
+import { assertOption } from "../options/service.js";
 
 /** Vendors and what they're owed: owners and managers run it, the accountant reads it. */
 const requireManage = (ctx: MemberContext) => {
@@ -20,7 +20,8 @@ interface VendorRow {
   id: string;
   name: string;
   category: string | null;
-  category_label: string | null;
+  categories: string[];
+  category_labels: string[] | null;
   service: string | null;
   contact_person: string | null;
   phone: string | null;
@@ -36,22 +37,31 @@ interface VendorRow {
   paid: string;
 }
 
+/** A vendor's category keys, main first; one written only to the older single column counts too. */
+const CATEGORY_KEYS = `CASE WHEN cardinality(v.categories) > 0 THEN v.categories WHEN v.category IS NOT NULL THEN ARRAY[v.category] ELSE '{}'::text[] END`;
+
 const VENDOR_SELECT = `
-  SELECT v.id, v.name, v.category, vc.label AS category_label, v.service, v.contact_person, v.phone, v.city, v.upi_id,
+  SELECT v.id, v.name, vk.keys[1] AS category, vk.keys AS categories, vc.labels AS category_labels, v.service, v.contact_person, v.phone, v.city, v.upi_id,
          v.bank_account, v.ifsc, v.gstin, v.preferred, v.archived_at, v.notes,
          coalesce(sum(p.amount) FILTER (WHERE p.status = 'owed'), 0) AS owed,
          coalesce(sum(p.amount) FILTER (WHERE p.status = 'paid'), 0) AS paid
     FROM vendors v
-    ${optionJoin("vc", "vendor_category", "v.workspace_id", "v.category")}
+    CROSS JOIN LATERAL (SELECT ${CATEGORY_KEYS} AS keys) vk
+    LEFT JOIN LATERAL (
+      SELECT array_agg(o.label ORDER BY array_position(vk.keys, o.key)) AS labels
+        FROM custom_options o
+       WHERE o.workspace_id = v.workspace_id AND o.list = 'vendor_category' AND o.key = ANY(vk.keys)
+    ) vc ON true
     LEFT JOIN payouts p ON p.vendor_id = v.id AND p.deleted_at IS NULL`;
-const GROUP = "GROUP BY v.id, vc.label";
+const GROUP = "GROUP BY v.id, vk.keys, vc.labels";
 
 const toSummary = (r: VendorRow): VendorSummary => ({
   id: r.id,
   name: r.name,
   category: r.category,
-  // What they do, in words: the category's name, or what was typed before categories.
-  service: r.category_label ?? r.service,
+  categories: r.categories,
+  // What they do, in words: the categories' names, or what was typed before categories.
+  service: r.category_labels?.length ? r.category_labels.join(", ") : r.service,
   contactPerson: r.contact_person,
   phone: r.phone,
   city: r.city,
@@ -95,6 +105,7 @@ export interface VendorFields {
   name?: string;
   service?: string | null;
   category?: string | null;
+  categories?: string[];
   contactPerson?: string | null;
   phone?: string | null;
   city?: string | null;
@@ -110,6 +121,7 @@ const VENDOR_COLUMNS: [keyof VendorFields, string][] = [
   ["name", "name"],
   ["service", "service"],
   ["category", "category"],
+  ["categories", "categories"],
   ["contactPerson", "contact_person"],
   ["phone", "phone"],
   ["city", "city"],
@@ -138,13 +150,32 @@ async function checkDuplicates(db: Queryable, workspaceId: string, input: Vendor
   await same("gstin", input.gstin, "gstin", "GST number");
 }
 
-async function checkCategory(db: Queryable, workspaceId: string, category: string | null | undefined, current?: string | null) {
-  if (category) await assertOption(db, workspaceId, "vendor_category", category, "category", current);
+/**
+ * Both columns in step: categories holds them all, main first; category is the first one.
+ * Only the older single category sent means just that one.
+ */
+function withCategories<T extends VendorFields>(input: T): T {
+  if (input.categories !== undefined) {
+    const categories = [...new Set(input.categories)];
+    return { ...input, categories, category: categories[0] ?? null };
+  }
+  if (input.category !== undefined) return { ...input, categories: input.category ? [input.category] : [] };
+  return input;
 }
 
-export async function createVendor(db: Db, ctx: MemberContext, input: VendorFields & { name: string }): Promise<Vendor> {
+/** Each category must be on the business's list; one the vendor already has stays allowed after it's hidden. */
+async function checkCategories(db: Queryable, workspaceId: string, input: VendorFields, sent: VendorFields, current: string[] = []) {
+  // Errors go on the field the screen sent.
+  const field = sent.categories !== undefined ? "categories" : "category";
+  for (const key of input.categories ?? []) {
+    if (!current.includes(key)) await assertOption(db, workspaceId, "vendor_category", key, field);
+  }
+}
+
+export async function createVendor(db: Db, ctx: MemberContext, sent: VendorFields & { name: string }): Promise<Vendor> {
   requireManage(ctx);
-  await checkCategory(db, ctx.workspaceId, input.category);
+  const input = withCategories(sent);
+  await checkCategories(db, ctx.workspaceId, input, sent);
   await checkDuplicates(db, ctx.workspaceId, input);
   const cols = VENDOR_COLUMNS.filter(([key]) => input[key] !== undefined);
   const { rows } = await db.query<{ id: string }>(
@@ -157,15 +188,16 @@ export async function createVendor(db: Db, ctx: MemberContext, input: VendorFiel
   return getVendor(db, ctx, id);
 }
 
-export async function updateVendor(db: Db, ctx: MemberContext, id: string, input: VendorFields): Promise<Vendor> {
+export async function updateVendor(db: Db, ctx: MemberContext, id: string, sent: VendorFields): Promise<Vendor> {
   requireManage(ctx);
-  const current = await db.query<{ name: string; category: string | null; archived_at: Date | null }>(
-    `SELECT name, category, archived_at FROM vendors WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL`,
+  const input = withCategories(sent);
+  const current = await db.query<{ name: string; categories: string[]; archived_at: Date | null }>(
+    `SELECT v.name, ${CATEGORY_KEYS} AS categories, v.archived_at FROM vendors v WHERE v.id = $1 AND v.workspace_id = $2 AND v.deleted_at IS NULL`,
     [id, ctx.workspaceId],
   );
   const was = current.rows[0];
   if (!was) throw notFound("This vendor");
-  await checkCategory(db, ctx.workspaceId, input.category, was.category);
+  await checkCategories(db, ctx.workspaceId, input, sent, was.categories);
   await checkDuplicates(db, ctx.workspaceId, input, id);
   if (input.archived && !was.archived_at) {
     // Nothing owed is lost from sight: pay or remove those first.

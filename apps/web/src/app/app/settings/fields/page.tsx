@@ -72,7 +72,7 @@ function Section({ entity, fields }: { entity: CustomFieldEntity; fields: Custom
   const [error, setError] = useState<string | null>(null);
   const section = SECTIONS[entity];
   const taken = new Set(rows.map((r) => r.label.trim().toLowerCase()));
-  const suggestions = customFieldSuggestions(workspace.businessTypeId).filter((s) => s.entity === entity && !taken.has(s.label.toLowerCase()));
+  const suggestions = customFieldSuggestions(workspace.businessTypeIds).filter((s) => s.entity === entity && !taken.has(s.label.toLowerCase()));
   const shape = (list: Row[]) => JSON.stringify(list.map((r) => [r.id, r.label, r.kind, r.options]));
   const changed = shape(rows) !== shape(toRows(fields));
 

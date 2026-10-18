@@ -28,7 +28,11 @@ export const workspaceAccess = {
 export const workspaceSummary = z.object({
   id: z.uuid(),
   name: z.string(),
+  /** The main kind of work, for the icon */
   businessTypeId: z.string(),
+  /** Every kind of work the business does, main first */
+  businessTypeIds: z.array(z.string()),
+  /** Their names, e.g. "Wedding planner · Photographer & filmmaker" */
   businessTypeName: z.string(),
   /** Icon name for the kind of business, e.g. `camera`. */
   businessTypeIcon: z.string(),
@@ -43,11 +47,22 @@ export type WorkspaceSummary = z.infer<typeof workspaceSummary>;
 
 export const businessName = z.string().trim().min(2, "Enter your business name").max(80);
 
-export const createWorkspaceInput = z.object({
-  name: businessName,
-  businessTypeId: z.string().trim().min(1, "Pick what your business does"),
-  city: z.string().trim().min(2, "Enter your city").max(60),
-});
+/** The kinds of work a business does: one or more, main first. */
+export const businessTypeIds = z
+  .array(z.string().trim().min(1))
+  .min(1, "Pick what your business does")
+  .max(6, "Pick up to 6")
+  .transform((ids) => [...new Set(ids)]);
+
+export const createWorkspaceInput = z
+  .object({
+    name: businessName,
+    /** One kind of work (older apps); businessTypeIds takes several */
+    businessTypeId: z.string().trim().min(1, "Pick what your business does").optional(),
+    businessTypeIds: businessTypeIds.optional(),
+    city: z.string().trim().min(2, "Enter your city").max(60),
+  })
+  .refine((v) => v.businessTypeIds?.length || v.businessTypeId, { message: "Pick what your business does", path: ["businessTypeIds"] });
 export type CreateWorkspaceInput = z.input<typeof createWorkspaceInput>;
 
 export const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -57,6 +72,8 @@ export const updateWorkspaceInput = z
   .object({
     name: businessName,
     city: z.string().trim().min(2).max(60),
+    /** Owner only: adding a kind of work adds its starter lists, services and checklist */
+    businessTypeIds,
     phone: optionalText(20),
     email: z
       .union([z.literal(""), z.email("Enter a valid email")])
@@ -116,6 +133,7 @@ export const workspace = z.object({
   id: z.uuid(),
   name: z.string(),
   businessTypeId: z.string(),
+  businessTypeIds: z.array(z.string()),
   businessTypeName: z.string(),
   businessTypeIcon: z.string(),
   city: z.string(),

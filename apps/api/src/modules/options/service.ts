@@ -40,7 +40,7 @@ const ADD_RIGHT: Record<OptionList, Permission[]> = {
 };
 
 /**
- * A new business starts with the built-in options, plus what its trade usually needs:
+ * A new business starts with the built-in options, plus what its trade (each of them) usually needs:
  * expense and service categories, designations and vendor categories of its own.
  */
 export async function installOptions(db: Queryable, workspaceId: string, businessTypeId: string): Promise<void> {
@@ -54,10 +54,16 @@ export async function installOptions(db: Queryable, workspaceId: string, busines
     // A trade's own come first: they're what it picks most.
     if (list === "designation") seeds.unshift(...(trade?.designations ?? []));
     if (list === "vendor_category") seeds.unshift(...(trade?.vendorCategories ?? []));
-    for (const [position, o] of seeds.entries()) {
+    // A second kind of work adds its own after the business's; ones it has (by key or name) are skipped.
+    const { rows } = await db.query<{ next: number }>(
+      `SELECT coalesce(max(position), -1) + 1 AS next FROM custom_options WHERE workspace_id = $1 AND list = $2`,
+      [workspaceId, list],
+    );
+    const base = rows[0]?.next ?? 0;
+    for (const [i, o] of seeds.entries()) {
       await db.query(
         `INSERT INTO custom_options (workspace_id, list, key, label, position) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-        [workspaceId, list, o.key, o.label, position],
+        [workspaceId, list, o.key, o.label, base + i],
       );
     }
   }

@@ -149,7 +149,7 @@ export function useMakeVendorQr(onMade: (p: Partner) => void) {
   async function make(v: Pick<VendorSummary, "id" | "name" | "phone" | "service">) {
     setMaking(v.id);
     try {
-      const p = await create.mutateAsync({ name: v.name, label: v.service?.slice(0, 60) ?? null, phone: v.phone ?? null, vendorId: v.id });
+      const p = await create.mutateAsync({ name: v.name, label: v.service?.slice(0, 120) ?? null, phone: v.phone ?? null, vendorId: v.id });
       toast(`QR code made for ${v.name}`);
       onMade(p);
     } catch (err) {

@@ -91,8 +91,18 @@ export const DELIVERABLE_SUGGESTIONS: Record<string, DeliverableSuggestion[]> = 
   fireworks: [{ title: "Show plan", days: -7 }],
 };
 
-export const deliverableSuggestions = (businessTypeId: string): DeliverableSuggestion[] =>
-  DELIVERABLE_SUGGESTIONS[businessTypeId] ?? COMMON;
+/** For one kind of work, or several (each suggestion once, by title). */
+export const deliverableSuggestions = (businessTypeIds: string | string[]): DeliverableSuggestion[] => {
+  const ids = [businessTypeIds].flat();
+  const lists = ids.map((id) => DELIVERABLE_SUGGESTIONS[id]).filter((l): l is DeliverableSuggestion[] => !!l);
+  if (!lists.length) return COMMON;
+  const seen = new Set<string>();
+  return lists.flat().filter((s) => {
+    if (seen.has(s.title.toLowerCase())) return false;
+    seen.add(s.title.toLowerCase());
+    return true;
+  });
+};
 
 /** The due date for a suggestion on an event with these dates, or null when it has none yet. */
 export function suggestedDue(days: number, event: { startDate: string | null; endDate: string | null }): string | null {

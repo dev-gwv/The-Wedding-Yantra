@@ -8,6 +8,7 @@ import { AppError } from "../../lib/http.js";
 import { ACCESS_COLUMNS, ACCESS_JOINS, accessFields, accessFrom, type AccessRow } from "./access.js";
 import type { OtpSender } from "./otp-sender.js";
 import { logoPath } from "../files/logo.js";
+import { TYPE_NAMES } from "../workspaces/type-names.js";
 
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
@@ -205,13 +206,14 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       id: string;
       name: string;
       business_type_id: string;
+      business_type_ids: string[];
       business_type_name: string;
       business_type_icon: string;
       timezone: string;
       logo_file_id: string | null;
     }
   >(
-    `SELECT w.id, w.name, w.business_type_id, bt.name AS business_type_name, bt.icon AS business_type_icon, w.timezone, w.logo_file_id,
+    `SELECT w.id, w.name, w.business_type_id, w.business_type_ids, ${TYPE_NAMES} AS business_type_name, bt.icon AS business_type_icon, w.timezone, w.logo_file_id,
             ${ACCESS_COLUMNS}
        FROM memberships m
        JOIN workspaces w ON w.id = m.workspace_id AND w.deleted_at IS NULL
@@ -227,6 +229,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       id: r.id,
       name: r.name,
       businessTypeId: r.business_type_id,
+      businessTypeIds: r.business_type_ids,
       businessTypeName: r.business_type_name,
       businessTypeIcon: r.business_type_icon,
       timezone: r.timezone,
