@@ -82,6 +82,7 @@ import type {
   SubmitLeadFormInput,
   TemplateInput,
   UpdateClientInput,
+  UpdateLeadFormInput,
   UpdateLeadInput,
   CreateInvitationInput,
   EmployeeDetailsInput,
@@ -549,6 +550,15 @@ export function useSetLeadFormEnabled(workspaceId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (enabled: boolean) => api.leadForm.setEnabled(workspaceId, enabled),
+    onSuccess: (data) => qc.setQueryData(queryKeys.leadForm(workspaceId), data),
+  });
+}
+
+export function useUpdateLeadForm(workspaceId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateLeadFormInput) => api.leadForm.update(workspaceId, input),
     onSuccess: (data) => qc.setQueryData(queryKeys.leadForm(workspaceId), data),
   });
 }

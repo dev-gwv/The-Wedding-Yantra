@@ -415,12 +415,70 @@ export type TemplateInput = z.input<typeof templateInput>;
 // Public enquiry form
 // ---------------------------------------------------------------------------
 
+/** Questions the business can add to its enquiry form; name and mobile are always asked. */
+export const FORM_FIELDS = ["email", "event_type", "event_date", "city", "services", "guests", "budget", "message"] as const;
+export type FormFieldKey = (typeof FORM_FIELDS)[number];
+
+export const FORM_FIELD_LABELS: Record<FormFieldKey, string> = {
+  email: "Email",
+  event_type: "Event",
+  event_date: "Event date",
+  city: "City",
+  services: "What they need (they can tick several)",
+  guests: "Number of guests",
+  budget: "Budget",
+  message: "Anything else?",
+};
+
+/** What a new form asks, besides name and mobile: short, so more people finish it. */
+export const DEFAULT_FORM_FIELDS: FormField[] = [{ key: "email" }, { key: "event_type" }, { key: "event_date" }, { key: "message" }];
+
+export interface FormField {
+  key: FormFieldKey;
+  /** They can't send the form without it */
+  required?: boolean;
+}
+
+/** After the form is sent: a thank-you, a WhatsApp chat with the business, or any link. */
+export const AFTER_SUBMIT = ["thanks", "whatsapp", "link"] as const;
+export type AfterSubmit = (typeof AFTER_SUBMIT)[number];
+
 export interface LeadFormSettings {
   slug: string;
   enabled: boolean;
+  /** In the order they're asked */
+  fields: FormField[];
+  afterSubmit: AfterSubmit;
+  /** The number the WhatsApp chat opens with; the business's own number when not set */
+  whatsappPhone: string | null;
+  /** The number used when whatsappPhone isn't set: the business profile's, else the owner's */
+  defaultWhatsappPhone: string | null;
+  /** The first line of the message typed for them; their details follow it */
+  whatsappText: string | null;
+  /** For "link": a WhatsApp short link or group invite, Instagram, a website */
+  redirectUrl: string | null;
 }
 
-export const updateLeadFormInput = z.object({ enabled: z.boolean() });
+const httpsLink = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((v) => v === "" || /^https:\/\/[^\s<>"]+\.[^\s<>"]+$/i.test(v), "Paste a link that starts with https://")
+  .transform((v) => v || null);
+
+export const updateLeadFormInput = z.object({
+  enabled: z.boolean().optional(),
+  fields: z
+    .array(z.object({ key: z.enum(FORM_FIELDS), required: z.boolean().optional() }))
+    .max(FORM_FIELDS.length)
+    .refine((list) => new Set(list.map((f) => f.key)).size === list.length, "Each question once")
+    .optional(),
+  afterSubmit: z.enum(AFTER_SUBMIT).optional(),
+  whatsappPhone: z.union([z.literal(""), phone]).nullable().optional().transform((v) => v || null),
+  whatsappText: optionalText(300),
+  redirectUrl: httpsLink.nullable().optional(),
+});
+export type UpdateLeadFormInput = z.input<typeof updateLeadFormInput>;
 
 export interface PublicLeadForm {
   businessName: string;
@@ -432,14 +490,32 @@ export interface PublicLeadForm {
   referrer: string | null;
   /** The partner whose QR code was scanned */
   partner: string | null;
+  /** The questions to ask, besides name and mobile */
+  fields: FormField[];
+  /** The choices for "What they need": the business's service categories */
+  services: string[];
+  /** After sending, they're taken to WhatsApp (or another link) */
+  goesTo: "whatsapp" | "link" | null;
 }
+
+export interface SubmitLeadFormResult {
+  received: true;
+  /** Where to send them next: a WhatsApp chat with their enquiry typed in, or the business's link */
+  redirectUrl: string | null;
+}
+
+const formCount = (max: number) => z.coerce.number().int().min(0).max(max).nullable().optional();
 
 export const submitLeadFormInput = z.object({
   name: personName,
   phone,
+  email: z.union([z.literal(""), z.email("Enter a valid email")]).nullable().optional().transform((v) => v || null),
   eventType: z.enum(EVENT_TYPES).nullable().optional(),
   eventDate: optionalDate,
   city: optionalText(60),
+  services: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  guests: formCount(100000),
+  budget: formCount(1_000_000_000),
   message: optionalText(1000),
   /** Hidden from people; bots fill it in. */
   website: z.string().max(200).optional(),

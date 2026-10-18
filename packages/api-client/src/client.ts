@@ -147,8 +147,10 @@ import type {
   PublicLeadForm,
   SaveStagesInput,
   SubmitLeadFormInput,
+  SubmitLeadFormResult,
   TemplateInput,
   UpdateClientInput,
+  UpdateLeadFormInput,
   UpdateLeadInput,
   WhatsAppTemplate,
   ApiError,
@@ -385,10 +387,11 @@ export function createApiClient(options: ApiClientOptions) {
       get: (workspaceId: string) => request<LeadFormSettings>("GET", `${ws(workspaceId)}/lead-form`),
       setEnabled: (workspaceId: string, enabled: boolean) =>
         request<LeadFormSettings>("PATCH", `${ws(workspaceId)}/lead-form`, { enabled }),
+      update: (workspaceId: string, input: UpdateLeadFormInput) => request<LeadFormSettings>("PATCH", `${ws(workspaceId)}/lead-form`, input),
       /** `ref` is the code from a client's "recommend us" link; `p` from a partner's QR code */
       publicGet: (slug: string, ref?: string, p?: string) => request<PublicLeadForm>("GET", `/public/forms/${encodeURIComponent(slug)}${qs({ ref, p })}`),
       submit: (slug: string, input: SubmitLeadFormInput) =>
-        request<{ received: true }>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
+        request<SubmitLeadFormResult>("POST", `/public/forms/${encodeURIComponent(slug)}`, input),
     },
     /** Facebook and Instagram lead ads. The owner only, except `deletionStatus`. */
     meta: {

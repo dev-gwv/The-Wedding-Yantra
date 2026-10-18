@@ -1,10 +1,13 @@
 import { can } from "@wedding-yantra/core";
-import type { LeadFormSettings, PipelineStage, StageKind, WhatsAppTemplate } from "@wedding-yantra/types";
-import { withTransaction, type Db } from "../../db.js";
+import type { AfterSubmit, FormField, LeadFormSettings, PipelineStage, StageKind, updateLeadFormInput, WhatsAppTemplate } from "@wedding-yantra/types";
+import type { z } from "zod";
+import { withTransaction, type Db, type Queryable } from "../../db.js";
 import { logActivity } from "../../lib/activity.js";
 import { AppError, forbidden, notFound } from "../../lib/http.js";
 import type { MemberContext } from "../auth/guard.js";
 import { listStages } from "./leads.js";
+
+type UpdateLeadFormInputParsed = z.output<typeof updateLeadFormInput>;
 
 /** Sales stages, editing quick replies and the form switch belong to whoever runs every lead. */
 const requireSettings = (ctx: MemberContext) => {
@@ -123,21 +126,67 @@ export async function deleteTemplate(db: Db, ctx: MemberContext, id: string) {
 
 // ---- Enquiry form -----------------------------------------------------------
 
-export async function getLeadForm(db: Db, ctx: MemberContext): Promise<LeadFormSettings> {
-  if (!can(ctx, "leads.work")) throw forbidden();
-  const { rows } = await db.query<LeadFormSettings>(`SELECT slug, enabled FROM lead_forms WHERE workspace_id = $1`, [
-    ctx.workspaceId,
-  ]);
-  if (!rows[0]) throw notFound("The enquiry form");
-  return rows[0];
+const FORM_COLUMNS = `f.slug, f.enabled, f.fields, f.after_submit, f.whatsapp_phone, f.whatsapp_text, f.redirect_url,
+  coalesce(nullif(w.phone, ''), (SELECT u.phone FROM memberships m JOIN users u ON u.id = m.user_id
+                                  WHERE m.workspace_id = w.id AND m.role = 'owner' AND m.removed_at IS NULL
+                                  ORDER BY m.created_at LIMIT 1)) AS default_phone`;
+
+interface FormRow {
+  slug: string;
+  enabled: boolean;
+  fields: FormField[];
+  after_submit: AfterSubmit;
+  whatsapp_phone: string | null;
+  whatsapp_text: string | null;
+  redirect_url: string | null;
+  default_phone: string | null;
 }
 
-export async function setLeadFormEnabled(db: Db, ctx: MemberContext, enabled: boolean): Promise<LeadFormSettings> {
-  requireSettings(ctx);
-  const { rows } = await db.query<LeadFormSettings>(
-    `UPDATE lead_forms SET enabled = $2 WHERE workspace_id = $1 RETURNING slug, enabled`,
-    [ctx.workspaceId, enabled],
+const toSettings = (r: FormRow): LeadFormSettings => ({
+  slug: r.slug,
+  enabled: r.enabled,
+  fields: r.fields,
+  afterSubmit: r.after_submit,
+  whatsappPhone: r.whatsapp_phone,
+  defaultWhatsappPhone: r.default_phone,
+  whatsappText: r.whatsapp_text,
+  redirectUrl: r.redirect_url,
+});
+
+async function readForm(db: Queryable, workspaceId: string): Promise<LeadFormSettings> {
+  const { rows } = await db.query<FormRow>(
+    `SELECT ${FORM_COLUMNS} FROM lead_forms f JOIN workspaces w ON w.id = f.workspace_id WHERE f.workspace_id = $1`,
+    [workspaceId],
   );
   if (!rows[0]) throw notFound("The enquiry form");
-  return rows[0];
+  return toSettings(rows[0]);
+}
+
+export async function getLeadForm(db: Db, ctx: MemberContext): Promise<LeadFormSettings> {
+  if (!can(ctx, "leads.work")) throw forbidden();
+  return readForm(db, ctx.workspaceId);
+}
+
+/** The switch, the questions, and where people go after sending the form. */
+export async function updateLeadForm(db: Db, ctx: MemberContext, input: UpdateLeadFormInputParsed): Promise<LeadFormSettings> {
+  requireSettings(ctx);
+  const now = await readForm(db, ctx.workspaceId);
+  const next = {
+    enabled: input.enabled ?? now.enabled,
+    fields: input.fields ?? now.fields,
+    afterSubmit: input.afterSubmit ?? now.afterSubmit,
+    whatsappPhone: input.whatsappPhone === undefined ? now.whatsappPhone : input.whatsappPhone,
+    whatsappText: input.whatsappText === undefined ? now.whatsappText : input.whatsappText,
+    redirectUrl: input.redirectUrl === undefined ? now.redirectUrl : input.redirectUrl,
+  };
+  if (next.afterSubmit === "whatsapp" && !next.whatsappPhone && !now.defaultWhatsappPhone)
+    throw new AppError(400, "VALIDATION_ERROR", "Add the WhatsApp number to chat on", { whatsappPhone: "Add your WhatsApp number" });
+  if (next.afterSubmit === "link" && !next.redirectUrl)
+    throw new AppError(400, "VALIDATION_ERROR", "Paste the link to open", { redirectUrl: "Paste the link to open" });
+  await db.query(
+    `UPDATE lead_forms SET enabled = $2, fields = $3, after_submit = $4, whatsapp_phone = $5, whatsapp_text = $6, redirect_url = $7
+      WHERE workspace_id = $1`,
+    [ctx.workspaceId, next.enabled, JSON.stringify(next.fields), next.afterSubmit, next.whatsappPhone, next.whatsappText, next.redirectUrl],
+  );
+  return readForm(db, ctx.workspaceId);
 }

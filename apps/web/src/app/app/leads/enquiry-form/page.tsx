@@ -10,6 +10,7 @@ import { BackLink } from "@/components/app/back-link";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
 import { enquiryFormUrl, PartnerQrRow, QrPoster, useMakeVendorQr } from "@/components/partners/partner-qr";
+import { AfterSendingCard, FormQuestionsCard } from "@/components/sales/form-settings";
 import { LeadExportButtons } from "@/components/sales/lead-export";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card, EmptyState, Notice, PageHeader } from "@/components/ui/misc";
@@ -131,11 +132,18 @@ export default function EnquiryFormPage() {
                   </div>
                 )}
                 <p className="text-sm text-ink-muted">
-                  The form asks for name, mobile, event, date, city and a note. Put the link in your Instagram bio, WhatsApp Business profile and Google listing.
+                  Put the link in your Instagram bio, WhatsApp Business profile and Google listing.
                 </p>
               </div>
             </div>
           </Card>
+
+          {editable && (
+            <>
+              <AfterSendingCard key={`after-${form.dataUpdatedAt}`} form={form.data} />
+              <FormQuestionsCard key={`questions-${form.dataUpdatedAt}`} form={form.data} />
+            </>
+          )}
 
           {editable && <PartnerCodes slug={form.data.slug} formOn={form.data.enabled} />}
         </div>

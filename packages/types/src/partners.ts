@@ -20,6 +20,8 @@ export interface PartnerSummary {
   code: string;
   /** Their page link is on (they can see their enquiries) */
   sharing: boolean;
+  /** For their page: /p/<token>. Null while sharing is stopped. */
+  viewToken: string | null;
   /** Their page shows client numbers in full, not masked */
   showPhone: boolean;
   /** Times the enquiry form was opened through their code */
@@ -32,8 +34,6 @@ export interface PartnerSummary {
 
 export interface Partner extends PartnerSummary {
   notes: string | null;
-  /** For their page: /p/<token>. Null while sharing is stopped. */
-  viewToken: string | null;
   leads: LeadSummary[];
 }
 

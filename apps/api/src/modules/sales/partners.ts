@@ -57,6 +57,7 @@ const toSummary = (r: PartnerRow): PartnerSummary => ({
   phone: r.phone,
   code: r.code,
   sharing: r.view_token !== null,
+  viewToken: r.view_token,
   showPhone: r.show_phone,
   scans: r.scans,
   enquiries: Number(r.enquiries),

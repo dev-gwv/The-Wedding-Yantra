@@ -12,6 +12,7 @@ import { BackLink } from "@/components/app/back-link";
 import { ENQUIRY_FORM_PATH } from "@/components/app/lead-sections";
 import { useCurrentWorkspace } from "@/components/app/workspace-context";
 import { PartnerFormSheet } from "@/components/partners/partner-form-sheet";
+import { partnerPageMessage, partnerPageUrl } from "@/components/partners/partner-qr";
 import { LeadCard } from "@/components/sales/lead-card";
 import { LeadExportButtons } from "@/components/sales/lead-export";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -48,7 +49,7 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
   const [qr, setQr] = useState<string | null>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const enquiryUrl = slug ? `${origin}/f/${slug}?p=${p.code}` : "";
-  const pageUrl = p.viewToken ? `${origin}/p/${p.viewToken}` : "";
+  const pageUrl = partnerPageUrl(p.viewToken);
 
   useEffect(() => {
     if (!enquiryUrl) return;
@@ -71,7 +72,7 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
       .then(() => toast(message))
       .catch((err) => toast(errorMessage(err), "error"));
 
-  const pageMessage = `Hi ${firstName(p.name)}, here is your page for enquiries that come to ${workspace.name} through your QR code. You can see each one and where it stands: ${pageUrl}`;
+  const pageMessage = partnerPageMessage(workspace.name, p.name, pageUrl);
 
   return (
     <div className="space-y-6">
@@ -111,41 +112,7 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
 
       {!p.archived && (
         <Card className="p-5 sm:p-6">
-          <h2 className="font-display text-lg font-extrabold">Their QR code</h2>
-          {!formOn && (
-            <div className="mt-3">
-              <Notice tone="warning">Your enquiry form is switched off, so this QR shows a &quot;not available&quot; page.{" "}
-                <Link href={ENQUIRY_FORM_PATH} className="font-bold underline">
-                  Switch it on
-                </Link></Notice>
-            </div>
-          )}
-          <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-            <div
-              className="size-44 shrink-0 rounded-2xl border border-line bg-surface p-2 [&_svg]:size-full"
-              role="img"
-              aria-label={`QR code for ${p.name}`}
-              dangerouslySetInnerHTML={qr ? { __html: qr } : undefined}
-            />
-            <div className="min-w-0 flex-1 space-y-3">
-              <p className="text-[15px] text-ink-muted">
-                Print it for {p.name}&apos;s counter, trial room or table. People scan it, fill in your enquiry form, and the enquiry is marked as theirs.
-              </p>
-              <QrDownloadButtons text={enquiryUrl} filename={`${workspace.name} x ${p.name} QR`} title={workspace.name} subtitle={`Scan to enquire · via ${p.name}`} />
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="min-w-0 break-all font-semibold text-ink-muted">{enquiryUrl}</span>
-                <button type="button" onClick={() => void copy(enquiryUrl, "Enquiry link")} className="inline-flex items-center gap-1 font-bold text-brand-strong">
-                  <Copy className="size-3.5" /> Copy
-                </button>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {!p.archived && (
-        <Card className="p-5 sm:p-6">
-          <h2 className="font-display text-lg font-extrabold">{firstName(p.name)}&apos;s page</h2>
+          <h2 className="font-display text-lg font-extrabold">{firstName(p.name)}&apos;s page: every enquiry, open to them</h2>
           <p className="mt-1 text-[15px] text-ink-muted">
             A private link where {p.name} sees every enquiry from their QR code and where it stands: new, in talks, booked or not booked. Never prices or payments.
           </p>
@@ -189,6 +156,40 @@ function PartnerView({ p, slug, formOn }: { p: Partner; slug: string | null; for
               onChange={(on) => void act(() => update.mutateAsync({ id: p.id, showPhone: on }), on ? "Numbers shown in full" : "Numbers masked")}
             />
           </label>
+        </Card>
+      )}
+
+      {!p.archived && (
+        <Card className="p-5 sm:p-6">
+          <h2 className="font-display text-lg font-extrabold">Their QR code</h2>
+          {!formOn && (
+            <div className="mt-3">
+              <Notice tone="warning">Your enquiry form is switched off, so this QR shows a &quot;not available&quot; page.{" "}
+                <Link href={ENQUIRY_FORM_PATH} className="font-bold underline">
+                  Switch it on
+                </Link></Notice>
+            </div>
+          )}
+          <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+            <div
+              className="size-44 shrink-0 rounded-2xl border border-line bg-surface p-2 [&_svg]:size-full"
+              role="img"
+              aria-label={`QR code for ${p.name}`}
+              dangerouslySetInnerHTML={qr ? { __html: qr } : undefined}
+            />
+            <div className="min-w-0 flex-1 space-y-3">
+              <p className="text-[15px] text-ink-muted">
+                Print it for {p.name}&apos;s counter, trial room or table. People scan it, fill in your enquiry form, and the enquiry is marked as theirs.
+              </p>
+              <QrDownloadButtons text={enquiryUrl} filename={`${workspace.name} x ${p.name} QR`} title={workspace.name} subtitle={`Scan to enquire · via ${p.name}`} />
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="min-w-0 break-all font-semibold text-ink-muted">{enquiryUrl}</span>
+                <button type="button" onClick={() => void copy(enquiryUrl, "Enquiry link")} className="inline-flex items-center gap-1 font-bold text-brand-strong">
+                  <Copy className="size-3.5" /> Copy
+                </button>
+              </div>
+            </div>
+          </div>
         </Card>
       )}
 

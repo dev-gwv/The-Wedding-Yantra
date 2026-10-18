@@ -160,8 +160,7 @@ export function salesRoutes(app: FastifyInstance, deps: { db: Db }) {
 
   app.patch<Ws>("/workspaces/:workspaceId/lead-form", async (request) => {
     const ctx = await member(request, request.params.workspaceId);
-    const { enabled } = parse(updateLeadFormInput, request.body);
-    return ok(await settings.setLeadFormEnabled(db, ctx, enabled));
+    return ok(await settings.updateLeadForm(db, ctx, parse(updateLeadFormInput, request.body)));
   });
 
   // Public: no sign-in. Anyone with the link can see the form and send an enquiry.

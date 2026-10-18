@@ -1,16 +1,17 @@
 "use client";
 
 import { usePublicForm, useSubmitPublicForm } from "@wedding-yantra/api-client/react";
-import { EVENT_LABELS, EVENT_TYPES, submitLeadFormInput, type EventType } from "@wedding-yantra/types";
-import { CircleCheck, Handshake, Heart, MailX } from "lucide-react";
+import { EVENT_LABELS, EVENT_TYPES, submitLeadFormInput, type EventType, type FormFieldKey } from "@wedding-yantra/types";
+import { Check, CircleCheck, ExternalLink, Handshake, Heart, MailX, MessageCircle } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { BusinessMark } from "@/components/app/business-mark";
 import { LogoMark } from "@/components/app/logo";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { PhoneField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { EmptyState, Notice } from "@/components/ui/misc";
 import { Splash } from "@/components/ui/spinner";
+import { cn } from "@/lib/cn";
 import { apiFieldErrors, errorMessage, validate } from "@/lib/errors";
 
 /** The page a business shares on Instagram or WhatsApp, or prints as a QR code. */
@@ -31,17 +32,55 @@ function PublicEnquiry() {
   const partnerCode = params.get("p")?.trim().slice(0, 20) || undefined;
   const form = usePublicForm(slug, ref, partnerCode);
   const submit = useSubmitPublicForm(slug);
-  const [values, setValues] = useState({ name: "", phone: "", eventType: "", eventDate: "", city: "", message: "", website: "" });
+  const [values, setValues] = useState({ name: "", phone: "", email: "", eventType: "", eventDate: "", city: "", guests: "", budget: "", message: "", website: "" });
+  const [services, setServices] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const set = (key: keyof typeof values) => (e: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
+  // Sent: on to WhatsApp (or the business's link) after a moment to read the thank-you.
+  const redirectUrl = submit.data?.redirectUrl ?? null;
+  useEffect(() => {
+    if (!redirectUrl) return;
+    const timer = setTimeout(() => window.location.assign(redirectUrl), 1500);
+    return () => clearTimeout(timer);
+  }, [redirectUrl]);
+
   if (form.isPending) return <Splash />;
+
+  const asked = new Map((form.data?.fields ?? []).map((f) => [f.key, f]));
+  const has = (key: FormFieldKey) => asked.has(key);
+  const label = (key: FormFieldKey, text: string) => (asked.get(key)?.required ? text : `${text} (optional)`);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const payload = { ...values, eventType: (values.eventType || null) as EventType | null, ...(ref && { ref }), ...(partnerCode && { p: partnerCode }) };
+    const count = (v: string) => (v.trim() === "" ? null : Number(v.replace(/[^\d]/g, "")));
+    const payload = {
+      ...values,
+      eventType: (values.eventType || null) as EventType | null,
+      guests: count(values.guests),
+      budget: count(values.budget),
+      ...(has("services") && { services }),
+      ...(ref && { ref }),
+      ...(partnerCode && { p: partnerCode }),
+    };
     const check = validate(submitLeadFormInput, payload);
-    if (check.errors) return setErrors(check.errors);
+    const missing: Record<string, string> = {};
+    const names: Record<FormFieldKey, keyof typeof payload> = {
+      email: "email",
+      event_type: "eventType",
+      event_date: "eventDate",
+      city: "city",
+      services: "services",
+      guests: "guests",
+      budget: "budget",
+      message: "message",
+    };
+    for (const f of form.data?.fields ?? []) {
+      const v = payload[names[f.key]];
+      if (f.required && (v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0)))
+        missing[names[f.key]] = f.key === "services" ? "Tick at least one" : "Please fill this in";
+    }
+    if (check.errors || Object.keys(missing).length) return setErrors({ ...missing, ...check.errors });
     setErrors({});
     try {
       await submit.mutateAsync(payload);
@@ -83,7 +122,19 @@ function PublicEnquiry() {
             </EmptyState>
           ) : submit.isSuccess ? (
             <EmptyState icon={CircleCheck} title="Thank you!" className="py-6">
-              {business.businessName} has your details and will get in touch with you soon.
+              {redirectUrl ? (
+                <>
+                  <span className="block">
+                    {business.goesTo === "link" ? `Taking you to ${business.businessName}…` : `Opening WhatsApp, so you can chat with ${business.businessName} right away…`}
+                  </span>
+                  <a href={redirectUrl} className={cn(buttonClass({ size: "lg" }), "mt-5")}>
+                    {business.goesTo === "link" ? <ExternalLink className="size-5" /> : <MessageCircle className="size-5" />}
+                    {business.goesTo === "link" ? "Continue" : "Chat on WhatsApp"}
+                  </a>
+                </>
+              ) : (
+                `${business.businessName} has your details and will get in touch with you soon.`
+              )}
             </EmptyState>
           ) : (
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
@@ -93,19 +144,66 @@ function PublicEnquiry() {
               </div>
               <TextField label="Your name" value={values.name} onChange={set("name")} error={errors.name} autoComplete="name" />
               <PhoneField label="Mobile number" value={values.phone} onChange={set("phone")} error={errors.phone} hint="We'll reach you on WhatsApp or a call." />
-              <div className="grid grid-cols-2 gap-3">
-                <SelectField label="Event" value={values.eventType} onChange={set("eventType")} error={errors.eventType}>
-                  <option value="">Choose</option>
-                  {EVENT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {EVENT_LABELS[t]}
-                    </option>
-                  ))}
-                </SelectField>
-                <TextField label="Date" type="date" value={values.eventDate} onChange={set("eventDate")} error={errors.eventDate} />
-              </div>
-              <TextField label="City" value={values.city} onChange={set("city")} error={errors.city} autoComplete="address-level2" />
-              <TextAreaField label="Anything else?" value={values.message} onChange={set("message")} error={errors.message} placeholder="Venue, number of people, what you're looking for" />
+              {has("email") && (
+                <TextField label={label("email", "Email")} type="email" value={values.email} onChange={set("email")} error={errors.email} autoComplete="email" inputMode="email" />
+              )}
+              {(has("event_type") || has("event_date")) && (
+                <div className={cn("grid gap-3", has("event_type") && has("event_date") && "grid-cols-2")}>
+                  {has("event_type") && (
+                    <SelectField label={label("event_type", "Event")} value={values.eventType} onChange={set("eventType")} error={errors.eventType}>
+                      <option value="">Choose</option>
+                      {EVENT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {EVENT_LABELS[t]}
+                        </option>
+                      ))}
+                    </SelectField>
+                  )}
+                  {has("event_date") && <TextField label={label("event_date", "Date")} type="date" value={values.eventDate} onChange={set("eventDate")} error={errors.eventDate} />}
+                </div>
+              )}
+              {has("city") && <TextField label={label("city", "City")} value={values.city} onChange={set("city")} error={errors.city} autoComplete="address-level2" />}
+              {has("services") && business.services.length > 0 && (
+                <fieldset>
+                  <legend className="mb-2 text-sm font-semibold">{label("services", "What do you need?")}</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {business.services.map((x) => {
+                      const on = services.includes(x);
+                      return (
+                        <button
+                          key={x}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setServices((list) => (on ? list.filter((y) => y !== x) : [...list, x]))}
+                          className={cn(
+                            "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition",
+                            on ? "border-brand bg-brand text-on-brand" : "border-line bg-surface hover:border-sun-300",
+                          )}
+                        >
+                          {on && <Check className="size-4" />} {x}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-xs text-ink-muted">Tick all that apply.</p>
+                  {errors.services && <p className="mt-1 text-sm font-semibold text-danger">{errors.services}</p>}
+                </fieldset>
+              )}
+              {(has("guests") || has("budget")) && (
+                <div className={cn("grid gap-3", has("guests") && has("budget") && "grid-cols-2")}>
+                  {has("guests") && <TextField label={label("guests", "Guests")} inputMode="numeric" value={values.guests} onChange={set("guests")} error={errors.guests} placeholder="300" />}
+                  {has("budget") && <TextField label={label("budget", "Budget (₹)")} inputMode="numeric" value={values.budget} onChange={set("budget")} error={errors.budget} placeholder="5,00,000" />}
+                </div>
+              )}
+              {has("message") && (
+                <TextAreaField
+                  label={label("message", "Anything else?")}
+                  value={values.message}
+                  onChange={set("message")}
+                  error={errors.message}
+                  placeholder="Venue, number of people, what you're looking for"
+                />
+              )}
               {/* Hidden from people. Bots fill it in, and their enquiries are ignored. */}
               <input type="text" name="website" value={values.website} onChange={set("website")} tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
               {errors._ && <Notice tone="danger">{errors._}</Notice>}

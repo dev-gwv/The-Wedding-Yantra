@@ -2,7 +2,8 @@
 
 import { useCreatePartner } from "@wedding-yantra/api-client/react";
 import type { Partner, PartnerSummary, VendorSummary } from "@wedding-yantra/types";
-import { ChevronRight, Download } from "lucide-react";
+import { firstName, whatsappLink } from "@wedding-yantra/core";
+import { ChevronRight, Download, Eye } from "lucide-react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
@@ -18,6 +19,16 @@ const origin = () => (typeof window === "undefined" ? "" : window.location.origi
 export function enquiryFormUrl(slug: string | null | undefined, partnerCode?: string) {
   if (!slug) return "";
   return `${origin()}/f/${slug}${partnerCode ? `?p=${partnerCode}` : ""}`;
+}
+
+/** The partner's private page: every enquiry from their QR code and where it stands. */
+export function partnerPageUrl(viewToken: string | null) {
+  return viewToken ? `${origin()}/p/${viewToken}` : "";
+}
+
+/** The WhatsApp message that sends a partner their page. */
+export function partnerPageMessage(businessName: string, partnerName: string, url: string) {
+  return `Hi ${firstName(partnerName)}, here is your page for enquiries that come to ${businessName} through your QR code. You can see each one and where it stands: ${url}`;
 }
 
 /** What's printed under a partner's QR code. */
@@ -78,6 +89,7 @@ export function PartnerQrRow({ p, slug }: { p: PartnerSummary; slug: string | nu
   const [busy, setBusy] = useState(false);
   const url = enquiryFormUrl(slug, p.code);
   const print = partnerQrText(workspace.name, p);
+  const page = partnerPageUrl(p.viewToken);
 
   async function download() {
     setBusy(true);
@@ -101,6 +113,18 @@ export function PartnerQrRow({ p, slug }: { p: PartnerSummary; slug: string | nu
         </span>
         <ChevronRight className="hidden size-4 shrink-0 text-ink-subtle sm:block" />
       </Link>
+      {page && (
+        <a
+          href={whatsappLink(partnerPageMessage(workspace.name, p.name, page), p.phone ?? undefined)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Send ${p.name} their page on WhatsApp`}
+          title="Send their page: every enquiry from their QR code"
+          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line text-brand-strong hover:bg-cream"
+        >
+          <Eye className="size-4" />
+        </a>
+      )}
       {url && (
         <button
           type="button"

@@ -54,6 +54,8 @@ describe("new enquiry alerts", () => {
   it("the public form tells the owner once per enquiry, and a repeat once more", async () => {
     const { owner, ws } = await business("761");
     const { slug } = (await call<{ slug: string }>(t.app, "GET", `/workspaces/${ws}/lead-form`, { token: owner })).body.data;
+    // City isn't asked unless the business adds it.
+    await call(t.app, "PATCH", `/workspaces/${ws}/lead-form`, { token: owner, body: { fields: [{ key: "event_type" }, { key: "event_date" }, { key: "city" }, { key: "message" }] } });
 
     await call(t.app, "POST", `/public/forms/${slug}`, {
       body: { name: "Neha Sharma", phone: "9876512345", eventType: "wedding", eventDate: "2027-01-20", city: "Jaipur" },
